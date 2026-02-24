@@ -61,11 +61,11 @@ Based on your analysis, create TWO detailed prompts for generating professional 
 
 CRITICAL: Both prompts must describe the EXACT SAME person from the photo. The face in the generated image must be recognizable as this person. Lead each prompt with a detailed facial description so the AI image model preserves identity and likeness.
 
-Respond in EXACTLY this JSON format:
+Respond with ONLY one valid JSON object (no markdown, no \`\`\` code fences, no extra text). Use double quotes for keys and strings; escape any " inside strings as \". Required keys: description, medicalPrompt, corporatePrompt. Example structure:
 {
-  "description": "Brief description of the person in the photo",
-  "medicalPrompt": "Full detailed prompt for medical portrait (start with precise face description)...",
-  "corporatePrompt": "Full detailed prompt for corporate portrait (start with precise face description)..."
+  "description": "Brief description of the person",
+  "medicalPrompt": "Full prompt for medical portrait...",
+  "corporatePrompt": "Full prompt for corporate portrait..."
 }`
 
     // Анализ фото: Gemini 2.5 Flash (запрос через fetchWithProxy для поддержки VPN/прокси)
@@ -92,6 +92,16 @@ Respond in EXACTLY this JSON format:
             temperature: 0.4,
             topP: 0.95,
             maxOutputTokens: 2048,
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "object",
+              properties: {
+                description: { type: "string", description: "Brief description of the person in the photo" },
+                medicalPrompt: { type: "string", description: "Full detailed prompt for medical portrait" },
+                corporatePrompt: { type: "string", description: "Full detailed prompt for corporate portrait" },
+              },
+              required: ["description", "medicalPrompt", "corporatePrompt"],
+            },
           },
         }),
       }
@@ -130,21 +140,59 @@ Respond in EXACTLY this JSON format:
       )
     }
 
-    // Parse JSON from response (handle markdown code blocks)
-    let parsed
-    try {
-      const jsonMatch = textContent.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        parsed = JSON.parse(jsonMatch[0])
-      } else {
-        throw new Error("No JSON found in response")
+    // Parse JSON: extract object respecting strings (braces inside "..." don't count)
+    function extractJsonObject(s: string): string | null {
+      const start = s.indexOf("{")
+      if (start === -1) return null
+      let depth = 0
+      let inString = false
+      let escape = false
+      let quote = '"'
+      for (let i = start; i < s.length; i++) {
+        const c = s[i]
+        if (escape) {
+          escape = false
+          continue
+        }
+        if (c === "\\" && inString) {
+          escape = true
+          continue
+        }
+        if (!inString) {
+          if (c === "{") depth++
+          else if (c === "}") {
+            depth--
+            if (depth === 0) return s.slice(start, i + 1)
+          } else if (c === '"' || c === "'") {
+            inString = true
+            quote = c
+          }
+          continue
+        }
+        if (c === quote) inString = false
       }
-    } catch {
-      logger.error("ANALYZE", "Не удалось разобрать ответ Gemini", { excerpt: textContent.slice(0, 300) })
-      return NextResponse.json(
-        { error: "Не удалось разобрать результат анализа" },
-        { status: 500 }
-      )
+      return null
+    }
+
+    let raw = textContent.trim()
+    const codeBlock = raw.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (codeBlock) raw = codeBlock[1].trim()
+    const jsonStr = extractJsonObject(raw) ?? raw.slice(raw.indexOf("{"))
+    let parsed: { description?: string; medicalPrompt?: string; corporatePrompt?: string }
+    try {
+      parsed = JSON.parse(jsonStr)
+    } catch (e1) {
+      try {
+        const fixed = jsonStr.replace(/,(\s*[}\]])/g, "$1")
+        parsed = JSON.parse(fixed)
+      } catch (e2) {
+        const msg = e1 instanceof Error ? e1.message : String(e1)
+        logger.error("ANALYZE", "Не удалось разобрать ответ Gemini", { error: msg, excerpt: textContent.slice(0, 600) })
+        return NextResponse.json(
+          { error: "Не удалось разобрать результат анализа" },
+          { status: 500 }
+        )
+      }
     }
 
     return NextResponse.json({

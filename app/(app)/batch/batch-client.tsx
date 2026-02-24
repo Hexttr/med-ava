@@ -30,7 +30,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { EmployeeCards } from "@/components/employee-cards"
 import type { Organization, OrganizationEmployee } from "@/lib/types"
-import { getAllOrganizations, getOrganizationById } from "@/lib/organizations-store"
+import { fetchAllOrganizations, fetchOrganizationById } from "@/lib/organizations-api"
+import { addGalleryItem } from "@/lib/gallery-api"
 
 interface BatchItem {
   id: string
@@ -84,24 +85,30 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    setOrganizations(getAllOrganizations())
+    fetchAllOrganizations().then(setOrganizations).catch(() => {})
   }, [])
 
   useEffect(() => {
     if (mode === "organization" && selectedOrganizationId) {
-      const org = getOrganizationById(selectedOrganizationId)
-      setOrgEmployees(org?.employees ?? [])
-      setItems(
-        (org?.employees ?? []).map((e) => ({
-          id: e.id,
-          name: e.name,
-          status: "pending" as const,
-          medicalUrl: null,
-          corporateUrl: null,
-          photoUrl: e.photoUrl,
-          preview: e.photoUrl,
-        }))
-      )
+      fetchOrganizationById(selectedOrganizationId).then((org) => {
+        if (!org) {
+          setOrgEmployees([])
+          setItems([])
+          return
+        }
+        setOrgEmployees(org.employees)
+        setItems(
+          org.employees.map((e) => ({
+            id: e.id,
+            name: e.name,
+            status: "pending" as const,
+            medicalUrl: null,
+            corporateUrl: null,
+            photoUrl: e.photoUrl,
+            preview: e.photoUrl,
+          }))
+        )
+      })
     } else if (mode === "organization") {
       setOrgEmployees([])
       setItems([])
@@ -249,19 +256,13 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
 
         if (medicalUrl && corporateUrl) {
           try {
-            const GALLERY_KEY = "eam_gallery"
-            const stored = sessionStorage.getItem(GALLERY_KEY)
-            const galleryItems = stored ? JSON.parse(stored) : []
-            galleryItems.unshift({
-              id: crypto.randomUUID(),
+            await addGalleryItem({
               name: item.name,
               medicalUrl,
               corporateUrl,
-              createdAt: Date.now(),
               organizationId: orgId || undefined,
-              organizationName: orgName,
+              organizationName: orgName ?? undefined,
             })
-            sessionStorage.setItem(GALLERY_KEY, JSON.stringify(galleryItems))
           } catch {
             // ignore
           }

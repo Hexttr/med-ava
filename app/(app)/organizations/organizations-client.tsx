@@ -13,6 +13,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
 import {
@@ -27,24 +28,28 @@ import {
 } from "@/components/ui/alert-dialog"
 import type { Organization, OrganizationEmployee } from "@/lib/types"
 import {
-  getAllOrganizations,
-  getOrganizationById,
-  createOrganization,
-  updateOrganization,
-  removeOrganization,
-} from "@/lib/organizations-store"
+  fetchAllOrganizations,
+  createOrganizationApi,
+  updateOrganizationApi,
+  deleteOrganizationApi,
+} from "@/lib/organizations-api"
+import { compressImageForStorage } from "@/lib/image-compress"
 
-function fileToDataUrl(file: File): Promise<string> {
+async function urlToDataUrl(url: string): Promise<string> {
+  if (url.startsWith("data:")) return url
+  const res = await fetch(url)
+  const blob = await res.blob()
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(reader.result as string)
     reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
+    reader.readAsDataURL(blob)
   })
 }
 
 export function OrganizationsClient() {
   const [organizations, setOrganizations] = useState<Organization[]>([])
+  const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formName, setFormName] = useState("")
@@ -53,8 +58,15 @@ export function OrganizationsClient() {
   const [formEmployees, setFormEmployees] = useState<OrganizationEmployee[]>([])
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
-  const loadOrgs = useCallback(() => {
-    setOrganizations(getAllOrganizations())
+  const loadOrgs = useCallback(async () => {
+    try {
+      const list = await fetchAllOrganizations()
+      setOrganizations(list)
+    } catch {
+      toast.error("Не удалось загрузить организации")
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -83,7 +95,7 @@ export function OrganizationsClient() {
     const newEmployees: OrganizationEmployee[] = []
     for (const file of files) {
       try {
-        const photoUrl = await fileToDataUrl(file)
+        const photoUrl = await compressImageForStorage(file)
         const name = file.name.replace(/\.[^.]+$/, "").trim() || "Сотрудник"
         newEmployees.push({
           id: crypto.randomUUID(),
@@ -110,47 +122,69 @@ export function OrganizationsClient() {
     setFormEmployees((prev) => prev.filter((e) => e.id !== id))
   }
 
-  function applySave(name: string, photoUrl: string | null) {
-    if (editingId) {
-      updateOrganization(editingId, { name, photoUrl, employees: formEmployees })
-      loadOrgs()
-      setDialogOpen(false)
-      toast.success("Организация обновлена")
-    } else {
-      const org = createOrganization({ name, photoUrl })
-      if (formEmployees.length) {
-        updateOrganization(org.id, { employees: formEmployees })
+  async function applySave(
+    name: string,
+    photoUrl: string | null,
+    employees: OrganizationEmployee[]
+  ) {
+    try {
+      const employeesList = Array.isArray(employees) ? employees : []
+      const compressedEmployees = await Promise.all(
+        employeesList.map(async (e) => {
+          const isDataUrl = e.photoUrl.startsWith("data:")
+          const photo = isDataUrl
+            ? await compressImageForStorage(e.photoUrl).catch(() => e.photoUrl)
+            : await urlToDataUrl(e.photoUrl)
+          return { ...e, photoUrl: photo }
+        })
+      )
+      if (editingId) {
+        await updateOrganizationApi(editingId, { name, photoUrl, employees: compressedEmployees })
+        await loadOrgs()
+        setDialogOpen(false)
+        toast.success("Организация обновлена")
+      } else {
+        await createOrganizationApi({ name, photoUrl, employees: compressedEmployees })
+        await loadOrgs()
+        setDialogOpen(false)
+        toast.success("Организация создана")
       }
-      loadOrgs()
-      setDialogOpen(false)
-      toast.success("Организация создана")
+    } catch (e) {
+      console.error("applySave failed", e)
+      toast.error("Не удалось сохранить. Проверьте консоль (F12).")
     }
   }
 
-  function handleSave() {
+  async function handleSave() {
     const name = formName.trim()
     if (!name) {
       toast.error("Введите название организации")
       return
     }
 
+    const employeesToSave = Array.isArray(formEmployees) ? [...formEmployees] : []
+
+    let photoUrlToSave: string | null = formPhotoUrl
     if (formPhotoFile) {
-      const reader = new FileReader()
-      reader.onload = () => {
-        applySave(name, reader.result as string)
+      try {
+        photoUrlToSave = await compressImageForStorage(formPhotoFile)
+      } catch {
+        toast.error("Не удалось обработать фото организации")
+        return
       }
-      reader.readAsDataURL(formPhotoFile)
-    } else {
-      applySave(name, formPhotoUrl)
     }
+    await applySave(name, photoUrlToSave, employeesToSave)
   }
 
-  function handleConfirmDelete() {
-    if (deleteId) {
-      removeOrganization(deleteId)
-      loadOrgs()
+  async function handleConfirmDelete() {
+    if (!deleteId) return
+    try {
+      await deleteOrganizationApi(deleteId)
+      await loadOrgs()
       setDeleteId(null)
       toast.success("Организация удалена")
+    } catch {
+      toast.error("Не удалось удалить организацию")
     }
   }
 
@@ -169,6 +203,16 @@ export function OrganizationsClient() {
     setFormPhotoUrl(null)
     setFormPhotoFile(null)
   }, [formPhotoUrl, formPhotoFile])
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-16">
+          <p className="text-sm text-muted-foreground">Загрузка...</p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   if (organizations.length === 0) {
     return (
@@ -195,6 +239,7 @@ export function OrganizationsClient() {
           <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Новая организация</DialogTitle>
+              <DialogDescription className="sr-only">Форма создания организации и списка сотрудников</DialogDescription>
             </DialogHeader>
             <OrgForm
               formName={formName}
@@ -270,6 +315,7 @@ export function OrganizationsClient() {
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingId ? "Редактирование организации" : "Новая организация"}</DialogTitle>
+            <DialogDescription className="sr-only">Форма организации и списка сотрудников</DialogDescription>
           </DialogHeader>
           <OrgForm
             formName={formName}

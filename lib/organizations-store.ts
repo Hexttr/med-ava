@@ -6,18 +6,21 @@ function getStored(): Organization[] {
   if (typeof window === "undefined") return []
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
   }
 }
 
-function setStored(items: Organization[]) {
+function setStored(items: Organization[]): void {
   if (typeof window === "undefined") return
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
-  } catch {
-    // quota or unavailable
+  } catch (e) {
+    console.error("organizations store: setStored failed", e)
+    throw e
   }
 }
 
@@ -30,15 +33,16 @@ export function getOrganizationById(id: string): Organization | null {
 }
 
 export function createOrganization(
-  data: Pick<Organization, "name" | "photoUrl">
+  data: Pick<Organization, "name" | "photoUrl"> & { employees?: OrganizationEmployee[] }
 ): Organization {
   const list = getStored()
+  const employees = Array.isArray(data.employees) ? data.employees : []
   const now = Date.now()
   const org: Organization = {
     id: crypto.randomUUID(),
-    name: data.name.trim(),
+    name: String(data.name ?? "").trim(),
     photoUrl: data.photoUrl ?? null,
-    employees: [],
+    employees,
     createdAt: now,
     updatedAt: now,
   }

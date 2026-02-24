@@ -13,8 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import type { GalleryItem } from "@/lib/types"
-
-const GALLERY_KEY = "eam_gallery"
+import { fetchGallery, addGalleryItem, deleteGalleryItem } from "@/lib/gallery-api"
 
 function sanitizeFileName(name: string): string {
   return name.replace(/[/\\:*?"<>|]/g, "_").trim() || "portrait"
@@ -42,54 +41,51 @@ function getExtension(mime: string): string {
 export function useGallery() {
   const [items, setItems] = useState<GalleryItem[]>([])
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     try {
-      const stored = sessionStorage.getItem(GALLERY_KEY)
-      if (stored) setItems(JSON.parse(stored))
+      const list = await fetchGallery()
+      setItems(list)
     } catch {
-      // ignore
+      setItems([])
     }
   }, [])
 
-  function addItem(item: Omit<GalleryItem, "id" | "createdAt">) {
-    const newItem: GalleryItem = {
-      ...item,
-      id: crypto.randomUUID(),
-      createdAt: Date.now(),
-    }
-    const updated = [newItem, ...items]
-    setItems(updated)
-    try {
-      sessionStorage.setItem(GALLERY_KEY, JSON.stringify(updated))
-    } catch {
-      // sessionStorage full or unavailable
-    }
+  useEffect(() => {
+    load()
+  }, [load])
+
+  async function addItem(item: Omit<GalleryItem, "id" | "createdAt">) {
+    const newItem = await addGalleryItem({
+      name: item.name,
+      medicalUrl: item.medicalUrl,
+      corporateUrl: item.corporateUrl,
+      organizationId: item.organizationId,
+      organizationName: item.organizationName,
+    })
+    await load()
     return newItem
   }
 
   function clearGallery() {
     setItems([])
-    try {
-      sessionStorage.removeItem(GALLERY_KEY)
-    } catch {
-      // ignore
-    }
   }
 
-  return { items, addItem, clearGallery }
+  return { items, addItem, clearGallery, load }
 }
 
 export function GalleryClient() {
   const [items, setItems] = useState<GalleryItem[]>([])
+  const [loading, setLoading] = useState(true)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
-  const loadItems = useCallback(() => {
+  const loadItems = useCallback(async () => {
     try {
-      const stored = sessionStorage.getItem(GALLERY_KEY)
-      if (stored) setItems(JSON.parse(stored))
-      else setItems([])
+      const list = await fetchGallery()
+      setItems(list)
     } catch {
       setItems([])
+    } finally {
+      setLoading(false)
     }
   }, [])
 
@@ -97,16 +93,14 @@ export function GalleryClient() {
     loadItems()
   }, [loadItems])
 
-  function removeItem(id: string) {
-    const updated = items.filter((item) => item.id !== id)
-    setItems(updated)
+  async function removeItem(id: string) {
     try {
-      if (updated.length) sessionStorage.setItem(GALLERY_KEY, JSON.stringify(updated))
-      else sessionStorage.removeItem(GALLERY_KEY)
+      await deleteGalleryItem(id)
+      setItems((prev) => prev.filter((item) => item.id !== id))
+      toast.success("Карточка удалена")
     } catch {
-      // ignore
+      toast.error("Не удалось удалить")
     }
-    toast.success("Карточка удалена")
   }
 
   async function downloadItem(item: GalleryItem) {
@@ -164,6 +158,16 @@ export function GalleryClient() {
     } catch {
       toast.error("Не удалось создать архив")
     }
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-16">
+          <p className="text-sm text-muted-foreground">Загрузка галереи...</p>
+        </CardContent>
+      </Card>
+    )
   }
 
   const singleItems = useMemo(

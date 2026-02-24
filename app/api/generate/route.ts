@@ -16,7 +16,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { prompt, style } = await request.json()
+    const body = await request.json()
+    const { prompt, style, referencePhotoBase64, referencePhotoMimeType } = body as {
+      prompt?: string
+      style?: string
+      referencePhotoBase64?: string
+      referencePhotoMimeType?: string
+    }
 
     if (!prompt) {
       return NextResponse.json(
@@ -25,21 +31,37 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const enhancedPrompt = `Professional studio headshot portrait photo. ${prompt}. CRITICAL: The face in the image MUST match the person described above exactly—same face shape, same eyes, same skin tone, same hair, same recognizable identity. Do not alter or idealize the face; preserve maximum likeness to the described person. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture. ${
+    const settingInstruction =
       style === "medical"
-        ? "Clean white/light gray backdrop, medical professional aesthetic."
-        : "Dark corporate backdrop, business professional aesthetic."
-    }`
+        ? "Show this person in a crisp white medical doctor's coat. Clean, well-lit studio backdrop in light gray or white. Professional headshot, shoulders up. Warm, approachable expression."
+        : "Show this person in professional business attire (dark suit/blazer). Clean corporate background in dark navy or charcoal gray. Professional headshot, shoulders up. Confident, professional expression."
+
+    const hasReferencePhoto = Boolean(referencePhotoBase64?.trim())
+
+    const geminiImagePrompt = hasReferencePhoto
+      ? `The attached image is the REFERENCE PHOTO of the person. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON — the face must be the same person, same identity, same likeness. Do NOT change the face, do NOT generate a different person. Only change the setting and clothing as follows: ${settingInstruction}. Keep the person's face, skin tone, hair, and all facial features identical to the reference. Output the generated portrait image.`
+      : `Professional studio headshot portrait photo. ${prompt}. CRITICAL: The face in the image MUST match the person described above exactly. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture. ${
+          style === "medical"
+            ? "Clean white/light gray backdrop, medical professional aesthetic."
+            : "Dark corporate backdrop, business professional aesthetic."
+        }`
 
     let gemini3ErrorText = ""
 
+    const parts: { text?: string; inlineData?: { mimeType: string; data: string } }[] = []
+    if (hasReferencePhoto) {
+      parts.push({
+        inlineData: {
+          mimeType: referencePhotoMimeType || "image/jpeg",
+          data: referencePhotoBase64!.replace(/^data:image\/\w+;base64,/, ""),
+        },
+      })
+    }
+    parts.push({ text: `Generate a professional portrait photo. ${geminiImagePrompt}` })
+
     // 1) Gemini 3 Pro Image (Nano Banana Pro) — основная модель
     const gemini3Body = {
-      contents: [
-        {
-          parts: [{ text: `Generate a professional portrait photo based on this description: ${enhancedPrompt}` }],
-        },
-      ],
+      contents: [{ parts }],
       generationConfig: {
         responseModalities: ["TEXT", "IMAGE"],
         imageConfig: { aspectRatio: "3:4" },
@@ -70,14 +92,19 @@ export async function POST(request: NextRequest) {
       logger.warn("GENERATE", "Gemini 3 Pro Image не вернул изображение", { status: gemini3Response.status, body: gemini3ErrorText.slice(0, 400) })
     }
 
-    // 2) Imagen 3 (запасной вариант)
+    // 2) Imagen 3 (запасной вариант; не поддерживает эталонное фото — только текст)
+    const imagenPrompt = `Professional studio headshot portrait photo. ${prompt}. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture. ${
+      style === "medical"
+        ? "Clean white/light gray backdrop, medical professional aesthetic."
+        : "Dark corporate backdrop, business professional aesthetic."
+    }`
     const imagenResponse = await fetchWithProxy(
       `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${geminiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          instances: [{ prompt: enhancedPrompt }],
+          instances: [{ prompt: imagenPrompt }],
           parameters: {
             sampleCount: 1,
             aspectRatio: "3:4",

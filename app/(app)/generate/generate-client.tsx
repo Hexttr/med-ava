@@ -20,7 +20,8 @@ import { PortraitCard } from "@/components/portrait-card"
 import { Progress } from "@/components/ui/progress"
 import type { ProcessingStatus } from "@/lib/types"
 import type { Organization } from "@/lib/types"
-import { getAllOrganizations, addEmployeeToOrganization } from "@/lib/organizations-store"
+import { fetchAllOrganizations, addEmployeeToOrganizationApi } from "@/lib/organizations-api"
+import { addGalleryItem } from "@/lib/gallery-api"
 
 interface GenerateClientProps {
   hasApiKey: boolean
@@ -40,7 +41,7 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>("")
 
   useEffect(() => {
-    setOrganizations(getAllOrganizations())
+    fetchAllOrganizations().then(setOrganizations).catch(() => {})
   }, [])
 
   const handleFileSelect = useCallback((selectedFile: File) => {
@@ -170,30 +171,24 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
         ? organizations.find((o) => o.id === selectedOrganizationId)
         : null
 
-      // Сохраняем в галерею (sessionStorage)
+      // Сохраняем в галерею (API / SQLite)
       try {
-        const GALLERY_KEY = "eam_gallery"
-        const stored = sessionStorage.getItem(GALLERY_KEY)
-        const items = stored ? JSON.parse(stored) : []
-        items.unshift({
-          id: crypto.randomUUID(),
+        await addGalleryItem({
           name,
           medicalUrl: medicalData.imageUrl,
           corporateUrl: corporateData.imageUrl,
-          createdAt: Date.now(),
           organizationId: selectedOrg?.id,
           organizationName: selectedOrg?.name,
         })
-        sessionStorage.setItem(GALLERY_KEY, JSON.stringify(items))
       } catch {
-        // sessionStorage переполнен или недоступен
+        // игнорируем
       }
 
       // Если выбрана организация — добавляем сотрудника в неё (имя + исходное фото)
       if (selectedOrganizationId && file) {
         try {
           const photoUrl = await fileToDataUrl(file)
-          addEmployeeToOrganization(selectedOrganizationId, { name, photoUrl })
+          await addEmployeeToOrganizationApi(selectedOrganizationId, { name, photoUrl })
         } catch {
           // игнорируем
         }

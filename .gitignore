@@ -9,3 +9,6 @@ node_modules/
 .env
 .env*.local
 .DS_Store
+
+# SQLite and uploads (local data)
+data/
