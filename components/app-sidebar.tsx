@@ -8,6 +8,7 @@ import {
   Settings,
   LayoutDashboard,
   ImageIcon,
+  Stethoscope,
 } from "lucide-react"
 
 import {
@@ -44,6 +45,11 @@ const navItems = [
     title: "Галерея",
     href: "/gallery",
     icon: ImageIcon,
+  },
+  {
+    title: "Диагностика сети",
+    href: "/diagnostic",
+    icon: Stethoscope,
   },
 ]
 

@@ -1,5 +1,20 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getGeminiKey } from "@/lib/settings"
+import { fetchWithProxy } from "@/lib/fetch-proxy"
+import { logger } from "@/lib/logger"
+
+export const runtime = "nodejs"
+export const maxDuration = 60
+
+function toBase64(bytes: ArrayBuffer): string {
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(bytes).toString("base64")
+  }
+  const arr = new Uint8Array(bytes)
+  let binary = ""
+  for (let i = 0; i < arr.length; i++) binary += String.fromCharCode(arr[i])
+  return typeof btoa !== "undefined" ? btoa(binary) : ""
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,20 +27,19 @@ export async function POST(request: NextRequest) {
     }
 
     const formData = await request.formData()
-    const photo = formData.get("photo") as File | null
-    const employeeName = (formData.get("employeeName") as string) || "Employee"
+    const photo = formData.get("photo") as File | Blob | null
+    const employeeName = (formData.get("employeeName") as string) || "Сотрудник"
 
-    if (!photo) {
+    if (!photo || typeof (photo as Blob).arrayBuffer !== "function") {
       return NextResponse.json(
         { error: "Фото не загружено" },
         { status: 400 }
       )
     }
 
-    // Convert file to base64
-    const bytes = await photo.arrayBuffer()
-    const base64 = Buffer.from(bytes).toString("base64")
-    const mimeType = photo.type || "image/jpeg"
+    const bytes = await (photo as Blob).arrayBuffer()
+    const base64 = toBase64(bytes)
+    const mimeType = (photo as File).type || "image/jpeg"
 
     // Call Gemini API for analysis
     const analysisPrompt = `You are a professional portrait photography prompt engineer for an AI image generation system called NanoBanano.
@@ -52,8 +66,9 @@ Respond in EXACTLY this JSON format:
   "corporatePrompt": "Full detailed prompt for corporate portrait..."
 }`
 
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+    // Анализ фото: Gemini 2.5 Flash (запрос через fetchWithProxy для поддержки VPN/прокси)
+    const geminiResponse = await fetchWithProxy(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -81,11 +96,25 @@ Respond in EXACTLY this JSON format:
     )
 
     if (!geminiResponse.ok) {
-      const err = await geminiResponse.text()
-      console.error("[v0] Gemini API error:", err)
+      const errText = await geminiResponse.text()
+      logger.error("ANALYZE", "Gemini API вернул ошибку", {
+        status: geminiResponse.status,
+        body: errText.slice(0, 800),
+      })
+      let userMessage = "Не удалось проанализировать фото. Проверьте API-ключ."
+      try {
+        const errJson = JSON.parse(errText)
+        const msg = errJson?.error?.message || errJson?.message
+        if (msg) userMessage = msg
+        if (/location is not supported|position|region|country not supported/i.test(String(msg))) {
+          userMessage += " Смените сервер VPN в HAPP на США (US) или Великобританию (UK)."
+        }
+      } catch {
+        if (errText.length < 200) userMessage = errText
+      }
       return NextResponse.json(
-        { error: "Не удалось проанализировать фото. Проверьте API-ключ." },
-        { status: 500 }
+        { error: userMessage },
+        { status: geminiResponse.status >= 400 && geminiResponse.status < 500 ? geminiResponse.status : 500 }
       )
     }
 
@@ -109,7 +138,7 @@ Respond in EXACTLY this JSON format:
         throw new Error("No JSON found in response")
       }
     } catch {
-      console.error("[v0] Failed to parse Gemini response:", textContent)
+      logger.error("ANALYZE", "Не удалось разобрать ответ Gemini", { excerpt: textContent.slice(0, 300) })
       return NextResponse.json(
         { error: "Не удалось разобрать результат анализа" },
         { status: 500 }
@@ -122,9 +151,10 @@ Respond in EXACTLY this JSON format:
       corporatePrompt: parsed.corporatePrompt || "Professional corporate portrait",
     })
   } catch (error) {
-    console.error("[v0] Analysis error:", error)
+    const message = error instanceof Error ? error.message : String(error)
+    logger.error("ANALYZE", "Исключение при анализе", { error: message, stack: (error as Error)?.stack?.slice(0, 400) })
     return NextResponse.json(
-      { error: "Внутренняя ошибка при анализе" },
+      { error: process.env.NODE_ENV === "development" ? message : "Внутренняя ошибка при анализе" },
       { status: 500 }
     )
   }

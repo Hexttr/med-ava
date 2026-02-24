@@ -70,8 +70,9 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
       })
 
       if (!analyzeRes.ok) {
-        const err = await analyzeRes.json()
-        throw new Error(err.error || "Ошибка анализа")
+        const err = await analyzeRes.json().catch(() => ({}))
+        const msg = typeof err?.error === "string" ? err.error : "Ошибка анализа"
+        throw new Error(msg)
       }
 
       const analysis = await analyzeRes.json()
@@ -120,6 +121,25 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
       setCorporateUrl(corporateData.imageUrl)
       setProgress(100)
       setStatus("complete")
+
+      // Сохраняем в галерею (sessionStorage)
+      try {
+        const GALLERY_KEY = "eam_gallery"
+        const stored = sessionStorage.getItem(GALLERY_KEY)
+        const items = stored ? JSON.parse(stored) : []
+        const name = employeeName.trim() || "Сотрудник"
+        items.unshift({
+          id: crypto.randomUUID(),
+          name,
+          medicalUrl: medicalData.imageUrl,
+          corporateUrl: corporateData.imageUrl,
+          createdAt: Date.now(),
+        })
+        sessionStorage.setItem(GALLERY_KEY, JSON.stringify(items))
+      } catch {
+        // sessionStorage переполнен или недоступен
+      }
+
       toast.success("Портреты успешно сгенерированы")
     } catch (error) {
       setStatus("error")

@@ -152,6 +152,24 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
               : p
           )
         )
+
+        if (medicalUrl && corporateUrl) {
+          try {
+            const GALLERY_KEY = "eam_gallery"
+            const stored = sessionStorage.getItem(GALLERY_KEY)
+            const items = stored ? JSON.parse(stored) : []
+            items.unshift({
+              id: crypto.randomUUID(),
+              name: item.name,
+              medicalUrl,
+              corporateUrl,
+              createdAt: Date.now(),
+            })
+            sessionStorage.setItem(GALLERY_KEY, JSON.stringify(items))
+          } catch {
+            // ignore
+          }
+        }
       } catch (error) {
         setItems((prev) =>
           prev.map((p) =>
