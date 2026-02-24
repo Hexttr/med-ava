@@ -19,7 +19,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Select,
   SelectContent,
@@ -27,9 +26,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Input } from "@/components/ui/input"
-import { EmployeeCards } from "@/components/employee-cards"
 import type { Organization, OrganizationEmployee } from "@/lib/types"
+import { BatchPortraitCard } from "@/components/batch-portrait-card"
 import { fetchAllOrganizations, fetchOrganizationById } from "@/lib/organizations-api"
 import { addGalleryItem } from "@/lib/gallery-api"
 
@@ -122,7 +120,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         id: crypto.randomUUID(),
         file,
         preview: URL.createObjectURL(file),
-        name: file.name.replace(/\.[^.]+$/, ""),
+        name: "",
         status: "pending" as const,
         medicalUrl: null,
         corporateUrl: null,
@@ -169,7 +167,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         id: crypto.randomUUID(),
         file,
         preview: URL.createObjectURL(file),
-        name: file.name.replace(/\.[^.]+$/, "").trim() || "Сотрудник",
+        name: "",
         status: "pending" as const,
         medicalUrl: null,
         corporateUrl: null,
@@ -183,6 +181,13 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
 
   async function processBatch() {
     if (items.length === 0) return
+    if (mode === "organization") {
+      const withoutName = items.filter((i) => !String(i.name ?? "").trim())
+      if (withoutName.length > 0) {
+        toast.error("Заполните имя у всех сотрудников")
+        return
+      }
+    }
 
     setIsProcessing(true)
     const orgId = mode === "organization" ? selectedOrganizationId : null
@@ -199,10 +204,10 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
           prev.map((p) => (p.id === item.id ? { ...p, status: "analyzing" } : p))
         )
 
-        const file = item.file ?? (await dataUrlToFile(item.photoUrl!, `${item.name}.jpg`))
+        const file = item.file ?? (await dataUrlToFile(item.photoUrl!, `${item.name?.trim() || "photo"}.jpg`))
         const formData = new FormData()
         formData.append("photo", file)
-        formData.append("employeeName", item.name)
+        formData.append("employeeName", item.name?.trim() || "Сотрудник")
 
         const analyzeRes = await fetch("/api/analyze", { method: "POST", body: formData })
         if (!analyzeRes.ok) throw new Error("Ошибка анализа")
@@ -257,7 +262,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         if (medicalUrl && corporateUrl) {
           try {
             await addGalleryItem({
-              name: item.name,
+              name: item.name?.trim() || "Сотрудник",
               medicalUrl,
               corporateUrl,
               organizationId: orgId || undefined,
@@ -391,19 +396,35 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         </div>
       )}
 
-      {/* Organization mode: employee cards (same as Organizations page) */}
-      {mode === "organization" && selectedOrganizationId && (
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Сотрудники организации. Можно удалить кого-то из списка перед генерацией или добавить фото.
-          </p>
-          <EmployeeCards
-            items={items.map((i) => ({ id: i.id, name: i.name, photoUrl: i.photoUrl ?? i.preview }))}
-            onChange={handleOrgEmployeeChange}
-            onRemove={handleOrgEmployeeRemove}
-            onFilesAdded={handleOrgFilesAdded}
-            disabled={isProcessing}
+      {/* Add employees (org mode only) */}
+      {mode === "organization" && selectedOrganizationId && !isProcessing && (
+        <div
+          className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-muted/30 py-4 text-center"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault()
+            if (e.dataTransfer.files?.length) handleOrgFilesAdded(Array.from(e.dataTransfer.files))
+          }}
+          onClick={() => inputRef.current?.click()}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") inputRef.current?.click()
+          }}
+        >
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files?.length) handleOrgFilesAdded(Array.from(e.target.files))
+              e.target.value = ""
+            }}
           />
+          <Upload className="size-5 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">Добавить сотрудников (фото)</span>
         </div>
       )}
 
@@ -459,111 +480,30 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         </div>
       )}
 
-      {/* Queue list — for upload mode or after org selected we show list */}
-      {mode === "upload" && items.length > 0 && (
-        <ScrollArea className="max-h-[60vh]">
-          <div className="flex flex-col gap-2">
-            {items.map((item, idx) => (
-              <Card
-                key={item.id}
-                className={
-                  isProcessing && idx === currentIndex ? "border-primary/30 bg-primary/5" : ""
-                }
-              >
-                <CardContent className="flex items-center gap-4 py-3">
-                  <div className="relative size-12 shrink-0 overflow-hidden rounded-md border border-border">
-                    <img
-                      src={item.preview}
-                      alt={item.name}
-                      className="size-full object-cover"
-                    />
-                  </div>
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-sm font-medium text-foreground">
-                      {item.name}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {item.status === "pending" && "Ожидание..."}
-                      {item.status === "analyzing" && "Анализ фото..."}
-                      {item.status === "generating" && "Генерация портретов..."}
-                      {item.status === "complete" && "Готово"}
-                      {item.status === "error" && (item.error || "Ошибка")}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {item.status === "complete" && (
-                      <CheckCircle2 className="size-4 text-success" />
-                    )}
-                    {(item.status === "analyzing" || item.status === "generating") && (
-                      <Loader2 className="size-4 animate-spin text-primary" />
-                    )}
-                    {item.status === "error" && (
-                      <AlertCircle className="size-4 text-destructive" />
-                    )}
-                    {item.status === "complete" && item.medicalUrl && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8"
-                        onClick={() => {
-                          if (item.medicalUrl) {
-                            const a = document.createElement("a")
-                            a.href = item.medicalUrl
-                            a.download = `${item.name}-medical.png`
-                            a.click()
-                          }
-                        }}
-                      >
-                        <Download className="size-4" />
-                        <span className="sr-only">Скачать медицинский</span>
-                      </Button>
-                    )}
-                    {!isProcessing && item.status === "pending" && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8"
-                        onClick={() => removeItem(item.id)}
-                      >
-                        <X className="size-4" />
-                        <span className="sr-only">Удалить</span>
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </ScrollArea>
-      )}
-
-      {/* In org mode we use EmployeeCards for display; show compact list for progress */}
-      {mode === "organization" && items.length > 0 && isProcessing && (
-        <ScrollArea className="max-h-[40vh]">
-          <div className="flex flex-col gap-2">
-            {items.map((item, idx) => (
-              <Card
-                key={item.id}
-                className={
-                  idx === currentIndex ? "border-primary/30 bg-primary/5" : ""
-                }
-              >
-                <CardContent className="flex items-center gap-4 py-2">
-                  <div className="relative size-10 shrink-0 overflow-hidden rounded border">
-                    <img src={item.photoUrl ?? item.preview} alt="" className="size-full object-cover" />
-                  </div>
-                  <span className="truncate text-sm font-medium">{item.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {item.status === "analyzing" && "Анализ..."}
-                    {item.status === "generating" && "Генерация..."}
-                    {item.status === "complete" && "Готово"}
-                    {item.status === "error" && item.error}
-                  </span>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </ScrollArea>
+      {/* Сетка карточек: исходник + «Стало» (до 3 в ряд на больших экранах) */}
+      {items.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {items.map((item, idx) => (
+            <BatchPortraitCard
+              key={item.id}
+              item={{
+                id: item.id,
+                name: item.name,
+                preview: item.photoUrl ?? item.preview,
+                status: item.status,
+                medicalUrl: item.medicalUrl,
+                corporateUrl: item.corporateUrl,
+                error: item.error,
+              }}
+              index={idx}
+              isCurrent={idx === currentIndex}
+              isProcessing={isProcessing}
+              onRemove={mode === "organization" || mode === "upload" ? () => removeItem(item.id) : undefined}
+              onNameChange={mode === "organization" ? (name) => handleOrgEmployeeChange(item.id, { name }) : undefined}
+              showNameInput={mode === "organization"}
+            />
+          ))}
+        </div>
       )}
     </div>
   )
