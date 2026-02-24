@@ -29,3 +29,28 @@ export interface AnalysisResult {
   medicalPrompt: string
   corporatePrompt: string
 }
+
+export interface OrganizationEmployee {
+  id: string
+  name: string
+  photoUrl: string
+}
+
+export interface Organization {
+  id: string
+  name: string
+  photoUrl: string | null
+  employees: OrganizationEmployee[]
+  createdAt: number
+  updatedAt: number
+}
+
+export interface GalleryItem {
+  id: string
+  name: string
+  medicalUrl: string
+  corporateUrl: string
+  createdAt: number
+  organizationId?: string
+  organizationName?: string
+}

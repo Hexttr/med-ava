@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Sparkles, AlertCircle, Settings, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -8,10 +8,19 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { PhotoUploader } from "@/components/photo-uploader"
 import { PortraitCard } from "@/components/portrait-card"
 import { Progress } from "@/components/ui/progress"
 import type { ProcessingStatus } from "@/lib/types"
+import type { Organization } from "@/lib/types"
+import { getAllOrganizations, addEmployeeToOrganization } from "@/lib/organizations-store"
 
 interface GenerateClientProps {
   hasApiKey: boolean
@@ -27,6 +36,12 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
   const [medicalPrompt, setMedicalPrompt] = useState<string>("")
   const [corporatePrompt, setCorporatePrompt] = useState<string>("")
   const [progress, setProgress] = useState(0)
+  const [organizations, setOrganizations] = useState<Organization[]>([])
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>("")
+
+  useEffect(() => {
+    setOrganizations(getAllOrganizations())
+  }, [])
 
   const handleFileSelect = useCallback((selectedFile: File) => {
     setFile(selectedFile)
@@ -51,6 +66,28 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
     setStatus("idle")
     setProgress(0)
   }, [preview])
+
+  function fileToDataUrl(f: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => reject(reader.error)
+      reader.readAsDataURL(f)
+    })
+  }
+
+  function fileToBase64(f: File): Promise<{ base64: string; mimeType: string }> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const dataUrl = reader.result as string
+        const base64 = dataUrl.includes(",") ? dataUrl.split(",")[1]! : dataUrl
+        resolve({ base64, mimeType: f.type || "image/jpeg" })
+      }
+      reader.onerror = () => reject(reader.error)
+      reader.readAsDataURL(f)
+    })
+  }
 
   async function handleGenerate() {
     if (!file) return
@@ -80,7 +117,9 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
       setCorporatePrompt(analysis.corporatePrompt)
       setProgress(30)
 
-      // Step 2: Generate medical portrait
+      const reference = await fileToBase64(file)
+
+      // Step 2: Generate medical portrait (с эталонным фото — тот же человек)
       setStatus("generating")
       setProgress(40)
 
@@ -90,6 +129,8 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
         body: JSON.stringify({
           prompt: analysis.medicalPrompt,
           style: "medical",
+          referencePhotoBase64: reference.base64,
+          referencePhotoMimeType: reference.mimeType,
         }),
       })
 
@@ -109,6 +150,8 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
         body: JSON.stringify({
           prompt: analysis.corporatePrompt,
           style: "corporate",
+          referencePhotoBase64: reference.base64,
+          referencePhotoMimeType: reference.mimeType,
         }),
       })
 
@@ -122,22 +165,38 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
       setProgress(100)
       setStatus("complete")
 
+      const name = employeeName.trim() || "Сотрудник"
+      const selectedOrg = selectedOrganizationId
+        ? organizations.find((o) => o.id === selectedOrganizationId)
+        : null
+
       // Сохраняем в галерею (sessionStorage)
       try {
         const GALLERY_KEY = "eam_gallery"
         const stored = sessionStorage.getItem(GALLERY_KEY)
         const items = stored ? JSON.parse(stored) : []
-        const name = employeeName.trim() || "Сотрудник"
         items.unshift({
           id: crypto.randomUUID(),
           name,
           medicalUrl: medicalData.imageUrl,
           corporateUrl: corporateData.imageUrl,
           createdAt: Date.now(),
+          organizationId: selectedOrg?.id,
+          organizationName: selectedOrg?.name,
         })
         sessionStorage.setItem(GALLERY_KEY, JSON.stringify(items))
       } catch {
         // sessionStorage переполнен или недоступен
+      }
+
+      // Если выбрана организация — добавляем сотрудника в неё (имя + исходное фото)
+      if (selectedOrganizationId && file) {
+        try {
+          const photoUrl = await fileToDataUrl(file)
+          addEmployeeToOrganization(selectedOrganizationId, { name, photoUrl })
+        } catch {
+          // игнорируем
+        }
       }
 
       toast.success("Портреты успешно сгенерированы")
@@ -192,11 +251,34 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
             <Label htmlFor="employee-name">Имя сотрудника</Label>
             <Input
               id="employee-name"
-              placeholder="Введите имя сотрудника"
+              placeholder="Введите имя (необязательно)"
               value={employeeName}
               onChange={(e) => setEmployeeName(e.target.value)}
               disabled={isProcessing}
             />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label>Организация</Label>
+            <Select
+              value={selectedOrganizationId || "_none"}
+              onValueChange={(v) => setSelectedOrganizationId(v === "_none" ? "" : v)}
+              disabled={isProcessing}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Не выбрана" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_none">Не выбрана</SelectItem>
+                {organizations.map((org) => (
+                  <SelectItem key={org.id} value={org.id}>
+                    {org.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              При выборе сотрудник будет добавлен в организацию после генерации
+            </p>
           </div>
           <PhotoUploader
             onFileSelect={handleFileSelect}

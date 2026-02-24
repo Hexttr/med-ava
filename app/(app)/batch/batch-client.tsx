@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import {
   Upload,
   Sparkles,
@@ -11,35 +11,102 @@ import {
   Loader2,
   Download,
   Trash2,
+  Building2,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
+import { EmployeeCards } from "@/components/employee-cards"
+import type { Organization, OrganizationEmployee } from "@/lib/types"
+import { getAllOrganizations, getOrganizationById } from "@/lib/organizations-store"
 
 interface BatchItem {
   id: string
-  file: File
-  preview: string
   name: string
   status: "pending" | "analyzing" | "generating" | "complete" | "error"
   medicalUrl: string | null
   corporateUrl: string | null
   error?: string
+  file?: File
+  photoUrl?: string
+  preview: string
 }
 
 interface BatchClientProps {
   hasApiKey: boolean
 }
 
+async function dataUrlToFile(dataUrl: string, fileName: string): Promise<File> {
+  const res = await fetch(dataUrl)
+  const blob = await res.blob()
+  return new File([blob], fileName, { type: blob.type || "image/jpeg" })
+}
+
+function fileToBase64(f: File): Promise<{ base64: string; mimeType: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = reader.result as string
+      const base64 = dataUrl.includes(",") ? dataUrl.split(",")[1]! : dataUrl
+      resolve({ base64, mimeType: f.type || "image/jpeg" })
+    }
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(f)
+  })
+}
+
+function dataUrlToBase64(dataUrl: string): { base64: string; mimeType: string } {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
+  if (!match) return { base64: "", mimeType: "image/jpeg" }
+  return { base64: match[2], mimeType: match[1] }
+}
+
 export function BatchClient({ hasApiKey }: BatchClientProps) {
+  const [mode, setMode] = useState<"upload" | "organization">("upload")
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>("")
+  const [organizations, setOrganizations] = useState<Organization[]>([])
+  const [orgEmployees, setOrgEmployees] = useState<OrganizationEmployee[]>([])
   const [items, setItems] = useState<BatchItem[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setOrganizations(getAllOrganizations())
+  }, [])
+
+  useEffect(() => {
+    if (mode === "organization" && selectedOrganizationId) {
+      const org = getOrganizationById(selectedOrganizationId)
+      setOrgEmployees(org?.employees ?? [])
+      setItems(
+        (org?.employees ?? []).map((e) => ({
+          id: e.id,
+          name: e.name,
+          status: "pending" as const,
+          medicalUrl: null,
+          corporateUrl: null,
+          photoUrl: e.photoUrl,
+          preview: e.photoUrl,
+        }))
+      )
+    } else if (mode === "organization") {
+      setOrgEmployees([])
+      setItems([])
+    }
+  }, [mode, selectedOrganizationId])
 
   const handleFiles = useCallback((files: FileList) => {
     const newItems: BatchItem[] = Array.from(files)
@@ -53,16 +120,13 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         medicalUrl: null,
         corporateUrl: null,
       }))
-
     setItems((prev) => [...prev, ...newItems])
   }, [])
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault()
-      if (e.dataTransfer.files?.length) {
-        handleFiles(e.dataTransfer.files)
-      }
+      if (e.dataTransfer.files?.length) handleFiles(e.dataTransfer.files)
     },
     [handleFiles]
   )
@@ -70,21 +134,52 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
   const removeItem = useCallback((id: string) => {
     setItems((prev) => {
       const item = prev.find((i) => i.id === id)
-      if (item) URL.revokeObjectURL(item.preview)
+      if (item?.file && item.preview?.startsWith("blob:")) URL.revokeObjectURL(item.preview)
       return prev.filter((i) => i.id !== id)
     })
   }, [])
 
   const clearAll = useCallback(() => {
-    items.forEach((item) => URL.revokeObjectURL(item.preview))
+    items.forEach((item) => {
+      if (item.file && item.preview?.startsWith("blob:")) URL.revokeObjectURL(item.preview)
+    })
     setItems([])
     setCurrentIndex(-1)
   }, [items])
+
+  const handleOrgEmployeeChange = useCallback((id: string, data: { name: string }) => {
+    setItems((prev) => prev.map((e) => (e.id === id ? { ...e, name: data.name } : e)))
+  }, [])
+
+  const handleOrgEmployeeRemove = useCallback((id: string) => {
+    setItems((prev) => prev.filter((e) => e.id !== id))
+  }, [])
+
+  const handleOrgFilesAdded = useCallback((files: File[]) => {
+    const newItems: BatchItem[] = files
+      .filter((f) => f.type.startsWith("image/"))
+      .map((file) => ({
+        id: crypto.randomUUID(),
+        file,
+        preview: URL.createObjectURL(file),
+        name: file.name.replace(/\.[^.]+$/, "").trim() || "Сотрудник",
+        status: "pending" as const,
+        medicalUrl: null,
+        corporateUrl: null,
+      }))
+    setItems((prev) => [...prev, ...newItems])
+  }, [])
+
+  const selectedOrg = selectedOrganizationId
+    ? organizations.find((o) => o.id === selectedOrganizationId)
+    : null
 
   async function processBatch() {
     if (items.length === 0) return
 
     setIsProcessing(true)
+    const orgId = mode === "organization" ? selectedOrganizationId : null
+    const orgName = selectedOrg?.name
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
@@ -93,53 +188,54 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
       setCurrentIndex(i)
 
       try {
-        // Update status to analyzing
         setItems((prev) =>
           prev.map((p) => (p.id === item.id ? { ...p, status: "analyzing" } : p))
         )
 
-        // Step 1: Analyze
+        const file = item.file ?? (await dataUrlToFile(item.photoUrl!, `${item.name}.jpg`))
         const formData = new FormData()
-        formData.append("photo", item.file)
+        formData.append("photo", file)
         formData.append("employeeName", item.name)
 
-        const analyzeRes = await fetch("/api/analyze", {
-          method: "POST",
-          body: formData,
-        })
-
-        if (!analyzeRes.ok) {
-          throw new Error("Ошибка анализа")
-        }
+        const analyzeRes = await fetch("/api/analyze", { method: "POST", body: formData })
+        if (!analyzeRes.ok) throw new Error("Ошибка анализа")
 
         const analysis = await analyzeRes.json()
+        const reference = item.file
+          ? await fileToBase64(item.file)
+          : dataUrlToBase64(item.photoUrl!)
 
-        // Update status to generating
         setItems((prev) =>
           prev.map((p) => (p.id === item.id ? { ...p, status: "generating" } : p))
         )
 
-        // Step 2: Generate medical
         const medicalRes = await fetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: analysis.medicalPrompt, style: "medical" }),
+          body: JSON.stringify({
+            prompt: analysis.medicalPrompt,
+            style: "medical",
+            referencePhotoBase64: reference.base64,
+            referencePhotoMimeType: reference.mimeType,
+          }),
         })
-
-        let medicalUrl = null
+        let medicalUrl: string | null = null
         if (medicalRes.ok) {
           const data = await medicalRes.json()
           medicalUrl = data.imageUrl
         }
 
-        // Step 3: Generate corporate
         const corporateRes = await fetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: analysis.corporatePrompt, style: "corporate" }),
+          body: JSON.stringify({
+            prompt: analysis.corporatePrompt,
+            style: "corporate",
+            referencePhotoBase64: reference.base64,
+            referencePhotoMimeType: reference.mimeType,
+          }),
         })
-
-        let corporateUrl = null
+        let corporateUrl: string | null = null
         if (corporateRes.ok) {
           const data = await corporateRes.json()
           corporateUrl = data.imageUrl
@@ -147,9 +243,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
 
         setItems((prev) =>
           prev.map((p) =>
-            p.id === item.id
-              ? { ...p, status: "complete", medicalUrl, corporateUrl }
-              : p
+            p.id === item.id ? { ...p, status: "complete", medicalUrl, corporateUrl } : p
           )
         )
 
@@ -157,15 +251,17 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
           try {
             const GALLERY_KEY = "eam_gallery"
             const stored = sessionStorage.getItem(GALLERY_KEY)
-            const items = stored ? JSON.parse(stored) : []
-            items.unshift({
+            const galleryItems = stored ? JSON.parse(stored) : []
+            galleryItems.unshift({
               id: crypto.randomUUID(),
               name: item.name,
               medicalUrl,
               corporateUrl,
               createdAt: Date.now(),
+              organizationId: orgId || undefined,
+              organizationName: orgName,
             })
-            sessionStorage.setItem(GALLERY_KEY, JSON.stringify(items))
+            sessionStorage.setItem(GALLERY_KEY, JSON.stringify(galleryItems))
           } catch {
             // ignore
           }
@@ -214,8 +310,54 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Upload area */}
-      {!isProcessing && (
+      {/* Mode switch */}
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex rounded-lg border border-border p-1">
+          <button
+            type="button"
+            onClick={() => setMode("upload")}
+            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              mode === "upload" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Upload className="size-4" />
+            Загрузить фото
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("organization")}
+            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              mode === "organization" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Building2 className="size-4" />
+            По организации
+          </button>
+        </div>
+
+        {mode === "organization" && (
+          <Select
+            value={selectedOrganizationId || "_none"}
+            onValueChange={(v) => setSelectedOrganizationId(v === "_none" ? "" : v)}
+            disabled={isProcessing}
+          >
+            <SelectTrigger className="w-[280px]">
+              <SelectValue placeholder="Выберите организацию" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_none">Выберите организацию</SelectItem>
+              {organizations.map((org) => (
+                <SelectItem key={org.id} value={org.id}>
+                  {org.name} ({org.employees.length})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
+      {/* Upload area — only in upload mode */}
+      {mode === "upload" && !isProcessing && (
         <div
           className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/30 px-6 py-10 text-center transition-colors hover:border-primary/40 hover:bg-muted/50"
           onDragOver={(e) => e.preventDefault()}
@@ -245,6 +387,22 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
           <p className="mt-1 text-xs text-muted-foreground">
             JPG, PNG, WebP. С каждого фото будут созданы два стиля портрета.
           </p>
+        </div>
+      )}
+
+      {/* Organization mode: employee cards (same as Organizations page) */}
+      {mode === "organization" && selectedOrganizationId && (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Сотрудники организации. Можно удалить кого-то из списка перед генерацией или добавить фото.
+          </p>
+          <EmployeeCards
+            items={items.map((i) => ({ id: i.id, name: i.name, photoUrl: i.photoUrl ?? i.preview }))}
+            onChange={handleOrgEmployeeChange}
+            onRemove={handleOrgEmployeeRemove}
+            onFilesAdded={handleOrgFilesAdded}
+            disabled={isProcessing}
+          />
         </div>
       )}
 
@@ -300,17 +458,15 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         </div>
       )}
 
-      {/* Queue list */}
-      {items.length > 0 && (
+      {/* Queue list — for upload mode or after org selected we show list */}
+      {mode === "upload" && items.length > 0 && (
         <ScrollArea className="max-h-[60vh]">
           <div className="flex flex-col gap-2">
             {items.map((item, idx) => (
               <Card
                 key={item.id}
                 className={
-                  isProcessing && idx === currentIndex
-                    ? "border-primary/30 bg-primary/5"
-                    : ""
+                  isProcessing && idx === currentIndex ? "border-primary/30 bg-primary/5" : ""
                 }
               >
                 <CardContent className="flex items-center gap-4 py-3">
@@ -373,6 +529,35 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
                       </Button>
                     )}
                   </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </ScrollArea>
+      )}
+
+      {/* In org mode we use EmployeeCards for display; show compact list for progress */}
+      {mode === "organization" && items.length > 0 && isProcessing && (
+        <ScrollArea className="max-h-[40vh]">
+          <div className="flex flex-col gap-2">
+            {items.map((item, idx) => (
+              <Card
+                key={item.id}
+                className={
+                  idx === currentIndex ? "border-primary/30 bg-primary/5" : ""
+                }
+              >
+                <CardContent className="flex items-center gap-4 py-2">
+                  <div className="relative size-10 shrink-0 overflow-hidden rounded border">
+                    <img src={item.photoUrl ?? item.preview} alt="" className="size-full object-cover" />
+                  </div>
+                  <span className="truncate text-sm font-medium">{item.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {item.status === "analyzing" && "Анализ..."}
+                    {item.status === "generating" && "Генерация..."}
+                    {item.status === "complete" && "Готово"}
+                    {item.status === "error" && item.error}
+                  </span>
                 </CardContent>
               </Card>
             ))}

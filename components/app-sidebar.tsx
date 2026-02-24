@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   ImageIcon,
   Stethoscope,
+  Building2,
 } from "lucide-react"
 
 import {
@@ -40,6 +41,11 @@ const navItems = [
     title: "Пакетная обработка",
     href: "/batch",
     icon: Users,
+  },
+  {
+    title: "Организации",
+    href: "/organizations",
+    icon: Building2,
   },
   {
     title: "Галерея",
