@@ -7,8 +7,9 @@ function toItemResponse(row: {
   name: string
   medical_path: string
   corporate_path: string
-  organization_id: string | null
-  organization_name: string | null
+  employee_id: string | null
+  department_id: string | null
+  department_name: string | null
   created_at: number
 }) {
   return {
@@ -16,26 +17,50 @@ function toItemResponse(row: {
     name: row.name,
     medicalUrl: `/api/files/${row.medical_path.replace(/\\/g, "/")}`,
     corporateUrl: `/api/files/${row.corporate_path.replace(/\\/g, "/")}`,
-    organizationId: row.organization_id ?? undefined,
-    organizationName: row.organization_name ?? undefined,
+    employeeId: row.employee_id ?? undefined,
+    departmentId: row.department_id ?? undefined,
+    departmentName: row.department_name ?? undefined,
     createdAt: row.created_at,
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const departmentId = searchParams.get("departmentId") ?? undefined
     const database = getDb()
-    const rows = database.prepare(
-      "SELECT id, name, medical_path, corporate_path, organization_id, organization_name, created_at FROM gallery_items ORDER BY created_at DESC"
-    ).all() as Array<{
+    let rows: Array<{
       id: string
       name: string
       medical_path: string
       corporate_path: string
-      organization_id: string | null
-      organization_name: string | null
+      employee_id: string | null
+      department_id: string | null
+      department_name: string | null
       created_at: number
     }>
+    if (departmentId && departmentId !== "") {
+      rows = database
+        .prepare(
+          `SELECT g.id, g.name, g.medical_path, g.corporate_path, g.employee_id, e.department_id AS department_id, d.name AS department_name, g.created_at
+           FROM gallery_items g
+           LEFT JOIN employees e ON g.employee_id = e.id
+           LEFT JOIN departments d ON e.department_id = d.id
+           WHERE e.department_id = ?
+           ORDER BY g.created_at DESC`
+        )
+        .all(departmentId) as typeof rows
+    } else {
+      rows = database
+        .prepare(
+          `SELECT g.id, g.name, g.medical_path, g.corporate_path, g.employee_id, e.department_id AS department_id, d.name AS department_name, g.created_at
+           FROM gallery_items g
+           LEFT JOIN employees e ON g.employee_id = e.id
+           LEFT JOIN departments d ON e.department_id = d.id
+           ORDER BY g.created_at DESC`
+        )
+        .all() as typeof rows
+    }
     return NextResponse.json(rows.map(toItemResponse))
   } catch (e) {
     console.error("[API] gallery GET", e)
@@ -52,28 +77,46 @@ export async function POST(request: NextRequest) {
     if (!medicalUrl || !corporateUrl || typeof medicalUrl !== "string" || typeof corporateUrl !== "string") {
       return NextResponse.json({ error: "Требуются medicalUrl и corporateUrl" }, { status: 400 })
     }
+    const employeeId = body?.employeeId ?? null
+    const database = getDb()
+    let departmentId: string | null = null
+    let departmentName: string | null = null
+    if (employeeId) {
+      const emp = database
+        .prepare(
+          "SELECT e.department_id, d.name FROM employees e LEFT JOIN departments d ON e.department_id = d.id WHERE e.id = ?"
+        )
+        .get(employeeId) as { department_id: string | null; name: string | null } | undefined
+      if (emp) {
+        departmentId = emp.department_id
+        departmentName = emp.name
+      }
+    }
     const id = crypto.randomUUID()
     const now = Date.now()
-    const organizationId = body.organizationId ?? null
-    const organizationName = body.organizationName ?? null
-
     const medicalPath = await saveBase64Image(medicalUrl, "gallery", `${id}_medical`)
     const corporatePath = await saveBase64Image(corporateUrl, "gallery", `${id}_corporate`)
-
-    const database = getDb()
-    database.prepare(
-      "INSERT INTO gallery_items (id, name, medical_path, corporate_path, organization_id, organization_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-    ).run(id, name, medicalPath, corporatePath, organizationId, organizationName, now)
-
-    const row = database.prepare(
-      "SELECT id, name, medical_path, corporate_path, organization_id, organization_name, created_at FROM gallery_items WHERE id = ?"
-    ).get(id) as {
+    database
+      .prepare(
+        "INSERT INTO gallery_items (id, name, medical_path, corporate_path, employee_id, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+      )
+      .run(id, name, medicalPath, corporatePath, employeeId, now)
+    const row = database
+      .prepare(
+        `SELECT g.id, g.name, g.medical_path, g.corporate_path, g.employee_id, e.department_id AS department_id, d.name AS department_name, g.created_at
+         FROM gallery_items g
+         LEFT JOIN employees e ON g.employee_id = e.id
+         LEFT JOIN departments d ON e.department_id = d.id
+         WHERE g.id = ?`
+      )
+      .get(id) as {
       id: string
       name: string
       medical_path: string
       corporate_path: string
-      organization_id: string | null
-      organization_name: string | null
+      employee_id: string | null
+      department_id: string | null
+      department_name: string | null
       created_at: number
     }
     return NextResponse.json(toItemResponse(row))

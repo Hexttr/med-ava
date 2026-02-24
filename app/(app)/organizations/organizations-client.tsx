@@ -96,7 +96,7 @@ export function OrganizationsClient() {
     for (const file of files) {
       try {
         const photoUrl = await compressImageForStorage(file)
-        const name = file.name.replace(/\.[^.]+$/, "").trim() || "Сотрудник"
+        const name = ""
         newEmployees.push({
           id: crypto.randomUUID(),
           name,
@@ -155,7 +155,7 @@ export function OrganizationsClient() {
     }
   }
 
-  async function handleSave() {
+  async   function handleSave() {
     const name = formName.trim()
     if (!name) {
       toast.error("Введите название организации")
@@ -163,6 +163,11 @@ export function OrganizationsClient() {
     }
 
     const employeesToSave = Array.isArray(formEmployees) ? [...formEmployees] : []
+    const emptyName = employeesToSave.find((e) => !String(e.name ?? "").trim())
+    if (emptyName) {
+      toast.error("Заполните имя у всех сотрудников")
+      return
+    }
 
     let photoUrlToSave: string | null = formPhotoUrl
     if (formPhotoFile) {

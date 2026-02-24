@@ -23,6 +23,8 @@ interface BatchPortraitCardProps {
   onRemove?: () => void
   onNameChange?: (name: string) => void
   showNameInput?: boolean
+  /** Кнопка «Сгенерировать» для этого сотрудника (только при status === "pending") */
+  onGenerate?: () => void
 }
 
 export function BatchPortraitCard({
@@ -33,6 +35,7 @@ export function BatchPortraitCard({
   onRemove,
   onNameChange,
   showNameInput = false,
+  onGenerate,
 }: BatchPortraitCardProps) {
   const isActive = isCurrent && (item.status === "analyzing" || item.status === "generating")
   const showPlaceholder = !item.medicalUrl || !item.corporateUrl
@@ -143,6 +146,18 @@ export function BatchPortraitCard({
           </span>
         )}
         <div className="flex items-center gap-1">
+          {item.status === "pending" && onGenerate && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-6 text-xs"
+              onClick={onGenerate}
+              disabled={isProcessing}
+            >
+              Сгенерировать
+            </Button>
+          )}
           {item.status === "complete" && (
             <CheckCircle2 className="size-3.5 text-green-600" />
           )}

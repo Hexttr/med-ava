@@ -124,7 +124,7 @@ export function EmployeeCards({
             <Input
               value={item.name}
               onChange={(e) => onChange(item.id, { name: e.target.value })}
-              placeholder="Имя сотрудника"
+              placeholder="Введите имя"
               disabled={disabled}
               className="h-8 text-sm"
             />

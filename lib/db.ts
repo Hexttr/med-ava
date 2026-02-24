@@ -15,9 +15,9 @@ function ensureDataDir() {
   if (!fs.existsSync(UPLOADS_DIR)) {
     fs.mkdirSync(UPLOADS_DIR, { recursive: true })
   }
-  const orgDir = path.join(UPLOADS_DIR, "organizations")
+  const employeesDir = path.join(UPLOADS_DIR, "employees")
   const galleryDir = path.join(UPLOADS_DIR, "gallery")
-  if (!fs.existsSync(orgDir)) fs.mkdirSync(orgDir, { recursive: true })
+  if (!fs.existsSync(employeesDir)) fs.mkdirSync(employeesDir, { recursive: true })
   if (!fs.existsSync(galleryDir)) fs.mkdirSync(galleryDir, { recursive: true })
 }
 
@@ -31,34 +31,113 @@ export function getDb(): Database.Database {
 }
 
 function runMigrations(database: Database.Database) {
+  // Schema version: 1 = old, 2 = new (departments + employees + gallery_items with employee_id)
   database.exec(`
-    CREATE TABLE IF NOT EXISTS organizations (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      photo_path TEXT,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS employees (
-      id TEXT PRIMARY KEY,
-      org_id TEXT NOT NULL,
-      name TEXT NOT NULL,
-      photo_path TEXT NOT NULL,
-      FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE
-    );
-    CREATE INDEX IF NOT EXISTS idx_employees_org_id ON employees(org_id);
-
-    CREATE TABLE IF NOT EXISTS gallery_items (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      medical_path TEXT NOT NULL,
-      corporate_path TEXT NOT NULL,
-      organization_id TEXT,
-      organization_name TEXT,
-      created_at INTEGER NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_gallery_org ON gallery_items(organization_id);
+    CREATE TABLE IF NOT EXISTS _schema_version (version INTEGER NOT NULL);
+    INSERT INTO _schema_version (version) SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM _schema_version);
   `)
+  const row = database.prepare("SELECT version FROM _schema_version LIMIT 1").get() as { version: number } | undefined
+  const version = row?.version ?? 1
+
+  if (version >= 2) {
+    return
+  }
+
+  const hasOrgs = database.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='organizations'"
+  ).get()
+
+  if (hasOrgs) {
+    // Migrate from old schema
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS departments (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS employees_new (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        photo_path TEXT NOT NULL,
+        department_id TEXT,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL
+      );
+    `)
+    const oldEmployees = database.prepare("SELECT id, name, photo_path FROM employees").all() as Array<{ id: string; name: string; photo_path: string }>
+    const now = Date.now()
+    const insertEmp = database.prepare(
+      "INSERT INTO employees_new (id, name, photo_path, department_id, created_at) VALUES (?, ?, ?, ?, ?)"
+    )
+    for (const e of oldEmployees) {
+      insertEmp.run(e.id, e.name, e.photo_path, null, now)
+    }
+    database.exec(`
+      DROP TABLE IF EXISTS employees;
+      ALTER TABLE employees_new RENAME TO employees;
+      CREATE INDEX IF NOT EXISTS idx_employees_department_id ON employees(department_id);
+    `)
+
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS gallery_items_new (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        medical_path TEXT NOT NULL,
+        corporate_path TEXT NOT NULL,
+        employee_id TEXT,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL
+      );
+    `)
+    const oldGallery = database.prepare(
+      "SELECT id, name, medical_path, corporate_path, created_at FROM gallery_items"
+    ).all() as Array<{ id: string; name: string; medical_path: string; corporate_path: string; created_at: number }>
+    const insertGal = database.prepare(
+      "INSERT INTO gallery_items_new (id, name, medical_path, corporate_path, employee_id, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    )
+    for (const g of oldGallery) {
+      insertGal.run(g.id, g.name, g.medical_path, g.corporate_path, null, g.created_at)
+    }
+    database.exec(`
+      DROP TABLE gallery_items;
+      ALTER TABLE gallery_items_new RENAME TO gallery_items;
+      CREATE INDEX IF NOT EXISTS idx_gallery_employee_id ON gallery_items(employee_id);
+      DROP TABLE IF EXISTS organizations;
+    `)
+  } else {
+    // Fresh install: create new schema only
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS departments (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS employees (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        photo_path TEXT NOT NULL,
+        department_id TEXT,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_employees_department_id ON employees(department_id);
+
+      CREATE TABLE IF NOT EXISTS gallery_items (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        medical_path TEXT NOT NULL,
+        corporate_path TEXT NOT NULL,
+        employee_id TEXT,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_gallery_employee_id ON gallery_items(employee_id);
+    `)
+  }
+
+  database.prepare("UPDATE _schema_version SET version = 2").run()
 }
 
 export function getUploadsDir(): string {

@@ -19,9 +19,10 @@ import { PhotoUploader } from "@/components/photo-uploader"
 import { PortraitCard } from "@/components/portrait-card"
 import { Progress } from "@/components/ui/progress"
 import type { ProcessingStatus } from "@/lib/types"
-import type { Organization } from "@/lib/types"
-import { fetchAllOrganizations, addEmployeeToOrganizationApi } from "@/lib/organizations-api"
+import type { Department } from "@/lib/types"
+import { fetchDepartments, createEmployee } from "@/lib/structure-api"
 import { addGalleryItem } from "@/lib/gallery-api"
+import { compressImageForStorage } from "@/lib/image-compress"
 
 interface GenerateClientProps {
   hasApiKey: boolean
@@ -37,11 +38,11 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
   const [medicalPrompt, setMedicalPrompt] = useState<string>("")
   const [corporatePrompt, setCorporatePrompt] = useState<string>("")
   const [progress, setProgress] = useState(0)
-  const [organizations, setOrganizations] = useState<Organization[]>([])
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>("")
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>("")
 
   useEffect(() => {
-    fetchAllOrganizations().then(setOrganizations).catch(() => {})
+    fetchDepartments().then(setDepartments).catch(() => [])
   }, [])
 
   const handleFileSelect = useCallback((selectedFile: File) => {
@@ -167,31 +168,31 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
       setStatus("complete")
 
       const name = employeeName.trim() || "Сотрудник"
-      const selectedOrg = selectedOrganizationId
-        ? organizations.find((o) => o.id === selectedOrganizationId)
-        : null
+      let employeeId: string | undefined
 
-      // Сохраняем в галерею (API / SQLite)
+      if (file) {
+        try {
+          const dataUrl = await compressImageForStorage(file).catch(() => fileToDataUrl(file))
+          const emp = await createEmployee({
+            name,
+            photoUrl: dataUrl,
+            departmentId: selectedDepartmentId || undefined,
+          })
+          employeeId = emp.id
+        } catch {
+          // ignore
+        }
+      }
+
       try {
         await addGalleryItem({
           name,
           medicalUrl: medicalData.imageUrl,
           corporateUrl: corporateData.imageUrl,
-          organizationId: selectedOrg?.id,
-          organizationName: selectedOrg?.name,
+          employeeId,
         })
       } catch {
-        // игнорируем
-      }
-
-      // Если выбрана организация — добавляем сотрудника в неё (имя + исходное фото)
-      if (selectedOrganizationId && file) {
-        try {
-          const photoUrl = await fileToDataUrl(file)
-          await addEmployeeToOrganizationApi(selectedOrganizationId, { name, photoUrl })
-        } catch {
-          // игнорируем
-        }
+        // ignore
       }
 
       toast.success("Портреты успешно сгенерированы")
@@ -253,26 +254,26 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label>Организация</Label>
+            <Label>Отдел</Label>
             <Select
-              value={selectedOrganizationId || "_none"}
-              onValueChange={(v) => setSelectedOrganizationId(v === "_none" ? "" : v)}
+              value={selectedDepartmentId || "_none"}
+              onValueChange={(v) => setSelectedDepartmentId(v === "_none" ? "" : v)}
               disabled={isProcessing}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Не выбрана" />
+                <SelectValue placeholder="Без отдела" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="_none">Не выбрана</SelectItem>
-                {organizations.map((org) => (
-                  <SelectItem key={org.id} value={org.id}>
-                    {org.name}
+                <SelectItem value="_none">Без отдела</SelectItem>
+                {departments.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              При выборе сотрудник будет добавлен в организацию после генерации
+              После генерации сотрудник будет добавлен в выбранный отдел или в корень
             </p>
           </div>
           <PhotoUploader

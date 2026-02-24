@@ -1,11 +1,18 @@
 "use client"
 
-import { useEffect, useState, useCallback, useMemo } from "react"
-import { ImageIcon, ArrowRight, X, Download, Building2 } from "lucide-react"
+import { useEffect, useState, useCallback } from "react"
+import { ImageIcon, ArrowRight, X, Download, FolderTree } from "lucide-react"
 import Link from "next/link"
 import JSZip from "jszip"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -13,7 +20,9 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import type { GalleryItem } from "@/lib/types"
-import { fetchGallery, addGalleryItem, deleteGalleryItem } from "@/lib/gallery-api"
+import type { Department } from "@/lib/types"
+import { fetchGallery, deleteGalleryItem } from "@/lib/gallery-api"
+import { fetchDepartments } from "@/lib/structure-api"
 
 function sanitizeFileName(name: string): string {
   return name.replace(/[/\\:*?"<>|]/g, "_").trim() || "portrait"
@@ -41,9 +50,9 @@ function getExtension(mime: string): string {
 export function useGallery() {
   const [items, setItems] = useState<GalleryItem[]>([])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (departmentId?: string) => {
     try {
-      const list = await fetchGallery()
+      const list = await fetchGallery(departmentId ? { departmentId } : undefined)
       setItems(list)
     } catch {
       setItems([])
@@ -54,33 +63,23 @@ export function useGallery() {
     load()
   }, [load])
 
-  async function addItem(item: Omit<GalleryItem, "id" | "createdAt">) {
-    const newItem = await addGalleryItem({
-      name: item.name,
-      medicalUrl: item.medicalUrl,
-      corporateUrl: item.corporateUrl,
-      organizationId: item.organizationId,
-      organizationName: item.organizationName,
-    })
-    await load()
-    return newItem
-  }
-
   function clearGallery() {
     setItems([])
   }
 
-  return { items, addItem, clearGallery, load }
+  return { items, clearGallery, load }
 }
 
 export function GalleryClient() {
   const [items, setItems] = useState<GalleryItem[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [filterDepartmentId, setFilterDepartmentId] = useState<string>("")
   const [loading, setLoading] = useState(true)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
-  const loadItems = useCallback(async () => {
+  const loadItems = useCallback(async (departmentId?: string) => {
     try {
-      const list = await fetchGallery()
+      const list = await fetchGallery(departmentId ? { departmentId } : undefined)
       setItems(list)
     } catch {
       setItems([])
@@ -90,8 +89,12 @@ export function GalleryClient() {
   }, [])
 
   useEffect(() => {
-    loadItems()
-  }, [loadItems])
+    fetchDepartments().then(setDepartments).catch(() => [])
+  }, [])
+
+  useEffect(() => {
+    loadItems(filterDepartmentId || undefined)
+  }, [loadItems, filterDepartmentId])
 
   async function removeItem(id: string) {
     try {
@@ -160,6 +163,8 @@ export function GalleryClient() {
     }
   }
 
+  const singleItems = items.sort((a, b) => b.createdAt - a.createdAt)
+
   if (loading) {
     return (
       <Card>
@@ -169,33 +174,6 @@ export function GalleryClient() {
       </Card>
     )
   }
-
-  const singleItems = useMemo(
-    () => items.filter((i) => !i.organizationId).sort((a, b) => b.createdAt - a.createdAt),
-    [items]
-  )
-  const byOrganization = useMemo(() => {
-    const map = new Map<string, { name: string; items: GalleryItem[] }>()
-    for (const item of items) {
-      if (!item.organizationId) continue
-      const key = item.organizationId
-      const existing = map.get(key)
-      const name = item.organizationName ?? "Организация"
-      if (!existing) {
-        map.set(key, { name, items: [item] })
-      } else {
-        existing.items.push(item)
-      }
-    }
-    for (const entry of map.values()) {
-      entry.items.sort((a, b) => b.createdAt - a.createdAt)
-    }
-    return Array.from(map.entries()).map(([id, { name, items: orgItems }]) => ({
-      id,
-      name,
-      items: orgItems,
-    }))
-  }, [items])
 
   if (items.length === 0) {
     return (
@@ -294,44 +272,40 @@ export function GalleryClient() {
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between gap-2">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">Галерея</h2>
-        <Button variant="outline" size="sm" onClick={downloadAll}>
-          <Download className="mr-2 size-4" />
-          Скачать все
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select
+            value={filterDepartmentId || "_all"}
+            onValueChange={(v) => setFilterDepartmentId(v === "_all" ? "" : v)}
+          >
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Все отделы" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_all">Все отделы</SelectItem>
+              {departments.map((d) => (
+                <SelectItem key={d.id} value={d.id}>
+                  <span className="flex items-center gap-2">
+                    <FolderTree className="size-3.5" />
+                    {d.name}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" onClick={downloadAll}>
+            <Download className="mr-2 size-4" />
+            Скачать все
+          </Button>
+        </div>
       </div>
 
-      {singleItems.length > 0 && (
-        <section className="mb-8">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <ImageIcon className="size-4" />
-            Одиночные обработки
-          </h3>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {singleItems.map((item) => renderCard(item))}
-          </div>
-        </section>
-      )}
-
-      {byOrganization.length > 0 && (
-        <section>
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <Building2 className="size-4" />
-            По организациям
-          </h3>
-          <div className="flex flex-col gap-6">
-            {byOrganization.map((org) => (
-              <div key={org.id}>
-                <h4 className="mb-2 text-sm font-semibold text-foreground">{org.name}</h4>
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                  {org.items.map((item) => renderCard(item))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      <section>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {singleItems.map((item) => renderCard(item))}
+        </div>
+      </section>
 
       <Dialog open={!!lightboxUrl} onOpenChange={(open) => !open && setLightboxUrl(null)}>
         <DialogContent showCloseButton={false} className="max-w-[95vw] max-h-[95vh] border-0 bg-black/95 p-0 overflow-hidden">

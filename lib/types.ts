@@ -45,12 +45,31 @@ export interface Organization {
   updatedAt: number
 }
 
+/** Один уровень отделов (плоский список). */
+export interface Department {
+  id: string
+  name: string
+  createdAt: number
+}
+
+/** Сотрудник: в корне (departmentId === null) или в отделе. */
+export interface Employee {
+  id: string
+  name: string
+  photoUrl: string
+  departmentId: string | null
+  departmentName?: string
+  createdAt: number
+}
+
 export interface GalleryItem {
   id: string
   name: string
   medicalUrl: string
   corporateUrl: string
   createdAt: number
-  organizationId?: string
-  organizationName?: string
+  /** Для фильтра по отделу в галерее. */
+  employeeId?: string
+  departmentId?: string
+  departmentName?: string
 }

@@ -2,16 +2,11 @@
 
 import { useState, useCallback, useRef, useEffect } from "react"
 import {
-  Upload,
-  Sparkles,
   AlertCircle,
   Settings,
-  X,
-  CheckCircle2,
   Loader2,
-  Download,
-  Trash2,
-  Building2,
+  FolderPlus,
+  UserPlus,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -26,267 +21,269 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { Organization, OrganizationEmployee } from "@/lib/types"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import type { Department, Employee } from "@/lib/types"
 import { BatchPortraitCard } from "@/components/batch-portrait-card"
-import { fetchAllOrganizations, fetchOrganizationById } from "@/lib/organizations-api"
+import {
+  fetchDepartments,
+  fetchEmployees,
+  createDepartment,
+  createEmployee,
+  updateEmployee,
+  deleteEmployee,
+} from "@/lib/structure-api"
 import { addGalleryItem } from "@/lib/gallery-api"
+import { compressImageForStorage } from "@/lib/image-compress"
 
-interface BatchItem {
-  id: string
-  name: string
-  status: "pending" | "analyzing" | "generating" | "complete" | "error"
-  medicalUrl: string | null
-  corporateUrl: string | null
-  error?: string
-  file?: File
-  photoUrl?: string
-  preview: string
-}
+type GenStatus = "pending" | "analyzing" | "generating" | "complete" | "error"
 
 interface BatchClientProps {
   hasApiKey: boolean
 }
 
-async function dataUrlToFile(dataUrl: string, fileName: string): Promise<File> {
-  const res = await fetch(dataUrl)
+async function urlToBase64(url: string): Promise<{ base64: string; mimeType: string }> {
+  const res = await fetch(url)
   const blob = await res.blob()
-  return new File([blob], fileName, { type: blob.type || "image/jpeg" })
-}
-
-function fileToBase64(f: File): Promise<{ base64: string; mimeType: string }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => {
       const dataUrl = reader.result as string
-      const base64 = dataUrl.includes(",") ? dataUrl.split(",")[1]! : dataUrl
-      resolve({ base64, mimeType: f.type || "image/jpeg" })
+      const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
+      if (!match) return reject(new Error("Invalid data URL"))
+      resolve({ base64: match[2], mimeType: match[1] })
     }
     reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(f)
+    reader.readAsDataURL(blob)
   })
 }
 
-function dataUrlToBase64(dataUrl: string): { base64: string; mimeType: string } {
-  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
-  if (!match) return { base64: "", mimeType: "image/jpeg" }
-  return { base64: match[2], mimeType: match[1] }
-}
-
 export function BatchClient({ hasApiKey }: BatchClientProps) {
-  const [mode, setMode] = useState<"upload" | "organization">("upload")
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>("")
-  const [organizations, setOrganizations] = useState<Organization[]>([])
-  const [orgEmployees, setOrgEmployees] = useState<OrganizationEmployee[]>([])
-  const [items, setItems] = useState<BatchItem[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [generationState, setGenerationState] = useState<Record<string, { status: GenStatus; medicalUrl?: string | null; corporateUrl?: string | null; error?: string }>>({})
   const [isProcessing, setIsProcessing] = useState(false)
-  const [currentIndex, setCurrentIndex] = useState(-1)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [currentId, setCurrentId] = useState<string | null>(null)
+  const [newDeptName, setNewDeptName] = useState("")
+  const [addDeptOpen, setAddDeptOpen] = useState(false)
+  const [addToDepartmentId, setAddToDepartmentId] = useState<string | null>(null)
+  const [genSelectValue, setGenSelectValue] = useState("_")
+  const inputRefRoot = useRef<HTMLInputElement>(null)
+  const inputRefDept = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    fetchAllOrganizations().then(setOrganizations).catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    if (mode === "organization" && selectedOrganizationId) {
-      fetchOrganizationById(selectedOrganizationId).then((org) => {
-        if (!org) {
-          setOrgEmployees([])
-          setItems([])
-          return
-        }
-        setOrgEmployees(org.employees)
-        setItems(
-          org.employees.map((e) => ({
-            id: e.id,
-            name: e.name,
-            status: "pending" as const,
-            medicalUrl: null,
-            corporateUrl: null,
-            photoUrl: e.photoUrl,
-            preview: e.photoUrl,
-          }))
-        )
-      })
-    } else if (mode === "organization") {
-      setOrgEmployees([])
-      setItems([])
+  const load = useCallback(async () => {
+    try {
+      const [depts, emps] = await Promise.all([fetchDepartments(), fetchEmployees()])
+      setDepartments(depts)
+      setEmployees(emps)
+    } catch {
+      setDepartments([])
+      setEmployees([])
     }
-  }, [mode, selectedOrganizationId])
-
-  const handleFiles = useCallback((files: FileList) => {
-    const newItems: BatchItem[] = Array.from(files)
-      .filter((f) => f.type.startsWith("image/"))
-      .map((file) => ({
-        id: crypto.randomUUID(),
-        file,
-        preview: URL.createObjectURL(file),
-        name: "",
-        status: "pending" as const,
-        medicalUrl: null,
-        corporateUrl: null,
-      }))
-    setItems((prev) => [...prev, ...newItems])
   }, [])
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault()
-      if (e.dataTransfer.files?.length) handleFiles(e.dataTransfer.files)
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const rootEmployees = employees.filter((e) => !e.departmentId)
+  const employeesByDept = departments.map((d) => ({
+    department: d,
+    employees: employees.filter((e) => e.departmentId === d.id),
+  }))
+  const allEmployees = employees
+  const completedCount = allEmployees.filter((e) => generationState[e.id]?.status === "complete").length
+  const progressPercent = allEmployees.length > 0 ? Math.round((completedCount / allEmployees.length) * 100) : 0
+
+  const handleAddDepartment = useCallback(async () => {
+    const name = newDeptName.trim()
+    if (!name) {
+      toast.error("Введите название отдела")
+      return
+    }
+    try {
+      await createDepartment({ name })
+      setNewDeptName("")
+      setAddDeptOpen(false)
+      await load()
+      toast.success("Отдел создан")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Не удалось создать отдел")
+    }
+  }, [newDeptName, load])
+
+  const handleDropOrSelect = useCallback(
+    async (files: FileList | File[], departmentId: string | null) => {
+      const list = Array.from("length" in files ? files : files).filter((f) => f.type.startsWith("image/"))
+      if (list.length === 0) return
+      for (const file of list) {
+        try {
+          const dataUrl = await compressImageForStorage(file).catch(() => {
+            return new Promise<string>((resolve, reject) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.onerror = () => reject(reader.error)
+              reader.readAsDataURL(file)
+            })
+          })
+          await createEmployee({
+            name: "Сотрудник",
+            photoUrl: dataUrl,
+            departmentId: departmentId ?? undefined,
+          })
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Не удалось добавить сотрудника")
+        }
+      }
+      await load()
+      if (list.length > 0) toast.success(list.length === 1 ? "Сотрудник добавлен" : "Сотрудники добавлены")
     },
-    [handleFiles]
+    [load]
   )
 
-  const removeItem = useCallback((id: string) => {
-    setItems((prev) => {
-      const item = prev.find((i) => i.id === id)
-      if (item?.file && item.preview?.startsWith("blob:")) URL.revokeObjectURL(item.preview)
-      return prev.filter((i) => i.id !== id)
-    })
-  }, [])
-
-  const clearAll = useCallback(() => {
-    items.forEach((item) => {
-      if (item.file && item.preview?.startsWith("blob:")) URL.revokeObjectURL(item.preview)
-    })
-    setItems([])
-    setCurrentIndex(-1)
-  }, [items])
-
-  const handleOrgEmployeeChange = useCallback((id: string, data: { name: string }) => {
-    setItems((prev) => prev.map((e) => (e.id === id ? { ...e, name: data.name } : e)))
-  }, [])
-
-  const handleOrgEmployeeRemove = useCallback((id: string) => {
-    setItems((prev) => prev.filter((e) => e.id !== id))
-  }, [])
-
-  const handleOrgFilesAdded = useCallback((files: File[]) => {
-    const newItems: BatchItem[] = files
-      .filter((f) => f.type.startsWith("image/"))
-      .map((file) => ({
-        id: crypto.randomUUID(),
-        file,
-        preview: URL.createObjectURL(file),
-        name: "",
-        status: "pending" as const,
-        medicalUrl: null,
-        corporateUrl: null,
-      }))
-    setItems((prev) => [...prev, ...newItems])
-  }, [])
-
-  const selectedOrg = selectedOrganizationId
-    ? organizations.find((o) => o.id === selectedOrganizationId)
-    : null
-
-  async function processBatch() {
-    if (items.length === 0) return
-    if (mode === "organization") {
-      const withoutName = items.filter((i) => !String(i.name ?? "").trim())
-      if (withoutName.length > 0) {
-        toast.error("Заполните имя у всех сотрудников")
-        return
-      }
-    }
-
-    setIsProcessing(true)
-    const orgId = mode === "organization" ? selectedOrganizationId : null
-    const orgName = selectedOrg?.name
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i]
-      if (item.status === "complete") continue
-
-      setCurrentIndex(i)
-
+  const handleEmployeeNameChange = useCallback(
+    async (employeeId: string, name: string) => {
+      const emp = employees.find((e) => e.id === employeeId)
+      if (!emp) return
       try {
-        setItems((prev) =>
-          prev.map((p) => (p.id === item.id ? { ...p, status: "analyzing" } : p))
-        )
+        await updateEmployee(employeeId, { name: name.trim() || "Сотрудник" })
+        setEmployees((prev) => prev.map((e) => (e.id === employeeId ? { ...e, name: name.trim() || "Сотрудник" } : e)))
+      } catch {
+        // ignore
+      }
+    },
+    [employees]
+  )
 
-        const file = item.file ?? (await dataUrlToFile(item.photoUrl!, `${item.name?.trim() || "photo"}.jpg`))
+  const handleRemoveEmployee = useCallback(
+    async (employeeId: string) => {
+      try {
+        await deleteEmployee(employeeId)
+        setEmployees((prev) => prev.filter((e) => e.id !== employeeId))
+        setGenerationState((prev) => {
+          const next = { ...prev }
+          delete next[employeeId]
+          return next
+        })
+        toast.success("Сотрудник удалён")
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Не удалось удалить")
+      }
+    },
+    []
+  )
+
+  const processOne = useCallback(
+    async (emp: Employee) => {
+      const id = emp.id
+      setCurrentId(id)
+      setGenerationState((prev) => ({ ...prev, [id]: { ...prev[id], status: "analyzing" } }))
+      try {
+        const photoUrl = emp.photoUrl.startsWith("http") || emp.photoUrl.startsWith("data:") ? emp.photoUrl : `${window.location.origin}${emp.photoUrl}`
+        const reference = await urlToBase64(photoUrl)
         const formData = new FormData()
+        formData.append("employeeName", emp.name)
+        const blobRes = await fetch(photoUrl)
+        const blob = await blobRes.blob()
+        const file = new File([blob], `${emp.name}.jpg`, { type: blob.type || "image/jpeg" })
         formData.append("photo", file)
-        formData.append("employeeName", item.name?.trim() || "Сотрудник")
 
         const analyzeRes = await fetch("/api/analyze", { method: "POST", body: formData })
         if (!analyzeRes.ok) throw new Error("Ошибка анализа")
-
         const analysis = await analyzeRes.json()
-        const reference = item.file
-          ? await fileToBase64(item.file)
-          : dataUrlToBase64(item.photoUrl!)
 
-        setItems((prev) =>
-          prev.map((p) => (p.id === item.id ? { ...p, status: "generating" } : p))
-        )
+        setGenerationState((prev) => ({ ...prev, [id]: { ...prev[id], status: "generating" } }))
 
-        const medicalRes = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: analysis.medicalPrompt,
-            style: "medical",
-            referencePhotoBase64: reference.base64,
-            referencePhotoMimeType: reference.mimeType,
+        const [medicalRes, corporateRes] = await Promise.all([
+          fetch("/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt: analysis.medicalPrompt,
+              style: "medical",
+              referencePhotoBase64: reference.base64,
+              referencePhotoMimeType: reference.mimeType,
+            }),
           }),
-        })
+          fetch("/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt: analysis.corporatePrompt,
+              style: "corporate",
+              referencePhotoBase64: reference.base64,
+              referencePhotoMimeType: reference.mimeType,
+            }),
+          }),
+        ])
         let medicalUrl: string | null = null
+        let corporateUrl: string | null = null
         if (medicalRes.ok) {
           const data = await medicalRes.json()
           medicalUrl = data.imageUrl
         }
-
-        const corporateRes = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: analysis.corporatePrompt,
-            style: "corporate",
-            referencePhotoBase64: reference.base64,
-            referencePhotoMimeType: reference.mimeType,
-          }),
-        })
-        let corporateUrl: string | null = null
         if (corporateRes.ok) {
           const data = await corporateRes.json()
           corporateUrl = data.imageUrl
         }
-
-        setItems((prev) =>
-          prev.map((p) =>
-            p.id === item.id ? { ...p, status: "complete", medicalUrl, corporateUrl } : p
-          )
-        )
-
+        setGenerationState((prev) => ({ ...prev, [id]: { status: "complete", medicalUrl, corporateUrl } }))
         if (medicalUrl && corporateUrl) {
           try {
             await addGalleryItem({
-              name: item.name?.trim() || "Сотрудник",
+              name: emp.name,
               medicalUrl,
               corporateUrl,
-              organizationId: orgId || undefined,
-              organizationName: orgName ?? undefined,
+              employeeId: id,
             })
           } catch {
             // ignore
           }
         }
       } catch (error) {
-        setItems((prev) =>
-          prev.map((p) =>
-            p.id === item.id
-              ? { ...p, status: "error", error: error instanceof Error ? error.message : "Ошибка" }
-              : p
-          )
-        )
+        setGenerationState((prev) => ({
+          ...prev,
+          [id]: { status: "error", error: error instanceof Error ? error.message : "Ошибка" },
+        }))
+      } finally {
+        setCurrentId(null)
       }
-    }
+    },
+    []
+  )
 
-    setIsProcessing(false)
-    setCurrentIndex(-1)
-    toast.success("Пакетная обработка завершена")
-  }
+  const processBatch = useCallback(
+    async (scope: "all" | "root" | "department" | "one", departmentId?: string, employeeId?: string) => {
+      let toProcess: Employee[]
+      if (scope === "one" && employeeId) {
+        toProcess = employees.filter((e) => e.id === employeeId)
+      } else if (scope === "department" && departmentId) {
+        toProcess = employees.filter((e) => e.departmentId === departmentId)
+      } else if (scope === "root") {
+        toProcess = employees.filter((e) => !e.departmentId)
+      } else {
+        toProcess = employees
+      }
+      toProcess = toProcess.filter((e) => generationState[e.id]?.status !== "complete")
+      if (toProcess.length === 0) {
+        toast.info(scope === "one" ? "У сотрудника уже есть портреты" : "Нет сотрудников для обработки")
+        return
+      }
+      setIsProcessing(true)
+      for (const emp of toProcess) {
+        await processOne(emp)
+      }
+      setIsProcessing(false)
+      toast.success("Обработка завершена")
+      setGenSelectValue("_")
+    },
+    [employees, generationState, processOne]
+  )
 
   if (!hasApiKey) {
     return (
@@ -310,201 +307,198 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
     )
   }
 
-  const completedCount = items.filter((i) => i.status === "complete").length
-  const totalCount = items.length
-  const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
-
   return (
     <div className="flex flex-col gap-6">
-      {/* Mode switch */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex rounded-lg border border-border p-1">
-          <button
-            type="button"
-            onClick={() => setMode("upload")}
-            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              mode === "upload" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Upload className="size-4" />
-            Загрузить фото
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("organization")}
-            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              mode === "organization" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Building2 className="size-4" />
-            По организации
-          </button>
-        </div>
-
-        {mode === "organization" && (
-          <Select
-            value={selectedOrganizationId || "_none"}
-            onValueChange={(v) => setSelectedOrganizationId(v === "_none" ? "" : v)}
-            disabled={isProcessing}
-          >
-            <SelectTrigger className="w-[280px]">
-              <SelectValue placeholder="Выберите организацию" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="_none">Выберите организацию</SelectItem>
-              {organizations.map((org) => (
-                <SelectItem key={org.id} value={org.id}>
-                  {org.name} ({org.employees.length})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setAddDeptOpen(true)}
+          disabled={isProcessing}
+        >
+          <FolderPlus className="mr-2 size-4" />
+          Добавить отдел
+        </Button>
+        <Select
+          value={genSelectValue}
+          onValueChange={(v) => {
+            setGenSelectValue(v)
+            if (v === "_all") processBatch("all")
+            else if (v === "_root") processBatch("root")
+            else if (v.startsWith("dept_")) processBatch("department", v.slice(5))
+          }}
+          disabled={isProcessing || employees.length === 0}
+        >
+          <SelectTrigger className="w-[220px]">
+            <SelectValue placeholder="Сгенерировать…" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_">Сгенерировать…</SelectItem>
+            <SelectItem value="_all">Сгенерировать все</SelectItem>
+            <SelectItem value="_root">Только без отдела</SelectItem>
+            {departments.map((d) => (
+              <SelectItem key={d.id} value={`dept_${d.id}`}>
+                Отдел: {d.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {allEmployees.length > 0 && (
+          <Badge variant="secondary" className="text-xs">
+            {completedCount}/{allEmployees.length} готово
+          </Badge>
         )}
       </div>
+      <input
+        ref={inputRefDept}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        multiple
+        className="hidden"
+        aria-hidden
+        onChange={(e) => {
+          if (e.target.files?.length && addToDepartmentId !== null)
+            handleDropOrSelect(e.target.files, addToDepartmentId)
+          e.target.value = ""
+          setAddToDepartmentId(null)
+        }}
+      />
 
-      {/* Upload area — only in upload mode */}
-      {mode === "upload" && !isProcessing && (
-        <div
-          className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/30 px-6 py-10 text-center transition-colors hover:border-primary/40 hover:bg-muted/50"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
-          onClick={() => inputRef.current?.click()}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") inputRef.current?.click()
-          }}
-        >
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              if (e.target.files?.length) handleFiles(e.target.files)
-              e.target.value = ""
-            }}
-          />
-          <Upload className="size-8 text-muted-foreground" />
-          <p className="mt-3 text-sm font-medium text-foreground">
-            Перетащите сюда несколько фото или нажмите для выбора
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            JPG, PNG, WebP. С каждого фото будут созданы два стиля портрета.
-          </p>
+      {allEmployees.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <Progress value={progressPercent} className="h-1.5" />
         </div>
       )}
 
-      {/* Add employees (org mode only) */}
-      {mode === "organization" && selectedOrganizationId && !isProcessing && (
+      {/* Без отдела */}
+      <div className="space-y-2">
+        <h3 className="text-sm font-medium text-muted-foreground">Без отдела</h3>
         <div
-          className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-muted/30 py-4 text-center"
+          className="flex min-h-[100px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-muted/20 py-4 transition-colors hover:border-primary/40 hover:bg-muted/40"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault()
-            if (e.dataTransfer.files?.length) handleOrgFilesAdded(Array.from(e.dataTransfer.files))
+            if (e.dataTransfer.files?.length) handleDropOrSelect(e.dataTransfer.files, null)
           }}
-          onClick={() => inputRef.current?.click()}
+          onClick={() => inputRefRoot.current?.click()}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") inputRef.current?.click()
+            if (e.key === "Enter" || e.key === " ") inputRefRoot.current?.click()
           }}
         >
           <input
-            ref={inputRef}
+            ref={inputRefRoot}
             type="file"
             accept="image/jpeg,image/png,image/webp"
             multiple
             className="hidden"
             onChange={(e) => {
-              if (e.target.files?.length) handleOrgFilesAdded(Array.from(e.target.files))
+              if (e.target.files?.length) handleDropOrSelect(e.target.files, null)
               e.target.value = ""
             }}
           />
-          <Upload className="size-5 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">Добавить сотрудников (фото)</span>
+          <UserPlus className="size-5 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">Добавить сотрудника (фото)</span>
         </div>
-      )}
-
-      {/* Controls */}
-      {items.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-foreground">
-                {totalCount} {totalCount === 1 ? "фото" : "фото"}
-              </span>
-              {completedCount > 0 && (
-                <Badge variant="secondary" className="text-xs">
-                  {completedCount} готово
-                </Badge>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {!isProcessing && (
-                <Button variant="ghost" size="sm" onClick={clearAll}>
-                  <Trash2 className="mr-2 size-4" />
-                  Очистить всё
-                </Button>
-              )}
-              <Button
-                onClick={processBatch}
-                disabled={isProcessing || items.length === 0}
-                size="sm"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 size-4 animate-spin" />
-                    Обработка {currentIndex + 1}/{totalCount}...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 size-4" />
-                    Сгенерировать все
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-
-          {isProcessing && (
-            <div className="flex flex-col gap-1">
-              <Progress value={progressPercent} className="h-1.5" />
-              <span className="text-xs text-muted-foreground">
-                Обработка фото {currentIndex + 1} из {totalCount}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Сетка карточек: исходник + «Стало» (до 3 в ряд на больших экранах) */}
-      {items.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map((item, idx) => (
-            <BatchPortraitCard
-              key={item.id}
-              item={{
-                id: item.id,
-                name: item.name,
-                preview: item.photoUrl ?? item.preview,
-                status: item.status,
-                medicalUrl: item.medicalUrl,
-                corporateUrl: item.corporateUrl,
-                error: item.error,
-              }}
-              index={idx}
-              isCurrent={idx === currentIndex}
-              isProcessing={isProcessing}
-              onRemove={mode === "organization" || mode === "upload" ? () => removeItem(item.id) : undefined}
-              onNameChange={mode === "organization" ? (name) => handleOrgEmployeeChange(item.id, { name }) : undefined}
-              showNameInput={mode === "organization"}
-            />
-          ))}
+          {rootEmployees.map((emp) => {
+            const gen = generationState[emp.id]
+            return (
+              <BatchPortraitCard
+                key={emp.id}
+                item={{
+                  id: emp.id,
+                  name: emp.name,
+                  preview: emp.photoUrl,
+                  status: gen?.status ?? "pending",
+                  medicalUrl: gen?.medicalUrl ?? null,
+                  corporateUrl: gen?.corporateUrl ?? null,
+                  error: gen?.error,
+                }}
+                index={rootEmployees.findIndex((e) => e.id === emp.id)}
+                isCurrent={currentId === emp.id}
+                isProcessing={isProcessing}
+                onRemove={() => handleRemoveEmployee(emp.id)}
+                onNameChange={(name) => handleEmployeeNameChange(emp.id, name)}
+                showNameInput
+                onGenerate={gen?.status !== "complete" ? () => processBatch("one", undefined, emp.id) : undefined}
+              />
+            )
+          })}
         </div>
-      )}
+      </div>
+
+      {/* По отделам */}
+      {employeesByDept.map(({ department, employees: deptEmployees }) => (
+        <div key={department.id} className="space-y-2">
+          <h3 className="text-sm font-medium text-muted-foreground">{department.name}</h3>
+          <div
+            className="flex min-h-[80px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-muted/20 py-3 transition-colors hover:border-primary/40 hover:bg-muted/40"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault()
+              if (e.dataTransfer.files?.length) handleDropOrSelect(e.dataTransfer.files, department.id)
+            }}
+            onClick={() => {
+              setAddToDepartmentId(department.id)
+              setTimeout(() => inputRefDept.current?.click(), 0)
+            }}
+            role="button"
+            tabIndex={0}
+          >
+            <UserPlus className="size-4 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Добавить в отдел</span>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {deptEmployees.map((emp) => {
+              const gen = generationState[emp.id]
+              return (
+                <BatchPortraitCard
+                  key={emp.id}
+                  item={{
+                    id: emp.id,
+                    name: emp.name,
+                    preview: emp.photoUrl,
+                    status: gen?.status ?? "pending",
+                    medicalUrl: gen?.medicalUrl ?? null,
+                    corporateUrl: gen?.corporateUrl ?? null,
+                    error: gen?.error,
+                  }}
+                  index={deptEmployees.findIndex((e) => e.id === emp.id)}
+                  isCurrent={currentId === emp.id}
+                  isProcessing={isProcessing}
+                  onRemove={() => handleRemoveEmployee(emp.id)}
+                  onNameChange={(name) => handleEmployeeNameChange(emp.id, name)}
+                  showNameInput
+                  onGenerate={gen?.status !== "complete" ? () => processBatch("one", undefined, emp.id) : undefined}
+                />
+              )
+            })}
+          </div>
+        </div>
+      ))}
+
+      <Dialog open={addDeptOpen} onOpenChange={setAddDeptOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Новый отдел</DialogTitle>
+          </DialogHeader>
+          <Input
+            placeholder="Название отдела"
+            value={newDeptName}
+            onChange={(e) => setNewDeptName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAddDepartment()}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddDeptOpen(false)}>
+              Отмена
+            </Button>
+            <Button onClick={handleAddDepartment}>Создать</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

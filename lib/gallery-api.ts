@@ -2,8 +2,11 @@ import type { GalleryItem } from "@/lib/types"
 
 const BASE = "/api/gallery"
 
-export async function fetchGallery(): Promise<GalleryItem[]> {
-  const res = await fetch(BASE)
+export async function fetchGallery(params?: { departmentId?: string }): Promise<GalleryItem[]> {
+  const url = params?.departmentId
+    ? `${BASE}?departmentId=${encodeURIComponent(params.departmentId)}`
+    : BASE
+  const res = await fetch(url)
   if (!res.ok) throw new Error(await res.text())
   const data = await res.json()
   return data
@@ -13,8 +16,7 @@ export async function addGalleryItem(body: {
   name: string
   medicalUrl: string
   corporateUrl: string
-  organizationId?: string
-  organizationName?: string
+  employeeId?: string
 }): Promise<GalleryItem> {
   const res = await fetch(BASE, {
     method: "POST",
