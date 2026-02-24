@@ -14,12 +14,12 @@
 Системный промпт просит описать человека на фото и вернуть два детальных промпта в JSON:
 
 - **Медицинский портрет (шаблон для Gemini):**  
-  «The person wearing a crisp white medical doctor's coat with a stethoscope, professional medical setting. Clean, well-lit studio backdrop in light gray or white. Professional headshot style, shoulders up. Warm, approachable expression. High-quality studio photography lighting.»
+  Сначала — детальное описание лица человека с фото; затем: «wearing a crisp white medical doctor's coat, professional medical setting. Clean, well-lit studio backdrop in light gray or white. Professional headshot style, shoulders up. Warm, approachable expression. High-quality studio photography lighting.» (стетоскоп убран; акцент на максимальное сходство лица.)
 
 - **Корпоративный портрет (шаблон для Gemini):**  
   «The person in professional business attire (dark suit/blazer). Clean corporate background in dark navy or charcoal gray. Professional headshot style, shoulders up. Confident, professional expression. Studio photography with rim lighting.»
 
-Ограничение: оба промпта должны описывать **одного и того же** человека с фото (внешность, этничность, черты лица сохраняются).
+Жёсткие требования: оба промпта должны описывать **одного и того же** человека; в начале каждого промпта — точное описание лица (форма, кожа, волосы, глаза, нос, рот, возраст, отличительные черты), чтобы сгенерированное изображение было максимально похоже на исходное фото. Стетоскоп в медицинском портрете не используется.
 
 В ответе API возвращаются поля `medicalPrompt` и `corporatePrompt` — это уже развёрнутые тексты от Gemini с описанием человека под каждый стиль.
 
@@ -34,7 +34,7 @@
 Формируется **общий префикс и суффикс**:
 
 - Префикс (общий для обоих стилей):  
-  `"Professional studio headshot portrait photo. " + prompt + ". Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture."`
+  `"Professional studio headshot portrait photo. " + prompt + ". CRITICAL: The face in the image MUST match the person described above exactly—same face shape, same eyes, same skin tone, same hair, same recognizable identity. Do not alter or idealize the face; preserve maximum likeness to the described person. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture."`
 
 - Суффикс по стилю:
   - **medical:**  

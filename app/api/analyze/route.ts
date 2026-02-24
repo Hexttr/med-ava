@@ -42,28 +42,30 @@ export async function POST(request: NextRequest) {
     const mimeType = (photo as File).type || "image/jpeg"
 
     // Call Gemini API for analysis
-    const analysisPrompt = `You are a professional portrait photography prompt engineer for an AI image generation system called NanoBanano.
+    const analysisPrompt = `You are a professional portrait photography prompt engineer for an AI image generation system. Your goal is to produce text prompts that will generate portraits where the face is MAXIMUM LIKENESS to the source photo.
 
-Analyze this photo of a person named "${employeeName}". Focus on:
-- Face shape, skin tone, hair color and style
-- Eye color and shape
-- Approximate age
-- Any distinguishing features
-- Gender presentation
+Analyze this photo of a person named "${employeeName}". You MUST describe the face in precise, unambiguous detail:
+- Exact face shape (oval, round, square, heart, etc.)
+- Skin tone and texture (specific shade, any visible features)
+- Hair: color, exact style, length, parting, any distinctive detail
+- Eyes: color, shape, spacing, eyebrows (shape and color)
+- Nose and mouth: shape, lip fullness, any distinctive traits
+- Approximate age and gender presentation
+- Any distinguishing features (moles, freckles, scars, glasses imprint, etc.)
 
-Based on your analysis, create TWO detailed prompts for generating professional portraits:
+Based on your analysis, create TWO detailed prompts for generating professional portraits. Each prompt MUST start with a full, precise description of this person's face and head so the generated image looks like the SAME person.
 
-1. MEDICAL PORTRAIT: The person wearing a crisp white medical doctor's coat with a stethoscope, professional medical setting. Clean, well-lit studio backdrop in light gray or white. Professional headshot style, shoulders up. Warm, approachable expression. High-quality studio photography lighting.
+1. MEDICAL PORTRAIT: First describe the person's face and appearance in full detail (so the portrait is unmistakably the same person), then: wearing a crisp white medical doctor's coat, professional medical setting. Clean, well-lit studio backdrop in light gray or white. Professional headshot style, shoulders up. Warm, approachable expression. High-quality studio photography lighting.
 
-2. CORPORATE PORTRAIT: The person in professional business attire (dark suit/blazer). Clean corporate background in dark navy or charcoal gray. Professional headshot style, shoulders up. Confident, professional expression. Studio photography with rim lighting.
+2. CORPORATE PORTRAIT: First describe the person's face and appearance in full detail (same as above—identical person), then: in professional business attire (dark suit/blazer). Clean corporate background in dark navy or charcoal gray. Professional headshot style, shoulders up. Confident, professional expression. Studio photography with rim lighting.
 
-IMPORTANT: Each prompt must describe the SAME person from the photo, maintaining their exact appearance, ethnicity, facial features, and characteristics. The prompts should be detailed enough for accurate portrait generation.
+CRITICAL: Both prompts must describe the EXACT SAME person from the photo. The face in the generated image must be recognizable as this person. Lead each prompt with a detailed facial description so the AI image model preserves identity and likeness.
 
 Respond in EXACTLY this JSON format:
 {
   "description": "Brief description of the person in the photo",
-  "medicalPrompt": "Full detailed prompt for medical portrait...",
-  "corporatePrompt": "Full detailed prompt for corporate portrait..."
+  "medicalPrompt": "Full detailed prompt for medical portrait (start with precise face description)...",
+  "corporatePrompt": "Full detailed prompt for corporate portrait (start with precise face description)..."
 }`
 
     // Анализ фото: Gemini 2.5 Flash (запрос через fetchWithProxy для поддержки VPN/прокси)

@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const enhancedPrompt = `Professional studio headshot portrait photo. ${prompt}. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture. ${
+    const enhancedPrompt = `Professional studio headshot portrait photo. ${prompt}. CRITICAL: The face in the image MUST match the person described above exactly—same face shape, same eyes, same skin tone, same hair, same recognizable identity. Do not alter or idealize the face; preserve maximum likeness to the described person. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture. ${
       style === "medical"
         ? "Clean white/light gray backdrop, medical professional aesthetic."
         : "Dark corporate backdrop, business professional aesthetic."
