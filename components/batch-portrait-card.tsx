@@ -255,6 +255,12 @@ export function BatchPortraitCard({
                 Сгенерировать
               </Button>
             )}
+            {(item.status === "analyzing" || item.status === "generating") && (
+              <Button type="button" size="sm" className="h-8 w-full shrink-0 text-sm" disabled>
+                <Loader2 className="mr-2 size-4 shrink-0 animate-spin" />
+                Генерация...
+              </Button>
+            )}
             {item.status === "complete" && onRegenerate && (
               <Button
                 type="button"

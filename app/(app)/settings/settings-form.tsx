@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect, useTransition } from "react"
+import { useState, useEffect, useTransition, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Key, Save, Trash2, CheckCircle2, ExternalLink, Stethoscope, Building2, FileText } from "lucide-react"
+import { Key, Save, Trash2, CheckCircle2, ExternalLink, Stethoscope, Building2, FileText, ImageIcon, FileTextIcon, Upload } from "lucide-react"
 import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,16 +11,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 
 interface AppSettingsData {
   organizationName: string
   backgroundMedical: string
   backgroundCorporate: string
+  backgroundMedicalImage?: string
+  backgroundCorporateImage?: string
+  backgroundMode?: "description" | "image"
   promptAnalysis: string
   promptUniversalFraming: string
   promptMedicalInstruction: string
@@ -40,19 +39,26 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
   const [orgName, setOrgName] = useState(initialAppSettings?.organizationName ?? "")
   const [bgMedical, setBgMedical] = useState(initialAppSettings?.backgroundMedical ?? "")
   const [bgCorporate, setBgCorporate] = useState(initialAppSettings?.backgroundCorporate ?? "")
+  const [bgMode, setBgMode] = useState<"description" | "image">(initialAppSettings?.backgroundMode ?? "description")
+  const [bgMedicalFile, setBgMedicalFile] = useState<File | null>(null)
+  const [bgCorporateFile, setBgCorporateFile] = useState<File | null>(null)
+  const [clearMedicalRequested, setClearMedicalRequested] = useState(false)
+  const [clearCorporateRequested, setClearCorporateRequested] = useState(false)
+  const medicalFileRef = useRef<HTMLInputElement>(null)
+  const corporateFileRef = useRef<HTMLInputElement>(null)
   const [promptAnalysis, setPromptAnalysis] = useState(initialAppSettings?.promptAnalysis ?? "")
   const [promptUniversalFraming, setPromptUniversalFraming] = useState(initialAppSettings?.promptUniversalFraming ?? "")
   const [promptMedicalInstruction, setPromptMedicalInstruction] = useState(initialAppSettings?.promptMedicalInstruction ?? "")
   const [promptCorporateInstruction, setPromptCorporateInstruction] = useState(initialAppSettings?.promptCorporateInstruction ?? "")
   const [promptNegative, setPromptNegative] = useState(initialAppSettings?.promptNegative ?? "")
   const [appPending, setAppPending] = useState(false)
-  const [promptsOpen, setPromptsOpen] = useState(true)
 
   useEffect(() => {
     if (initialAppSettings) {
       setOrgName(initialAppSettings.organizationName)
       setBgMedical(initialAppSettings.backgroundMedical)
       setBgCorporate(initialAppSettings.backgroundCorporate)
+      setBgMode(initialAppSettings.backgroundMode ?? "description")
       setPromptAnalysis(initialAppSettings.promptAnalysis ?? "")
       setPromptUniversalFraming(initialAppSettings.promptUniversalFraming ?? "")
       setPromptMedicalInstruction(initialAppSettings.promptMedicalInstruction ?? "")
@@ -107,6 +113,29 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
   async function handleSaveAppSettings() {
     setAppPending(true)
     try {
+      if (bgMode === "image" && (bgMedicalFile || bgCorporateFile || clearMedicalRequested || clearCorporateRequested)) {
+        const fd = new FormData()
+        if (bgMedicalFile) fd.append("backgroundMedical", bgMedicalFile)
+        if (bgCorporateFile) fd.append("backgroundCorporate", bgCorporateFile)
+        if (clearMedicalRequested) fd.append("clearMedical", "true")
+        if (clearCorporateRequested) fd.append("clearCorporate", "true")
+        const bgRes = await fetch("/api/settings/backgrounds", {
+          method: "POST",
+          body: fd,
+        })
+        const bgData = await bgRes.json().catch(() => ({}))
+        if (!bgRes.ok) {
+          toast.error(bgData.error || "Не удалось сохранить фоны")
+          setAppPending(false)
+          return
+        }
+        setBgMedicalFile(null)
+        setBgCorporateFile(null)
+        setClearMedicalRequested(false)
+        setClearCorporateRequested(false)
+        if (medicalFileRef.current) medicalFileRef.current.value = ""
+        if (corporateFileRef.current) corporateFileRef.current.value = ""
+      }
       const res = await fetch("/api/settings/app", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -114,6 +143,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
           organizationName: orgName.trim(),
           backgroundMedical: bgMedical.trim(),
           backgroundCorporate: bgCorporate.trim(),
+          backgroundMode: bgMode,
           promptAnalysis: promptAnalysis.trim(),
           promptUniversalFraming: promptUniversalFraming.trim(),
           promptMedicalInstruction: promptMedicalInstruction.trim(),
@@ -136,7 +166,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
   }
 
   return (
-    <div className="grid max-w-5xl grid-cols-1 gap-6 lg:grid-cols-2">
+    <div className="grid w-full max-w-full grid-cols-1 gap-6 lg:grid-cols-[minmax(0,440px)_1fr]">
       <div className="flex flex-col gap-6">
       <Card>
         <CardHeader>
@@ -145,9 +175,9 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
               <Building2 className="size-5 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-base">Название организации</CardTitle>
+              <CardTitle className="text-base">Настройки организации</CardTitle>
               <CardDescription>
-                Отображается в левой колонке сверху вместо подзаголовка
+                Название и фоны для портретов (описание или изображения)
               </CardDescription>
             </div>
           </div>
@@ -163,26 +193,140 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="bg-medical">Фон 1 — для медицинского портрета</Label>
-            <Textarea
-              id="bg-medical"
-              placeholder="Оставьте пустым, чтобы модель сама выбирала фон (светло-серый/белый)"
-              value={bgMedical}
-              onChange={(e) => setBgMedical(e.target.value)}
-              rows={2}
-              className="resize-none"
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="bg-corporate">Фон 2 — для корпоративного портрета</Label>
-            <Textarea
-              id="bg-corporate"
-              placeholder="Оставьте пустым, чтобы модель сама выбирала фон (тёмно-серый/синий)"
-              value={bgCorporate}
-              onChange={(e) => setBgCorporate(e.target.value)}
-              rows={2}
-              className="resize-none"
-            />
+            <Label>Фоны для портретов</Label>
+            <Tabs value={bgMode} onValueChange={(v) => setBgMode(v as "description" | "image")}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="description" className="gap-1.5">
+                  <FileTextIcon className="size-4" />
+                  Описание
+                </TabsTrigger>
+                <TabsTrigger value="image" className="gap-1.5">
+                  <ImageIcon className="size-4" />
+                  Изображения
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="description" className="mt-3 flex flex-col gap-3">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="bg-medical">Фон 1 — для медицинского портрета</Label>
+                  <Textarea
+                    id="bg-medical"
+                    placeholder="Оставьте пустым для базовых настроек (светло-серый/белый)"
+                    value={bgMedical}
+                    onChange={(e) => setBgMedical(e.target.value)}
+                    rows={2}
+                    className="resize-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="bg-corporate">Фон 2 — для корпоративного портрета</Label>
+                  <Textarea
+                    id="bg-corporate"
+                    placeholder="Оставьте пустым для базовых настроек (тёмно-серый/синий)"
+                    value={bgCorporate}
+                    onChange={(e) => setBgCorporate(e.target.value)}
+                    rows={2}
+                    className="resize-none"
+                  />
+                </div>
+              </TabsContent>
+              <TabsContent value="image" className="mt-3 flex flex-col gap-3">
+                <p className="text-xs text-muted-foreground">
+                  Изображения имеют высший приоритет. Если загружены — используются вместо описания.
+                </p>
+                <div className="flex flex-col gap-2">
+                  <Label>Фон 1 — медицинский</Label>
+                  {(bgMedicalFile || (initialAppSettings?.backgroundMedicalImage && !clearMedicalRequested)) && (
+                    <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-2">
+                      {bgMedicalFile ? (
+                        <span className="text-sm">{bgMedicalFile.name}</span>
+                      ) : initialAppSettings?.backgroundMedicalImage ? (
+                        <img
+                          src={`/api/files/${initialAppSettings.backgroundMedicalImage}`}
+                          alt="Мед. фон"
+                          className="h-12 w-12 rounded object-cover"
+                        />
+                      ) : null}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setBgMedicalFile(null)
+                          if (medicalFileRef.current) medicalFileRef.current.value = ""
+                          if (initialAppSettings?.backgroundMedicalImage) setClearMedicalRequested(true)
+                        }}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      ref={medicalFileRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={(e) => setBgMedicalFile(e.target.files?.[0] ?? null)}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => medicalFileRef.current?.click()}
+                    >
+                      <Upload className="mr-2 size-4" />
+                      {bgMedicalFile ? "Заменить" : "Загрузить изображение"}
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label>Фон 2 — корпоративный</Label>
+                  {(bgCorporateFile || (initialAppSettings?.backgroundCorporateImage && !clearCorporateRequested)) && (
+                    <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-2">
+                      {bgCorporateFile ? (
+                        <span className="text-sm">{bgCorporateFile.name}</span>
+                      ) : initialAppSettings?.backgroundCorporateImage ? (
+                        <img
+                          src={`/api/files/${initialAppSettings.backgroundCorporateImage}`}
+                          alt="Корп. фон"
+                          className="h-12 w-12 rounded object-cover"
+                        />
+                      ) : null}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setBgCorporateFile(null)
+                          if (corporateFileRef.current) corporateFileRef.current.value = ""
+                          if (initialAppSettings?.backgroundCorporateImage) setClearCorporateRequested(true)
+                        }}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      ref={corporateFileRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={(e) => setBgCorporateFile(e.target.files?.[0] ?? null)}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => corporateFileRef.current?.click()}
+                    >
+                      <Upload className="mr-2 size-4" />
+                      {bgCorporateFile ? "Заменить" : "Загрузить изображение"}
+                    </Button>
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
           <Button onClick={handleSaveAppSettings} disabled={appPending}>
             <Save className="mr-2 size-4" />
@@ -296,19 +440,13 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
             <div>
               <CardTitle className="text-base">Промпты для генерации</CardTitle>
               <CardDescription>
-                Текущие значения (по умолчанию или сохранённые). Английский рекомендуется для лучшего качества. Редактируйте и сохраните.
+                Текущие значения (по умолчанию или сохранённые). Редактируйте и сохраните.
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <Collapsible open={promptsOpen} onOpenChange={setPromptsOpen}>
-            <CollapsibleTrigger asChild>
-              <Button variant="outline" size="sm" className="w-full justify-between">
-                {promptsOpen ? "Свернуть промпты" : "Развернуть промпты"}
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-4 flex flex-col gap-4">
+          <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="prompt-analysis">Промпт анализа (шаблон)</Label>
                 <Textarea
@@ -364,8 +502,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
                   className="resize-none font-mono text-xs"
                 />
               </div>
-            </CollapsibleContent>
-          </Collapsible>
+          </div>
           <Button onClick={handleSaveAppSettings} disabled={appPending}>
             <Save className="mr-2 size-4" />
             Сохранить промпты

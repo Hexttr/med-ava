@@ -35,6 +35,25 @@ export function getAbsolutePath(relativePath: string): string {
 }
 
 /**
+ * Сохраняет буфер изображения в backgrounds/. Возвращает путь относительно data/uploads.
+ */
+export async function saveBackgroundImage(
+  buffer: Buffer,
+  filename: string,
+  mimeType: string
+): Promise<string> {
+  const ext = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg"
+  const dir = "backgrounds"
+  const baseDir = getUploadsDir()
+  const fullDir = path.join(baseDir, dir)
+  await fs.mkdir(fullDir, { recursive: true })
+  const finalName = `${filename}.${ext}`
+  const filePath = path.join(fullDir, finalName)
+  await fs.writeFile(filePath, buffer)
+  return path.join(dir, finalName)
+}
+
+/**
  * Удаляет файл по относительному пути. Игнорирует ошибки если файла нет.
  */
 export async function removeFile(relativePath: string): Promise<void> {

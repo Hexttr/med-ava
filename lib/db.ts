@@ -17,8 +17,10 @@ function ensureDataDir() {
   }
   const employeesDir = path.join(UPLOADS_DIR, "employees")
   const galleryDir = path.join(UPLOADS_DIR, "gallery")
+  const backgroundsDir = path.join(UPLOADS_DIR, "backgrounds")
   if (!fs.existsSync(employeesDir)) fs.mkdirSync(employeesDir, { recursive: true })
   if (!fs.existsSync(galleryDir)) fs.mkdirSync(galleryDir, { recursive: true })
+  if (!fs.existsSync(backgroundsDir)) fs.mkdirSync(backgroundsDir, { recursive: true })
 }
 
 export function getDb(): Database.Database {

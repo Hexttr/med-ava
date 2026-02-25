@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
+import fs from "fs/promises"
+import path from "path"
 import { getGeminiKey } from "@/lib/settings"
 import { getAppSettings } from "@/lib/app-settings"
+import { getAbsolutePath } from "@/lib/storage"
 import { fetchWithProxy } from "@/lib/fetch-proxy"
 import { logger } from "@/lib/logger"
 import { checkRateLimit } from "@/lib/rate-limit"
@@ -55,10 +58,49 @@ export async function POST(request: NextRequest) {
     }
 
     const appSettings = getAppSettings()
-    const backgroundMedical = appSettings.backgroundMedical.trim()
-    const backgroundCorporate = appSettings.backgroundCorporate.trim()
     const defaultBackdropMedical = "Clean, well-lit studio backdrop in light gray or white."
     const defaultBackdropCorporate = "Clean corporate background in dark navy or charcoal gray."
+
+    // Приоритет: изображение > текст > базовые настройки
+    const bgMedicalImagePath = appSettings.backgroundMedicalImage?.trim()
+    const bgCorporateImagePath = appSettings.backgroundCorporateImage?.trim()
+    const backgroundMedical = appSettings.backgroundMedical.trim()
+    const backgroundCorporate = appSettings.backgroundCorporate.trim()
+
+    const hasMedicalImage = Boolean(bgMedicalImagePath)
+    const hasCorporateImage = Boolean(bgCorporateImagePath)
+    let backdropMedicalImageBase64: string | null = null
+    let backdropCorporateImageBase64: string | null = null
+    let backdropMedicalMime = "image/jpeg"
+    let backdropCorporateMime = "image/jpeg"
+
+    if (hasMedicalImage) {
+      try {
+        const fullPath = getAbsolutePath(bgMedicalImagePath)
+        const buf = await fs.readFile(fullPath)
+        backdropMedicalImageBase64 = buf.toString("base64")
+        const ext = path.extname(fullPath).toLowerCase()
+        backdropMedicalMime = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg"
+      } catch {
+        logger.warn("GENERATE", "Не удалось прочитать фон медицинского портрета", { path: bgMedicalImagePath })
+      }
+    }
+    if (hasCorporateImage) {
+      try {
+        const fullPath = getAbsolutePath(bgCorporateImagePath)
+        const buf = await fs.readFile(fullPath)
+        backdropCorporateImageBase64 = buf.toString("base64")
+        const ext = path.extname(fullPath).toLowerCase()
+        backdropCorporateMime = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg"
+      } catch {
+        logger.warn("GENERATE", "Не удалось прочитать фон корпоративного портрета", { path: bgCorporateImagePath })
+      }
+    }
+
+    const useMedicalImage = style === "medical" && backdropMedicalImageBase64
+    const useCorporateImage = style === "corporate" && backdropCorporateImageBase64
+    const useBackgroundImage = useMedicalImage || useCorporateImage
+
     const backdropMedical = backgroundMedical ? `Background: ${backgroundMedical}` : defaultBackdropMedical
     const backdropCorporate = backgroundCorporate ? `Background: ${backgroundCorporate}` : defaultBackdropCorporate
 
@@ -75,13 +117,20 @@ export async function POST(request: NextRequest) {
 
     const hasReferencePhoto = Boolean(referencePhotoBase64?.trim())
 
-    const geminiImagePrompt = hasReferencePhoto
-      ? `The attached image is the REFERENCE PHOTO of the person. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON — the face must be the same person, same identity, same likeness. Do NOT change the face, do NOT generate a different person. Only change the setting and clothing as follows: ${settingInstruction}. Keep the person's face, skin tone, hair, and all facial features identical to the reference.${negativeSuffix} Output the generated portrait image.`
-      : `Professional studio portrait photo. ${universalFraming} ${prompt}. CRITICAL: The face in the image MUST match the person described above exactly. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture. ${
-          style === "medical"
-            ? (backgroundMedical ? `${backdropMedical} Medical professional aesthetic.` : "Clean white/light gray backdrop, medical professional aesthetic.")
-            : (backgroundCorporate ? `${backdropCorporate} Business professional aesthetic.` : "Dark corporate backdrop, business professional aesthetic.")
-        }${negativeSuffix}`
+    let geminiImagePrompt: string
+    if (useBackgroundImage && hasReferencePhoto) {
+      geminiImagePrompt = `The FIRST attached image is the REFERENCE PHOTO of the person. The SECOND attached image is the BACKGROUND to use. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON placed onto this exact background. CRITICAL: The face must be the same person, same identity, same likeness. Do NOT change the face. Place the person naturally and seamlessly onto the provided background — match the lighting direction and color temperature of the environment, cast appropriate soft shadows on the floor/surfaces, ensure correct scale and perspective relative to background elements, blend edges naturally (no cutout/pasted look). ${settingInstruction}. Keep the person's face, skin tone, hair, and all facial features identical to the reference. Use standard portrait framing: head and upper torso only, bust-length, shoulders visible — same crop for both medical and corporate styles.${negativeSuffix} Output the generated portrait image.`
+    } else if (useBackgroundImage && !hasReferencePhoto) {
+      geminiImagePrompt = `The attached image is the BACKGROUND to use. Generate ONE professional studio portrait photo. ${universalFraming} ${prompt}. Place the person described in the prompt onto this exact background — match lighting, cast natural shadows, correct scale. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture.${negativeSuffix} Output the generated portrait image.`
+    } else if (hasReferencePhoto) {
+      geminiImagePrompt = `The attached image is the REFERENCE PHOTO of the person. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON — the face must be the same person, same identity, same likeness. Do NOT change the face, do NOT generate a different person. Only change the setting and clothing as follows: ${settingInstruction}. Keep the person's face, skin tone, hair, and all facial features identical to the reference.${negativeSuffix} Output the generated portrait image.`
+    } else {
+      geminiImagePrompt = `Professional studio portrait photo. ${universalFraming} ${prompt}. CRITICAL: The face in the image MUST match the person described above exactly. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture. ${
+        style === "medical"
+          ? (backgroundMedical ? `${backdropMedical} Medical professional aesthetic.` : "Clean white/light gray backdrop, medical professional aesthetic.")
+          : (backgroundCorporate ? `${backdropCorporate} Business professional aesthetic.` : "Dark corporate backdrop, business professional aesthetic.")
+      }${negativeSuffix}`
+    }
 
     let gemini3ErrorText = ""
 
@@ -92,6 +141,13 @@ export async function POST(request: NextRequest) {
           mimeType: referencePhotoMimeType || "image/jpeg",
           data: referencePhotoBase64!.replace(/^data:image\/\w+;base64,/, ""),
         },
+      })
+    }
+    if (useBackgroundImage) {
+      const bgData = useMedicalImage ? backdropMedicalImageBase64! : backdropCorporateImageBase64!
+      const bgMime = useMedicalImage ? backdropMedicalMime : backdropCorporateMime
+      parts.push({
+        inlineData: { mimeType: bgMime, data: bgData },
       })
     }
     parts.push({ text: `Generate a professional portrait photo. ${geminiImagePrompt}` })

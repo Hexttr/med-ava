@@ -6,7 +6,7 @@
 import { getAppSettings } from "./app-settings"
 
 const DEFAULT_UNIVERSAL_FRAMING =
-  "Standard portrait framing: head and upper torso only, bust-length, shoulders visible, same head-to-body scale as all other portraits in the system. Do not crop tighter or wider."
+  "Standard portrait framing: head and upper torso only, bust-length, shoulders visible, same head-to-body scale for ALL portraits (medical and corporate must be IDENTICAL crop and proportions). Do not crop tighter or wider. Same framing in both styles."
 
 const DEFAULT_ANALYSIS_PROMPT = `You are a professional portrait photography prompt engineer for an AI image generation system. Your goal is to produce text prompts that will generate portraits where the face is MAXIMUM LIKENESS to the source photo.
 
