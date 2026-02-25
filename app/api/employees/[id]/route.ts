@@ -128,6 +128,15 @@ export async function DELETE(
     if (!row) {
       return NextResponse.json({ error: "Сотрудник не найден" }, { status: 404 })
     }
+    // Удаляем записи галереи этого сотрудника и их файлы
+    const galleryRows = database
+      .prepare("SELECT id, medical_path, corporate_path FROM gallery_items WHERE employee_id = ?")
+      .all(id) as Array<{ id: string; medical_path: string; corporate_path: string }>
+    for (const g of galleryRows) {
+      await removeFile(g.medical_path).catch(() => {})
+      await removeFile(g.corporate_path).catch(() => {})
+      database.prepare("DELETE FROM gallery_items WHERE id = ?").run(g.id)
+    }
     await removeFile(row.photo_path)
     database.prepare("DELETE FROM employees WHERE id = ?").run(id)
     return NextResponse.json({ success: true })

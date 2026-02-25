@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
           `SELECT e.id, e.name, e.photo_path, e.department_id, e.created_at, d.name AS department_name
            FROM employees e
            LEFT JOIN departments d ON e.department_id = d.id
-           ORDER BY e.created_at DESC`
+           ORDER BY e.name ASC`
         )
         .all() as typeof rows
     } else {
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
            FROM employees e
            LEFT JOIN departments d ON e.department_id = d.id
            WHERE e.department_id = ?
-           ORDER BY e.created_at DESC`
+           ORDER BY e.name ASC`
         )
         .all(departmentId) as typeof rows
     }

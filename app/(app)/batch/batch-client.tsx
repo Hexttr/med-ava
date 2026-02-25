@@ -8,6 +8,8 @@ import {
   FolderPlus,
   UserPlus,
   Sparkles,
+  Pencil,
+  Trash2,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -30,6 +32,8 @@ import {
   createEmployee,
   updateEmployee,
   deleteEmployee,
+  updateDepartment,
+  deleteDepartment,
 } from "@/lib/structure-api"
 import { fetchGallery, addGalleryItem } from "@/lib/gallery-api"
 import { compressImageForStorage } from "@/lib/image-compress"
@@ -65,6 +69,8 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
   const [currentId, setCurrentId] = useState<string | null>(null)
   const [newDeptName, setNewDeptName] = useState("")
   const [addDeptOpen, setAddDeptOpen] = useState(false)
+  const [editDeptId, setEditDeptId] = useState<string | null>(null)
+  const [editDeptName, setEditDeptName] = useState("")
   const [addEmployeesOpen, setAddEmployeesOpen] = useState(false)
   const [addToDepartmentId, setAddToDepartmentId] = useState<string | null>(null)
   /** "_all" = все сотрудники, иначе id отдела */
@@ -141,6 +147,33 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
       toast.error(e instanceof Error ? e.message : "Не удалось создать отдел")
     }
   }, [newDeptName, load])
+
+  const handleSaveEditDepartment = useCallback(async () => {
+    if (!editDeptId || !editDeptName.trim()) return
+    try {
+      await updateDepartment(editDeptId, { name: editDeptName.trim() })
+      setEditDeptId(null)
+      setEditDeptName("")
+      await load()
+      toast.success("Отдел обновлён")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Не удалось обновить отдел")
+    }
+  }, [editDeptId, editDeptName, load])
+
+  const handleDeleteDepartment = useCallback(
+    async (id: string) => {
+      try {
+        await deleteDepartment(id)
+        if (filterDepartmentId === id) setFilterDepartmentId("_all")
+        await load()
+        toast.success("Отдел удалён")
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Не удалось удалить отдел")
+      }
+    },
+    [filterDepartmentId, load]
+  )
 
   const handleDropOrSelect = useCallback(
     async (files: FileList | File[], departmentId: string | null) => {
@@ -375,12 +408,13 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Первая строка: три кнопки */}
+      {/* Первая строка: три кнопки одинаковой высоты */}
       <div className="flex flex-wrap items-center gap-3">
         <Button
           type="button"
           variant="outline"
           size="sm"
+          className="h-9"
           onClick={() => setAddDeptOpen(true)}
           disabled={isProcessing}
         >
@@ -391,6 +425,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
           type="button"
           variant="outline"
           size="sm"
+          className="h-9"
           onClick={() => setAddEmployeesOpen(true)}
           disabled={isProcessing}
         >
@@ -400,6 +435,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         <Button
           type="button"
           size="sm"
+          className="h-9"
           onClick={handleGenerateVisible}
           disabled={isProcessing || visibleEmployees.length === 0}
         >
@@ -433,23 +469,61 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         {departments.map((d) => {
           const count = employees.filter((e) => e.departmentId === d.id).length
           return (
-            <button
+            <div
               key={d.id}
-              type="button"
-              onClick={() => setFilterDepartmentId(d.id)}
-              disabled={isProcessing}
               className={cn(
-                "flex min-h-[88px] flex-col items-stretch justify-between rounded-lg border px-3 py-2 text-left transition-colors",
+                "relative flex min-h-[88px] flex-col items-stretch justify-between rounded-lg border px-3 py-2 text-left transition-colors",
                 filterDepartmentId === d.id
                   ? "border-primary bg-primary/15 text-primary"
                   : "border-border bg-card hover:bg-muted/50"
               )}
             >
-              <span className="line-clamp-2 text-sm font-medium">{d.name}</span>
-              <span className="mt-1 self-end text-2xl font-semibold tabular-nums text-muted-foreground">
-                {count}
-              </span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setFilterDepartmentId(d.id)}
+                disabled={isProcessing}
+                className="absolute inset-0 z-0 rounded-lg"
+                aria-label={`Выбрать отдел ${d.name}`}
+              />
+              <div className="relative z-10 flex flex-1 flex-col justify-between pointer-events-none">
+                <div className="flex items-start gap-1 pr-10">
+                  <span className="line-clamp-2 min-w-0 flex-1 pt-0.5 text-sm font-medium">
+                    {d.name}
+                  </span>
+                </div>
+                <span className="mt-1 self-end text-2xl font-semibold tabular-nums text-muted-foreground">
+                  {count}
+                </span>
+              </div>
+              <div className="absolute right-2 top-2 z-10 flex items-center gap-0.5 pointer-events-auto">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-6 rounded"
+                  onClick={() => {
+                    setEditDeptId(d.id)
+                    setEditDeptName(d.name)
+                  }}
+                  disabled={isProcessing}
+                  aria-label="Редактировать отдел"
+                >
+                  <Pencil className="size-3" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-6 rounded text-muted-foreground hover:text-destructive"
+                  onClick={() => handleDeleteDepartment(d.id)}
+                  disabled={isProcessing || count > 0}
+                  aria-label="Удалить отдел"
+                  title={count > 0 ? "Сначала переместите сотрудников" : "Удалить отдел"}
+                >
+                  <Trash2 className="size-3" />
+                </Button>
+              </div>
+            </div>
           )
         })}
       </div>
@@ -492,7 +566,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         }}
       />
 
-      <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-2 lg:gap-3">
+      <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-2 lg:gap-10">
         {visibleEmployees.map((emp) => {
           const gen = generationState[emp.id]
           return (
@@ -542,6 +616,26 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
               Отмена
             </Button>
             <Button onClick={handleAddDepartment}>Создать</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editDeptId} onOpenChange={(open) => !open && setEditDeptId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Редактировать отдел</DialogTitle>
+          </DialogHeader>
+          <Input
+            placeholder="Название отдела"
+            value={editDeptName}
+            onChange={(e) => setEditDeptName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSaveEditDepartment()}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDeptId(null)}>
+              Отмена
+            </Button>
+            <Button onClick={handleSaveEditDepartment}>Сохранить</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

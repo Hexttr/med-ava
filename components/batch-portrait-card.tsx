@@ -70,14 +70,14 @@ export function BatchPortraitCard({
         isActive && "ring-1 ring-primary/20"
       )}
     >
-      {!isProcessing && item.status === "pending" && onRemove && (
+      {!isProcessing && onRemove && (
         <Button
           type="button"
           variant="ghost"
           size="icon"
           className="absolute right-1.5 top-1.5 z-10 size-6 rounded-full bg-red-500 text-white hover:bg-red-600"
           onClick={onRemove}
-          aria-label="Удалить"
+          aria-label="Удалить сотрудника"
         >
           <X className="size-3.5" />
         </Button>
@@ -87,12 +87,20 @@ export function BatchPortraitCard({
         <div className="grid grid-cols-3 gap-0">
           {/* Было */}
           <div className="flex flex-col border-r border-border">
-            <div className="flex items-center justify-between border-b border-border px-2 py-2">
+            <div className="flex items-center border-b border-border px-2 py-2">
               <span className="text-xs font-medium text-muted-foreground">Было</span>
+            </div>
+            <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted/30">
+              <img
+                src={resolvePreviewUrl(item.preview)}
+                alt=""
+                className="size-full object-cover object-top"
+              />
               <Button
-                variant="ghost"
+                type="button"
+                variant="secondary"
                 size="icon"
-                className="size-6"
+                className="absolute right-1.5 bottom-1.5 z-10 size-7 rounded-full shadow-md opacity-90 hover:opacity-100"
                 onClick={() => {
                   const url = resolvePreviewUrl(item.preview)
                   const a = document.createElement("a")
@@ -101,43 +109,39 @@ export function BatchPortraitCard({
                   a.click()
                 }}
                 aria-label="Скачать исходное фото"
+                title="Скачать"
               >
-                <Download className="size-3" />
+                <Download className="size-3.5" />
               </Button>
-            </div>
-            <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted/30">
-              <img
-                src={resolvePreviewUrl(item.preview)}
-                alt=""
-                className="size-full object-cover object-top"
-              />
             </div>
           </div>
 
           {/* Стало — медицинский */}
           <div className="flex flex-col border-r border-border">
-            <div className="flex items-center justify-between border-b border-border px-2 py-2">
+            <div className="flex items-center border-b border-border px-2 py-2">
               <span className="text-xs font-medium text-muted-foreground">Стало</span>
-              {item.medicalUrl && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-6"
-                  onClick={() => {
-                    const a = document.createElement("a")
-                    a.href = item.medicalUrl!
-                    a.download = `${item.name || "photo"}-medical.png`
-                    a.click()
-                  }}
-                  aria-label="Скачать медицинский"
-                >
-                  <Download className="size-3" />
-                </Button>
-              )}
             </div>
             <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted/30">
               {item.medicalUrl ? (
-                <img src={item.medicalUrl} alt="Медицинский" className="size-full object-cover object-top" />
+                <>
+                  <img src={item.medicalUrl} alt="Медицинский" className="size-full object-cover object-top" />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="absolute right-1.5 bottom-1.5 z-10 size-7 rounded-full shadow-md opacity-90 hover:opacity-100"
+                    onClick={() => {
+                      const a = document.createElement("a")
+                      a.href = item.medicalUrl!
+                      a.download = `${item.name || "photo"}-medical.png`
+                      a.click()
+                    }}
+                    aria-label="Скачать медицинский портрет"
+                    title="Скачать"
+                  >
+                    <Download className="size-3.5" />
+                  </Button>
+                </>
               ) : (
                 <div
                   className={cn(
@@ -157,28 +161,30 @@ export function BatchPortraitCard({
 
           {/* Стало — корпоративный */}
           <div className="flex flex-col">
-            <div className="flex items-center justify-between border-b border-border px-2 py-2">
+            <div className="flex items-center border-b border-border px-2 py-2">
               <span className="text-xs font-medium text-muted-foreground">Стало</span>
-              {item.corporateUrl && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-6"
-                  onClick={() => {
-                    const a = document.createElement("a")
-                    a.href = item.corporateUrl!
-                    a.download = `${item.name || "photo"}-corporate.png`
-                    a.click()
-                  }}
-                  aria-label="Скачать корпоративный"
-                >
-                  <Download className="size-3" />
-                </Button>
-              )}
             </div>
             <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted/30">
               {item.corporateUrl ? (
-                <img src={item.corporateUrl} alt="Корпоративный" className="size-full object-cover object-top" />
+                <>
+                  <img src={item.corporateUrl} alt="Корпоративный" className="size-full object-cover object-top" />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="absolute right-1.5 bottom-1.5 z-10 size-7 rounded-full shadow-md opacity-90 hover:opacity-100"
+                    onClick={() => {
+                      const a = document.createElement("a")
+                      a.href = item.corporateUrl!
+                      a.download = `${item.name || "photo"}-corporate.png`
+                      a.click()
+                    }}
+                    aria-label="Скачать корпоративный портрет"
+                    title="Скачать"
+                  >
+                    <Download className="size-3.5" />
+                  </Button>
+                </>
               ) : (
                 <div
                   className={cn(
@@ -237,12 +243,12 @@ export function BatchPortraitCard({
               <span className="flex h-8 items-center text-sm text-muted-foreground">—</span>
             )}
           </div>
-          <div className="flex min-w-0 items-center">
+          <div className="flex min-h-8 min-w-0 items-center">
             {item.status === "pending" && onGenerate && (
               <Button
                 type="button"
                 size="sm"
-                className="h-8 w-full text-sm"
+                className="h-8 w-full shrink-0 text-sm"
                 onClick={onGenerate}
                 disabled={isProcessing}
               >
@@ -253,7 +259,7 @@ export function BatchPortraitCard({
               <Button
                 type="button"
                 size="sm"
-                className="h-8 w-full text-sm"
+                className="h-8 w-full shrink-0 text-sm"
                 onClick={onRegenerate}
                 disabled={isProcessing}
               >
