@@ -435,12 +435,12 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         <Button
           type="button"
           size="sm"
-          className="h-9"
+          className={cn("h-9", isProcessing && "disabled:!opacity-90")}
           onClick={handleGenerateVisible}
           disabled={isProcessing || visibleEmployees.length === 0}
         >
           {isProcessing ? (
-            <Loader2 className="mr-2 size-4 animate-spin" />
+            <Loader2 className="mr-2 size-4 shrink-0 animate-spin" />
           ) : (
             <Sparkles className="mr-2 size-4" />
           )}
