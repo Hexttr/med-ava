@@ -163,7 +163,7 @@ export function GalleryClient() {
     }
   }
 
-  const singleItems = items.sort((a, b) => b.createdAt - a.createdAt)
+  const singleItems = [...items].sort((a, b) => a.name.localeCompare(b.name, "ru"))
 
   if (loading) {
     return (
@@ -218,45 +218,43 @@ export function GalleryClient() {
         >
           <X className="size-4" />
         </button>
-        <CardContent className="flex flex-col gap-3 pt-4">
+        <CardContent className="flex flex-col gap-3 pb-4 pt-4">
           <p className="pr-8 text-sm font-medium text-foreground">{item.name}</p>
           <div className="grid grid-cols-2 gap-2">
             {item.medicalUrl && (
-              <div className="flex flex-col gap-1">
+              <div>
                 <button
                   type="button"
                   onClick={() => setLightboxUrl(item.medicalUrl)}
-                  className="aspect-[3/4] overflow-hidden rounded-md border border-border text-left transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="aspect-[3/4] w-full overflow-hidden rounded-md border border-border text-left transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <img
                     src={item.medicalUrl}
-                    alt={`${item.name} — Медицинский`}
+                    alt={item.name}
                     className="size-full object-cover"
                     draggable={false}
                   />
                 </button>
-                <span className="text-[10px] text-muted-foreground">Медицинский</span>
               </div>
             )}
             {item.corporateUrl && (
-              <div className="flex flex-col gap-1">
+              <div>
                 <button
                   type="button"
                   onClick={() => setLightboxUrl(item.corporateUrl)}
-                  className="aspect-[3/4] overflow-hidden rounded-md border border-border text-left transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="aspect-[3/4] w-full overflow-hidden rounded-md border border-border text-left transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <img
                     src={item.corporateUrl}
-                    alt={`${item.name} — Корпоративный`}
+                    alt={item.name}
                     className="size-full object-cover"
                     draggable={false}
                   />
                 </button>
-                <span className="text-[10px] text-muted-foreground">Корпоративный</span>
               </div>
             )}
           </div>
-          <div className="flex items-center justify-between gap-2">
+          <div className="-mt-1 flex items-center justify-between gap-2">
             <span className="text-[10px] text-muted-foreground">
               {new Date(item.createdAt).toLocaleString()}
             </span>
@@ -272,9 +270,7 @@ export function GalleryClient() {
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">Галерея</h2>
-        <div className="flex items-center gap-2">
+      <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
           <Select
             value={filterDepartmentId || "_all"}
             onValueChange={(v) => setFilterDepartmentId(v === "_all" ? "" : v)}
@@ -294,11 +290,10 @@ export function GalleryClient() {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" onClick={downloadAll}>
+          <Button size="sm" onClick={downloadAll}>
             <Download className="mr-2 size-4" />
             Скачать все
           </Button>
-        </div>
       </div>
 
       <section>

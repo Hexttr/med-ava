@@ -6,7 +6,7 @@ export default function GalleryPage() {
     <>
       <PageHeader
         title="Галерея"
-        description="Просмотр и скачивание сгенерированных портретов за сессию"
+        description="Просмотр и скачивание сгенерированных портретов"
         breadcrumbs={[{ label: "EAM", href: "/" }, { label: "Галерея" }]}
       />
       <div className="flex flex-1 flex-col p-4 md:p-6">

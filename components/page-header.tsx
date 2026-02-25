@@ -19,8 +19,8 @@ interface PageHeaderProps {
 export function PageHeader({ title, description, breadcrumbs, actions }: PageHeaderProps) {
   return (
     <header className="flex flex-col gap-4 border-b border-border bg-card px-4 py-4 md:px-6">
-      <div className="flex items-center gap-3">
-        <SidebarTrigger className="-ml-1" />
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <SidebarTrigger className="-ml-1 shrink-0 min-h-11 min-w-11 touch-manipulation md:min-h-0 md:min-w-0 md:size-7" aria-label="Открыть меню" />
         <Separator orientation="vertical" className="h-5" />
         {breadcrumbs && breadcrumbs.length > 0 && (
           <Breadcrumb>

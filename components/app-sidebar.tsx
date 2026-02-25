@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   ImageIcon,
   Stethoscope,
+  X,
 } from "lucide-react"
 
 import {
@@ -23,7 +24,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  useSidebar,
 } from "@/components/ui/sidebar"
+import { useIsMobile } from "@/hooks/use-mobile"
+import { Button } from "@/components/ui/button"
 
 const navItems = [
   {
@@ -61,6 +65,8 @@ interface AppSidebarProps {
 
 export function AppSidebar({ initialOrganizationName }: AppSidebarProps) {
   const pathname = usePathname()
+  const isMobile = useIsMobile()
+  const { setOpenMobile } = useSidebar()
   const [subtitle, setSubtitle] = useState(
     initialOrganizationName?.trim() || DEFAULT_SUBTITLE
   )
@@ -74,10 +80,27 @@ export function AppSidebar({ initialOrganizationName }: AppSidebarProps) {
       .catch(() => {})
   }, [])
 
+  // Закрывать выдвижное меню на мобильных при переходе по ссылке
+  useEffect(() => {
+    if (isMobile) setOpenMobile(false)
+  }, [pathname, isMobile, setOpenMobile])
+
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="px-4 py-5">
-        <Link href="/" className="flex items-center gap-3">
+      <SidebarHeader className="relative px-4 py-5">
+        {isMobile && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-2 top-2 size-8"
+            onClick={() => setOpenMobile(false)}
+            aria-label="Закрыть меню"
+          >
+            <X className="size-5" />
+          </Button>
+        )}
+        <Link href="/" className="flex items-center gap-3 pr-8">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary">
             <span className="text-sm font-bold text-sidebar-primary-foreground">E</span>
           </div>

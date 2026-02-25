@@ -5,6 +5,7 @@ import { saveBase64Image } from "@/lib/storage"
 function toItemResponse(row: {
   id: string
   name: string
+  employee_name: string | null
   medical_path: string
   corporate_path: string
   employee_id: string | null
@@ -14,7 +15,7 @@ function toItemResponse(row: {
 }) {
   return {
     id: row.id,
-    name: row.name,
+    name: row.employee_name ?? row.name,
     medicalUrl: `/api/files/${row.medical_path.replace(/\\/g, "/")}`,
     corporateUrl: `/api/files/${row.corporate_path.replace(/\\/g, "/")}`,
     employeeId: row.employee_id ?? undefined,
@@ -32,6 +33,7 @@ export async function GET(request: NextRequest) {
     let rows: Array<{
       id: string
       name: string
+      employee_name: string | null
       medical_path: string
       corporate_path: string
       employee_id: string | null
@@ -42,7 +44,7 @@ export async function GET(request: NextRequest) {
     if (departmentId && departmentId !== "") {
       rows = database
         .prepare(
-          `SELECT g.id, g.name, g.medical_path, g.corporate_path, g.employee_id, e.department_id AS department_id, d.name AS department_name, g.created_at
+          `SELECT g.id, g.name, g.medical_path, g.corporate_path, g.employee_id, e.name AS employee_name, e.department_id AS department_id, d.name AS department_name, g.created_at
            FROM gallery_items g
            LEFT JOIN employees e ON g.employee_id = e.id
            LEFT JOIN departments d ON e.department_id = d.id
@@ -53,7 +55,7 @@ export async function GET(request: NextRequest) {
     } else {
       rows = database
         .prepare(
-          `SELECT g.id, g.name, g.medical_path, g.corporate_path, g.employee_id, e.department_id AS department_id, d.name AS department_name, g.created_at
+          `SELECT g.id, g.name, g.medical_path, g.corporate_path, g.employee_id, e.name AS employee_name, e.department_id AS department_id, d.name AS department_name, g.created_at
            FROM gallery_items g
            LEFT JOIN employees e ON g.employee_id = e.id
            LEFT JOIN departments d ON e.department_id = d.id
