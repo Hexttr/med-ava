@@ -1,9 +1,80 @@
+import React from "react"
 import Link from "next/link"
-import { UserCircle, Users, ImageIcon, Settings, ArrowRight, AlertCircle } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  UserCircle,
+  Users,
+  Images,
+  ArrowRight,
+  AlertCircle,
+  Settings,
+  Upload,
+  ScanSearch,
+  Sparkles,
+  Download,
+} from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { getGeminiKey } from "@/lib/settings"
+
+const featureCards = [
+  {
+    title: "Одиночная обработка",
+    description:
+      "Загрузите одно фото и получите два стиля портрета: медицинский (белый халат) и корпоративный.",
+    href: "/generate",
+    label: "Начать",
+    icon: UserCircle,
+    iconBg: "bg-primary/15",
+    iconColor: "text-primary",
+  },
+  {
+    title: "Пакетная обработка",
+    description: "Загрузите несколько фото сотрудников сразу для массовой генерации портретов.",
+    href: "/batch",
+    label: "Начать",
+    icon: Users,
+    iconBg: "bg-emerald-500/15",
+    iconColor: "text-emerald-600 dark:text-emerald-400",
+  },
+  {
+    title: "Галерея",
+    description:
+      "Просмотр всех сгенерированных портретов за сессию. Скачивание по одному или пакетом.",
+    href: "/gallery",
+    label: "Открыть галерею",
+    icon: Images,
+    iconBg: "bg-muted",
+    iconColor: "text-muted-foreground",
+  },
+] as const
+
+const howItWorksSteps = [
+  {
+    step: "01",
+    title: "Загрузка",
+    description: "Прикрепите фото сотрудника в JPG или PNG",
+    icon: Upload,
+  },
+  {
+    step: "02",
+    title: "Анализ",
+    description: "Gemini анализирует фото и создаёт оптимальный промпт",
+    icon: ScanSearch,
+  },
+  {
+    step: "03",
+    title: "Генерация",
+    description: "NanoBanano создаёт два варианта портрета",
+    icon: Sparkles,
+  },
+  {
+    step: "04",
+    title: "Результат",
+    description: "Скачайте портреты в медицинском и корпоративном стиле",
+    icon: Download,
+  },
+] as const
 
 export default async function DashboardPage() {
   const geminiKey = await getGeminiKey()
@@ -16,7 +87,7 @@ export default async function DashboardPage() {
         description="Корпоративный генератор портретов — система генерации аватаров"
         breadcrumbs={[{ label: "EAM" }, { label: "Главная" }]}
       />
-      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+      <div className="flex flex-1 flex-col gap-10 p-4 md:p-6">
         {!isConfigured && (
           <Card className="border-destructive/30 bg-destructive/5">
             <CardContent className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between">
@@ -39,86 +110,73 @@ export default async function DashboardPage() {
           </Card>
         )}
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <Card className="group transition-colors hover:border-primary/30">
-            <CardHeader>
-              <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-                <UserCircle className="size-5 text-primary" />
-              </div>
-              <CardTitle className="mt-3 text-base">Одиночная обработка</CardTitle>
-              <CardDescription>
-                Загрузите одно фото и получите два стиля портрета: медицинский (белый халат) и корпоративный.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="ghost" size="sm" className="gap-1 px-0 text-primary" asChild>
-                <Link href="/generate">
-                  Начать
-                  <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
+        {/* Карточки возможностей */}
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {featureCards.map((item) => {
+            const Icon = item.icon
+            return (
+              <Card
+                key={item.href}
+                className="group border border-border bg-card shadow-sm transition-shadow hover:shadow-md"
+              >
+                <CardContent className="flex flex-col gap-3 p-5">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`flex size-12 shrink-0 items-center justify-center rounded-xl ${item.iconBg} ${item.iconColor}`}
+                    >
+                      <Icon className="size-6" />
+                    </div>
+                    <h2 className="text-base font-semibold text-foreground">{item.title}</h2>
+                  </div>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {item.description}
+                  </p>
+                  <Link
+                    href={item.href}
+                    className="inline-flex items-center gap-1 text-sm font-medium text-primary transition-colors hover:text-primary/80"
+                  >
+                    {item.label}
+                    <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </section>
 
-          <Card className="group transition-colors hover:border-primary/30">
-            <CardHeader>
-              <div className="flex size-10 items-center justify-center rounded-lg bg-accent/10">
-                <Users className="size-5 text-accent" />
-              </div>
-              <CardTitle className="mt-3 text-base">Пакетная обработка</CardTitle>
-              <CardDescription>
-                Загрузите несколько фото сотрудников сразу для массовой генерации портретов.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="ghost" size="sm" className="gap-1 px-0 text-primary" asChild>
-                <Link href="/batch">
-                  Начать
-                  <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="group transition-colors hover:border-primary/30">
-            <CardHeader>
-              <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
-                <ImageIcon className="size-5 text-muted-foreground" />
-              </div>
-              <CardTitle className="mt-3 text-base">Галерея</CardTitle>
-              <CardDescription>
-                Просмотр всех сгенерированных портретов за сессию. Скачивание по одному или пакетом.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="ghost" size="sm" className="gap-1 px-0 text-primary" asChild>
-                <Link href="/gallery">
-                  Открыть галерею
-                  <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Как это работает</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-6 md:grid-cols-4">
-              {[
-                { step: "01", title: "Загрузка", desc: "Прикрепите фото сотрудника в JPG или PNG" },
-                { step: "02", title: "Анализ", desc: "Gemini анализирует фото и создаёт оптимальный промпт" },
-                { step: "03", title: "Генерация", desc: "NanoBanano создаёт два варианта портрета" },
-                { step: "04", title: "Результат", desc: "Скачайте портреты в медицинском и корпоративном стиле" },
-              ].map((item) => (
-                <div key={item.step} className="flex flex-col gap-2">
-                  <span className="font-mono text-xs text-muted-foreground">{item.step}</span>
-                  <h3 className="text-sm font-medium text-foreground">{item.title}</h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
-                </div>
-              ))}
+        {/* Как это работает */}
+        <Card className="border border-border bg-card shadow-sm">
+          <CardContent className="flex flex-col gap-6 p-5">
+            <h2 className="text-center text-lg font-semibold text-foreground">Как это работает?</h2>
+            <div className="mt-4 flex flex-col gap-8 md:flex-row md:items-start">
+            {howItWorksSteps.map((item, index) => {
+              const Icon = item.icon
+              const isLast = index === howItWorksSteps.length - 1
+              return (
+                <React.Fragment key={item.step}>
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <Icon className="size-5" />
+                      </div>
+                      <span className="font-mono text-2xl font-light tabular-nums text-muted-foreground">
+                        {item.step}
+                      </span>
+                      <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {item.description}
+                    </p>
+                  </div>
+                  {!isLast && (
+                    <div
+                      className="mt-[2.75rem] hidden min-w-6 flex-1 border-t border-border md:block"
+                      aria-hidden
+                    />
+                  )}
+                </React.Fragment>
+              )
+            })}
             </div>
           </CardContent>
         </Card>

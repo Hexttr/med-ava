@@ -39,7 +39,7 @@ import {
   updateEmployee,
   deleteEmployee,
 } from "@/lib/structure-api"
-import { addGalleryItem } from "@/lib/gallery-api"
+import { fetchGallery, addGalleryItem } from "@/lib/gallery-api"
 import { compressImageForStorage } from "@/lib/image-compress"
 
 type GenStatus = "pending" | "analyzing" | "generating" | "complete" | "error"
@@ -79,9 +79,34 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
 
   const load = useCallback(async () => {
     try {
-      const [depts, emps] = await Promise.all([fetchDepartments(), fetchEmployees()])
+      const [depts, emps, galleryItems] = await Promise.all([
+        fetchDepartments(),
+        fetchEmployees(),
+        fetchGallery().catch(() => []),
+      ])
       setDepartments(depts)
       setEmployees(emps)
+      // Показать «Стало» для сотрудников, у которых уже есть результаты в галерее
+      const byEmployee = new Map<string, { medicalUrl: string; corporateUrl: string }>()
+      for (const item of galleryItems) {
+        if (item.employeeId && !byEmployee.has(item.employeeId)) {
+          byEmployee.set(item.employeeId, {
+            medicalUrl: item.medicalUrl,
+            corporateUrl: item.corporateUrl,
+          })
+        }
+      }
+      setGenerationState((prev) => {
+        const next = { ...prev }
+        for (const [employeeId, urls] of byEmployee) {
+          next[employeeId] = {
+            status: "complete",
+            medicalUrl: urls.medicalUrl,
+            corporateUrl: urls.corporateUrl,
+          }
+        }
+        return next
+      })
     } catch {
       setDepartments([])
       setEmployees([])
