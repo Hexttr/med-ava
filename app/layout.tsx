@@ -15,8 +15,9 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'EAM — Корпоративный генератор портретов',
+  title: 'PhotoHUB - удобная пакетная обработка фотографий для вашей организации',
   description: 'Система генерации профессиональных портретов для медучреждений',
+  icons: { icon: '/favicon.png' },
 }
 
 export const viewport: Viewport = {

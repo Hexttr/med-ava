@@ -16,7 +16,10 @@ import { cn } from "@/lib/utils"
 export interface BatchPortraitCardItem {
   id: string
   name: string
+  /** Сжатое превью для отображения */
   preview: string
+  /** Оригинал для скачивания (если отличается от preview) */
+  originalUrl?: string
   status: "pending" | "analyzing" | "generating" | "complete" | "error"
   medicalUrl: string | null
   corporateUrl: string | null
@@ -102,7 +105,7 @@ export function BatchPortraitCard({
                 size="icon"
                 className="absolute right-1.5 bottom-1.5 z-10 size-7 rounded-none shadow-md opacity-90 hover:opacity-100"
                 onClick={() => {
-                  const url = resolvePreviewUrl(item.preview)
+                  const url = resolvePreviewUrl(item.originalUrl ?? item.preview)
                   const a = document.createElement("a")
                   a.href = url
                   a.download = `${item.name || "photo"}-original.jpg`

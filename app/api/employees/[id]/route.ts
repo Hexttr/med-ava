@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
-import { saveBase64Image, removeFile } from "@/lib/storage"
+import { saveEmployeePhoto, removeFile } from "@/lib/storage"
 import { validateBase64Image } from "@/lib/upload-validation"
 import { logger } from "@/lib/logger"
 
@@ -8,14 +8,17 @@ function toResponse(row: {
   id: string
   name: string
   photo_path: string
+  thumbnail_path: string | null
   department_id: string | null
   created_at: number
   department_name?: string
 }) {
+  const displayPath = row.thumbnail_path ?? row.photo_path
   return {
     id: row.id,
     name: row.name,
     photoUrl: `/api/files/${row.photo_path.replace(/\\/g, "/")}`,
+    thumbnailUrl: `/api/files/${displayPath.replace(/\\/g, "/")}`,
     departmentId: row.department_id ?? null,
     departmentName: row.department_name,
     createdAt: row.created_at,
@@ -31,7 +34,7 @@ export async function GET(
     const database = getDb()
     const row = database
       .prepare(
-        `SELECT e.id, e.name, e.photo_path, e.department_id, e.created_at, d.name AS department_name
+        `SELECT e.id, e.name, e.photo_path, e.thumbnail_path, e.department_id, e.created_at, d.name AS department_name
          FROM employees e
          LEFT JOIN departments d ON e.department_id = d.id
          WHERE e.id = ?`
@@ -40,6 +43,7 @@ export async function GET(
       id: string
       name: string
       photo_path: string
+      thumbnail_path: string | null
       department_id: string | null
       created_at: number
       department_name?: string
@@ -63,8 +67,8 @@ export async function PATCH(
     const body = await request.json()
     const database = getDb()
     const existing = database
-      .prepare("SELECT id, name, photo_path, department_id FROM employees WHERE id = ?")
-      .get(id) as { id: string; name: string; photo_path: string; department_id: string | null } | undefined
+      .prepare("SELECT id, name, photo_path, thumbnail_path, department_id FROM employees WHERE id = ?")
+      .get(id) as { id: string; name: string; photo_path: string; thumbnail_path: string | null; department_id: string | null } | undefined
     if (!existing) {
       return NextResponse.json({ error: "Сотрудник не найден" }, { status: 404 })
     }
@@ -73,12 +77,18 @@ export async function PATCH(
     if (body.name !== undefined) name = String(body.name).trim() || "Сотрудник"
 
     let photoPath = existing.photo_path
+    let thumbnailPath: string | null = existing.thumbnail_path
     if (body.photoUrl !== undefined) {
       await removeFile(existing.photo_path)
+      if (existing.thumbnail_path) await removeFile(existing.thumbnail_path)
       if (body.photoUrl && typeof body.photoUrl === "string") {
         const valid = validateBase64Image(body.photoUrl)
         if (!valid.ok) return NextResponse.json({ error: valid.error }, { status: 400 })
-        photoPath = await saveBase64Image(body.photoUrl, "employees", id)
+        const saved = await saveEmployeePhoto(body.photoUrl, id)
+        photoPath = saved.path
+        thumbnailPath = saved.thumbnailPath
+      } else {
+        thumbnailPath = null
       }
     }
 
@@ -94,12 +104,12 @@ export async function PATCH(
     }
 
     database
-      .prepare("UPDATE employees SET name = ?, photo_path = ?, department_id = ? WHERE id = ?")
-      .run(name, photoPath, departmentId, id)
+      .prepare("UPDATE employees SET name = ?, photo_path = ?, thumbnail_path = ?, department_id = ? WHERE id = ?")
+      .run(name, photoPath, thumbnailPath, departmentId, id)
 
     const row = database
       .prepare(
-        `SELECT e.id, e.name, e.photo_path, e.department_id, e.created_at, d.name AS department_name
+        `SELECT e.id, e.name, e.photo_path, e.thumbnail_path, e.department_id, e.created_at, d.name AS department_name
          FROM employees e
          LEFT JOIN departments d ON e.department_id = d.id
          WHERE e.id = ?`
@@ -108,6 +118,7 @@ export async function PATCH(
       id: string
       name: string
       photo_path: string
+      thumbnail_path: string | null
       department_id: string | null
       created_at: number
       department_name?: string
@@ -126,8 +137,8 @@ export async function DELETE(
   try {
     const { id } = await params
     const database = getDb()
-    const row = database.prepare("SELECT photo_path FROM employees WHERE id = ?").get(id) as
-      | { photo_path: string }
+    const row = database.prepare("SELECT photo_path, thumbnail_path FROM employees WHERE id = ?").get(id) as
+      | { photo_path: string; thumbnail_path: string | null }
       | undefined
     if (!row) {
       return NextResponse.json({ error: "Сотрудник не найден" }, { status: 404 })
@@ -142,6 +153,7 @@ export async function DELETE(
       database.prepare("DELETE FROM gallery_items WHERE id = ?").run(g.id)
     }
     await removeFile(row.photo_path)
+    if (row.thumbnail_path) await removeFile(row.thumbnail_path)
     database.prepare("DELETE FROM employees WHERE id = ?").run(id)
     return NextResponse.json({ success: true })
   } catch (e) {

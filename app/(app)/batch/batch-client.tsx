@@ -29,15 +29,17 @@ import {
   fetchDepartments,
   fetchEmployees,
   createDepartment,
-  createEmployee,
+  createEmployeesBatch,
   updateEmployee,
   deleteEmployee,
   updateDepartment,
   deleteDepartment,
 } from "@/lib/structure-api"
 import { fetchGallery, addGalleryItem } from "@/lib/gallery-api"
-import { compressImageForStorage } from "@/lib/image-compress"
 import { cn } from "@/lib/utils"
+
+const UPLOAD_BATCH_LIMIT = 50
+const CARDS_PER_PAGE = 30
 
 type GenStatus = "pending" | "analyzing" | "generating" | "complete" | "error"
 
@@ -75,6 +77,9 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
   const [addToDepartmentId, setAddToDepartmentId] = useState<string | null>(null)
   /** "_all" = все сотрудники, иначе id отдела */
   const [filterDepartmentId, setFilterDepartmentId] = useState<string>("_all")
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null)
+  const [cardsPage, setCardsPage] = useState(1)
   const inputRefRoot = useRef<HTMLInputElement>(null)
   const inputRefDept = useRef<HTMLInputElement>(null)
   const inputRefAddEmployees = useRef<HTMLInputElement>(null)
@@ -119,6 +124,10 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
     load()
   }, [load])
 
+  useEffect(() => {
+    setCardsPage(1)
+  }, [filterDepartmentId])
+
   const rootEmployees = employees.filter((e) => !e.departmentId)
   const employeesByDept = departments.map((d) => ({
     department: d,
@@ -130,6 +139,10 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
     filterDepartmentId === "_all"
       ? allEmployees
       : employees.filter((e) => e.departmentId === filterDepartmentId)
+
+  const displayedCount = Math.min(cardsPage * CARDS_PER_PAGE, visibleEmployees.length)
+  const displayedEmployees = visibleEmployees.slice(0, displayedCount)
+  const hasMore = displayedCount < visibleEmployees.length
 
   const handleAddDepartment = useCallback(async () => {
     const name = newDeptName.trim()
@@ -179,27 +192,27 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
     async (files: FileList | File[], departmentId: string | null) => {
       const list = Array.from("length" in files ? files : files).filter((f) => f.type.startsWith("image/"))
       if (list.length === 0) return
-      for (const file of list) {
-        try {
-          const dataUrl = await compressImageForStorage(file).catch(() => {
-            return new Promise<string>((resolve, reject) => {
-              const reader = new FileReader()
-              reader.onload = () => resolve(reader.result as string)
-              reader.onerror = () => reject(reader.error)
-              reader.readAsDataURL(file)
-            })
-          })
-          await createEmployee({
-            name: "Сотрудник",
-            photoUrl: dataUrl,
-            departmentId: departmentId ?? undefined,
-          })
-        } catch (e) {
-          toast.error(e instanceof Error ? e.message : "Не удалось добавить сотрудника")
-        }
+      if (list.length > UPLOAD_BATCH_LIMIT) {
+        toast.warning(`Загружено ${UPLOAD_BATCH_LIMIT} из ${list.length}. Остальные можно добавить повторной загрузкой.`)
       }
-      await load()
-      if (list.length > 0) toast.success(list.length === 1 ? "Сотрудник добавлен" : "Сотрудники добавлены")
+      const toUpload = list.slice(0, UPLOAD_BATCH_LIMIT)
+      setUploading(true)
+      setUploadProgress(`Загрузка ${toUpload.length} фото...`)
+      try {
+        const result = await createEmployeesBatch(toUpload, departmentId ?? undefined)
+        await load()
+        if (result.created > 0) {
+          toast.success(result.created === 1 ? "Сотрудник добавлен" : `Добавлено сотрудников: ${result.created}`)
+        }
+        if (result.errors?.length) {
+          toast.error(`Ошибки: ${result.errors.slice(0, 2).join("; ")}${result.errors.length > 2 ? "..." : ""}`)
+        }
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Не удалось добавить сотрудников")
+      } finally {
+        setUploading(false)
+        setUploadProgress(null)
+      }
     },
     [load]
   )
@@ -427,10 +440,19 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
           size="sm"
           className="h-9"
           onClick={() => setAddEmployeesOpen(true)}
-          disabled={isProcessing}
+          disabled={isProcessing || uploading}
         >
-          <UserPlus className="mr-2 size-4" />
-          Добавить сотрудников
+          {uploading ? (
+            <>
+              <Loader2 className="mr-2 size-4 shrink-0 animate-spin" />
+              {uploadProgress ?? "Загрузка..."}
+            </>
+          ) : (
+            <>
+              <UserPlus className="mr-2 size-4" />
+              Добавить сотрудников
+            </>
+          )}
         </Button>
         <Button
           type="button"
@@ -575,7 +597,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
       />
 
       <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-2 lg:gap-10">
-        {visibleEmployees.map((emp) => {
+        {displayedEmployees.map((emp) => {
           const gen = generationState[emp.id]
           return (
             <BatchPortraitCard
@@ -583,7 +605,8 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
               item={{
                 id: emp.id,
                 name: emp.name,
-                preview: emp.photoUrl,
+                preview: emp.thumbnailUrl ?? emp.photoUrl,
+                originalUrl: emp.thumbnailUrl ? emp.photoUrl : undefined,
                 status: gen?.status ?? "pending",
                 medicalUrl: gen?.medicalUrl ?? null,
                 corporateUrl: gen?.corporateUrl ?? null,
@@ -591,7 +614,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
                 departmentId: emp.departmentId ?? undefined,
                 departmentName: emp.departmentName,
               }}
-              index={visibleEmployees.findIndex((e) => e.id === emp.id)}
+              index={displayedEmployees.findIndex((e) => e.id === emp.id)}
               isCurrent={currentId === emp.id}
               isProcessing={isProcessing}
               departments={departments}
@@ -607,6 +630,17 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
           )
         })}
       </div>
+      {hasMore && (
+        <div className="flex justify-center">
+          <Button
+            variant="outline"
+            onClick={() => setCardsPage((p) => p + 1)}
+            disabled={isProcessing}
+          >
+            Показать ещё ({visibleEmployees.length - displayedCount} осталось)
+          </Button>
+        </div>
+      )}
 
       <Dialog open={addDeptOpen} onOpenChange={setAddDeptOpen}>
         <DialogContent>
@@ -654,7 +688,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
             <DialogTitle>Добавить сотрудников</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Перетащите сюда сразу несколько фотографий сотрудников или нажмите для выбора файлов. Каждое фото будет добавлено как отдельный сотрудник.
+            Перетащите сюда несколько фотографий или нажмите для выбора. Каждое фото — отдельный сотрудник. Рекомендуется не более 50 за раз. Фото сохраняются без сжатия для лучшей похожести при генерации.
           </p>
           <div
             className="flex min-h-[180px] cursor-pointer flex-col items-center justify-center gap-2 rounded-none border-2 border-dashed border-border bg-muted/20 py-6 transition-colors hover:border-primary/40 hover:bg-muted/40"

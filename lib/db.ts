@@ -42,9 +42,7 @@ function runMigrations(database: Database.Database) {
   const row = database.prepare("SELECT version FROM _schema_version LIMIT 1").get() as { version: number } | undefined
   const version = row?.version ?? 1
 
-  if (version >= 2) {
-    return
-  }
+  if (version < 2) {
 
   const hasOrgs = database.prepare(
     "SELECT name FROM sqlite_master WHERE type='table' AND name='organizations'"
@@ -141,6 +139,16 @@ function runMigrations(database: Database.Database) {
   }
 
   database.prepare("UPDATE _schema_version SET version = 2").run()
+  }
+
+  if (version < 3) {
+    try {
+      database.exec("ALTER TABLE employees ADD COLUMN thumbnail_path TEXT")
+    } catch {
+      // Column may already exist
+    }
+    database.prepare("UPDATE _schema_version SET version = 3").run()
+  }
 }
 
 export function getUploadsDir(): string {

@@ -70,6 +70,25 @@ export async function createEmployee(body: {
   return res.json()
 }
 
+export async function createEmployeesBatch(files: File[], departmentId?: string | null): Promise<{
+  created: number
+  employees: Employee[]
+  errors?: string[]
+}> {
+  const formData = new FormData()
+  for (const f of files) formData.append("photo", f)
+  if (departmentId != null) formData.append("departmentId", departmentId)
+  const res = await fetch(`${EMPLOYEES_BASE}/batch`, {
+    method: "POST",
+    body: formData,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || "Не удалось добавить сотрудников")
+  }
+  return res.json()
+}
+
 export async function updateEmployee(
   id: string,
   body: { name?: string; photoUrl?: string; departmentId?: string | null }

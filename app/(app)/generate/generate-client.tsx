@@ -21,7 +21,7 @@ import type { ProcessingStatus } from "@/lib/types"
 import type { Department } from "@/lib/types"
 import { fetchDepartments, createEmployee } from "@/lib/structure-api"
 import { addGalleryItem } from "@/lib/gallery-api"
-import { compressImageForStorage } from "@/lib/image-compress"
+import { fileToDataUrl } from "@/lib/file-utils"
 
 interface GenerateClientProps {
   hasApiKey: boolean
@@ -62,15 +62,6 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
     setStatus("idle")
     setProgress(0)
   }, [preview])
-
-  function fileToDataUrl(f: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as string)
-      reader.onerror = () => reject(reader.error)
-      reader.readAsDataURL(f)
-    })
-  }
 
   function fileToBase64(f: File): Promise<{ base64: string; mimeType: string }> {
     return new Promise((resolve, reject) => {
@@ -164,7 +155,7 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
 
       if (file) {
         try {
-          const dataUrl = await compressImageForStorage(file).catch(() => fileToDataUrl(file))
+          const dataUrl = await fileToDataUrl(file)
           const emp = await createEmployee({
             name,
             photoUrl: dataUrl,

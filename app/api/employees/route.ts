@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
-import { saveBase64Image } from "@/lib/storage"
+import { saveEmployeePhoto } from "@/lib/storage"
 import { validateBase64Image } from "@/lib/upload-validation"
 import { logger } from "@/lib/logger"
 
@@ -8,14 +8,17 @@ function toResponse(row: {
   id: string
   name: string
   photo_path: string
+  thumbnail_path: string | null
   department_id: string | null
   created_at: number
   department_name?: string
 }) {
+  const displayPath = row.thumbnail_path ?? row.photo_path
   return {
     id: row.id,
     name: row.name,
     photoUrl: `/api/files/${row.photo_path.replace(/\\/g, "/")}`,
+    thumbnailUrl: `/api/files/${displayPath.replace(/\\/g, "/")}`,
     departmentId: row.department_id ?? null,
     departmentName: row.department_name,
     createdAt: row.created_at,
@@ -31,6 +34,7 @@ export async function GET(request: NextRequest) {
       id: string
       name: string
       photo_path: string
+      thumbnail_path: string | null
       department_id: string | null
       created_at: number
       department_name?: string
@@ -38,7 +42,7 @@ export async function GET(request: NextRequest) {
     if (departmentId === undefined || departmentId === "") {
       rows = database
         .prepare(
-          `SELECT e.id, e.name, e.photo_path, e.department_id, e.created_at, d.name AS department_name
+          `SELECT e.id, e.name, e.photo_path, e.thumbnail_path, e.department_id, e.created_at, d.name AS department_name
            FROM employees e
            LEFT JOIN departments d ON e.department_id = d.id
            ORDER BY e.name ASC`
@@ -47,7 +51,7 @@ export async function GET(request: NextRequest) {
     } else {
       rows = database
         .prepare(
-          `SELECT e.id, e.name, e.photo_path, e.department_id, e.created_at, d.name AS department_name
+          `SELECT e.id, e.name, e.photo_path, e.thumbnail_path, e.department_id, e.created_at, d.name AS department_name
            FROM employees e
            LEFT JOIN departments d ON e.department_id = d.id
            WHERE e.department_id = ?
@@ -81,20 +85,16 @@ export async function POST(request: NextRequest) {
       }
     }
     const empId = crypto.randomUUID()
-    const photoPath = await saveBase64Image(
-      photoUrl,
-      "employees",
-      empId
-    )
+    const { path: photoPath, thumbnailPath } = await saveEmployeePhoto(photoUrl, empId)
     const now = Date.now()
     database
       .prepare(
-        "INSERT INTO employees (id, name, photo_path, department_id, created_at) VALUES (?, ?, ?, ?, ?)"
+        "INSERT INTO employees (id, name, photo_path, thumbnail_path, department_id, created_at) VALUES (?, ?, ?, ?, ?, ?)"
       )
-      .run(empId, name || "Сотрудник", photoPath, departmentId, now)
+      .run(empId, name || "Сотрудник", photoPath, thumbnailPath, departmentId, now)
     const row = database
       .prepare(
-        `SELECT e.id, e.name, e.photo_path, e.department_id, e.created_at, d.name AS department_name
+        `SELECT e.id, e.name, e.photo_path, e.thumbnail_path, e.department_id, e.created_at, d.name AS department_name
          FROM employees e
          LEFT JOIN departments d ON e.department_id = d.id
          WHERE e.id = ?`
@@ -103,6 +103,7 @@ export async function POST(request: NextRequest) {
       id: string
       name: string
       photo_path: string
+      thumbnail_path: string | null
       department_id: string | null
       created_at: number
       department_name?: string

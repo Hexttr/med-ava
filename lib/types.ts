@@ -56,7 +56,10 @@ export interface Department {
 export interface Employee {
   id: string
   name: string
+  /** Оригинал — для генерации. */
   photoUrl: string
+  /** Сжатое превью — для отображения в списке. Если нет — использовать photoUrl. */
+  thumbnailUrl?: string
   departmentId: string | null
   departmentName?: string
   createdAt: number
