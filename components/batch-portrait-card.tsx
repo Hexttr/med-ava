@@ -4,6 +4,13 @@ import { X, Download, Loader2, AlertCircle, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 
 export interface BatchPortraitCardItem {
@@ -14,6 +21,13 @@ export interface BatchPortraitCardItem {
   medicalUrl: string | null
   corporateUrl: string | null
   error?: string
+  departmentId?: string
+  departmentName?: string
+}
+
+export interface DepartmentOption {
+  id: string
+  name: string
 }
 
 interface BatchPortraitCardProps {
@@ -21,10 +35,13 @@ interface BatchPortraitCardProps {
   index: number
   isCurrent: boolean
   isProcessing: boolean
+  departments?: DepartmentOption[]
   onRemove?: () => void
   onNameChange?: (name: string) => void
+  onDepartmentChange?: (employeeId: string, departmentId: string | null) => void
   showNameInput?: boolean
   onGenerate?: () => void
+  onRegenerate?: () => void
 }
 
 function resolvePreviewUrl(preview: string): string {
@@ -36,17 +53,20 @@ export function BatchPortraitCard({
   item,
   isCurrent,
   isProcessing,
+  departments = [],
   onRemove,
   onNameChange,
+  onDepartmentChange,
   showNameInput = false,
   onGenerate,
+  onRegenerate,
 }: BatchPortraitCardProps) {
   const isActive = isCurrent && (item.status === "analyzing" || item.status === "generating")
 
   return (
     <Card
       className={cn(
-        "relative overflow-hidden border border-border bg-card shadow-sm transition-shadow hover:shadow-md",
+        "relative w-full overflow-hidden border border-border bg-card shadow-sm transition-shadow hover:shadow-md",
         isActive && "ring-1 ring-primary/20"
       )}
     >
@@ -55,7 +75,7 @@ export function BatchPortraitCard({
           type="button"
           variant="ghost"
           size="icon"
-          className="absolute right-2 top-2 z-10 size-7 rounded-full bg-red-500 text-white hover:bg-red-600"
+          className="absolute right-1.5 top-1.5 z-10 size-6 rounded-full bg-red-500 text-white hover:bg-red-600"
           onClick={onRemove}
           aria-label="Удалить"
         >
@@ -67,21 +87,36 @@ export function BatchPortraitCard({
         <div className="grid grid-cols-3 gap-0">
           {/* Было */}
           <div className="flex flex-col border-r border-border">
-            <div className="flex items-center justify-between border-b border-border px-2 py-1.5">
+            <div className="flex items-center justify-between border-b border-border px-2 py-2">
               <span className="text-xs font-medium text-muted-foreground">Было</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-6"
+                onClick={() => {
+                  const url = resolvePreviewUrl(item.preview)
+                  const a = document.createElement("a")
+                  a.href = url
+                  a.download = `${item.name || "photo"}-original.jpg`
+                  a.click()
+                }}
+                aria-label="Скачать исходное фото"
+              >
+                <Download className="size-3" />
+              </Button>
             </div>
             <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted/30">
               <img
                 src={resolvePreviewUrl(item.preview)}
                 alt=""
-                className="size-full object-cover"
+                className="size-full object-cover object-top"
               />
             </div>
           </div>
 
           {/* Стало — медицинский */}
           <div className="flex flex-col border-r border-border">
-            <div className="flex items-center justify-between border-b border-border px-2 py-1.5">
+            <div className="flex items-center justify-between border-b border-border px-2 py-2">
               <span className="text-xs font-medium text-muted-foreground">Стало</span>
               {item.medicalUrl && (
                 <Button
@@ -102,7 +137,7 @@ export function BatchPortraitCard({
             </div>
             <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted/30">
               {item.medicalUrl ? (
-                <img src={item.medicalUrl} alt="Медицинский" className="size-full object-cover" />
+                <img src={item.medicalUrl} alt="Медицинский" className="size-full object-cover object-top" />
               ) : (
                 <div
                   className={cn(
@@ -111,21 +146,18 @@ export function BatchPortraitCard({
                   )}
                 >
                   {isActive ? (
-                    <Loader2 className="size-5 animate-spin text-primary" />
+                    <Loader2 className="size-4 animate-spin text-primary" />
                   ) : (
                     <span className="text-[10px] text-muted-foreground">—</span>
                   )}
                 </div>
               )}
             </div>
-            <span className="border-t border-border px-2 py-0.5 text-[10px] text-muted-foreground">
-              Белый халат
-            </span>
           </div>
 
           {/* Стало — корпоративный */}
           <div className="flex flex-col">
-            <div className="flex items-center justify-between border-b border-border px-2 py-1.5">
+            <div className="flex items-center justify-between border-b border-border px-2 py-2">
               <span className="text-xs font-medium text-muted-foreground">Стало</span>
               {item.corporateUrl && (
                 <Button
@@ -146,7 +178,7 @@ export function BatchPortraitCard({
             </div>
             <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted/30">
               {item.corporateUrl ? (
-                <img src={item.corporateUrl} alt="Корпоративный" className="size-full object-cover" />
+                <img src={item.corporateUrl} alt="Корпоративный" className="size-full object-cover object-top" />
               ) : (
                 <div
                   className={cn(
@@ -155,59 +187,89 @@ export function BatchPortraitCard({
                   )}
                 >
                   {isActive ? (
-                    <Loader2 className="size-5 animate-spin text-primary" />
+                    <Loader2 className="size-4 animate-spin text-primary" />
                   ) : (
                     <span className="text-[10px] text-muted-foreground">—</span>
                   )}
                 </div>
               )}
             </div>
-            <span className="border-t border-border px-2 py-0.5 text-[10px] text-muted-foreground">
-              Деловой
-            </span>
           </div>
         </div>
 
-        {/* Имя и действия */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2">
-          {showNameInput && onNameChange ? (
-            <Input
-              value={item.name}
-              onChange={(e) => onNameChange(e.target.value)}
-              placeholder="Введите имя"
-              disabled={isProcessing}
-              className="h-7 min-w-0 flex-1 text-xs"
-            />
-          ) : (
-            <span className="truncate text-xs font-medium text-foreground">
-              {item.name || "—"}
-            </span>
-          )}
-          <div className="flex items-center gap-1">
+        {/* Имя, отдел и кнопка — по 33% ширины */}
+        <div className="grid grid-cols-3 gap-2 border-t border-border px-3 py-2">
+          <div className="min-w-0">
+            {showNameInput && onNameChange ? (
+              <Input
+                value={item.name}
+                onChange={(e) => onNameChange(e.target.value)}
+                placeholder="Введите имя"
+                disabled={isProcessing}
+                className="h-8 w-full min-w-0 text-sm"
+              />
+            ) : (
+              <span className="flex h-8 items-center truncate text-sm font-medium text-foreground">
+                {item.name || "—"}
+              </span>
+            )}
+          </div>
+          <div className="min-w-0">
+            {departments.length > 0 && onDepartmentChange ? (
+              <Select
+                value={item.departmentId ?? "_none"}
+                onValueChange={(v) => onDepartmentChange(item.id, v === "_none" ? null : v)}
+                disabled={isProcessing}
+              >
+                <SelectTrigger className="h-8 w-full min-w-0 text-sm">
+                  <SelectValue placeholder="Отдел" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">Без отдела</SelectItem>
+                  {departments.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <span className="flex h-8 items-center text-sm text-muted-foreground">—</span>
+            )}
+          </div>
+          <div className="flex min-w-0 items-center">
             {item.status === "pending" && onGenerate && (
               <Button
                 type="button"
-                variant="outline"
                 size="sm"
-                className="h-6 text-xs"
+                className="h-8 w-full text-sm"
                 onClick={onGenerate}
                 disabled={isProcessing}
               >
                 Сгенерировать
               </Button>
             )}
-            {item.status === "complete" && (
-              <CheckCircle2 className="size-3.5 text-green-600" />
+            {item.status === "complete" && onRegenerate && (
+              <Button
+                type="button"
+                size="sm"
+                className="h-8 w-full text-sm"
+                onClick={onRegenerate}
+                disabled={isProcessing}
+              >
+                <CheckCircle2 className="mr-2 size-4 shrink-0" />
+                <span className="truncate">Перегенерировать</span>
+              </Button>
             )}
             {item.status === "error" && (
-              <AlertCircle className="size-3.5 text-destructive" title={item.error} />
+              <AlertCircle className="size-3.5 shrink-0 text-destructive" title={item.error} />
             )}
           </div>
         </div>
       </CardContent>
 
       {item.status === "error" && item.error && (
-        <p className="border-t border-border px-3 py-1.5 text-[10px] text-destructive">
+        <p className="border-t border-border px-3 py-1.5 text-xs text-destructive">
           {item.error}
         </p>
       )}

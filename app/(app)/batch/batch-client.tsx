@@ -7,20 +7,12 @@ import {
   Loader2,
   FolderPlus,
   UserPlus,
+  Sparkles,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -41,6 +33,7 @@ import {
 } from "@/lib/structure-api"
 import { fetchGallery, addGalleryItem } from "@/lib/gallery-api"
 import { compressImageForStorage } from "@/lib/image-compress"
+import { cn } from "@/lib/utils"
 
 type GenStatus = "pending" | "analyzing" | "generating" | "complete" | "error"
 
@@ -72,10 +65,13 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
   const [currentId, setCurrentId] = useState<string | null>(null)
   const [newDeptName, setNewDeptName] = useState("")
   const [addDeptOpen, setAddDeptOpen] = useState(false)
+  const [addEmployeesOpen, setAddEmployeesOpen] = useState(false)
   const [addToDepartmentId, setAddToDepartmentId] = useState<string | null>(null)
-  const [genSelectValue, setGenSelectValue] = useState("_")
+  /** "_all" = все сотрудники, иначе id отдела */
+  const [filterDepartmentId, setFilterDepartmentId] = useState<string>("_all")
   const inputRefRoot = useRef<HTMLInputElement>(null)
   const inputRefDept = useRef<HTMLInputElement>(null)
+  const inputRefAddEmployees = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     try {
@@ -123,8 +119,11 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
     employees: employees.filter((e) => e.departmentId === d.id),
   }))
   const allEmployees = employees
-  const completedCount = allEmployees.filter((e) => generationState[e.id]?.status === "complete").length
-  const progressPercent = allEmployees.length > 0 ? Math.round((completedCount / allEmployees.length) * 100) : 0
+  /** Сотрудники, видимые при текущем фильтре */
+  const visibleEmployees =
+    filterDepartmentId === "_all"
+      ? allEmployees
+      : employees.filter((e) => e.departmentId === filterDepartmentId)
 
   const handleAddDepartment = useCallback(async () => {
     const name = newDeptName.trim()
@@ -184,6 +183,23 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
       }
     },
     [employees]
+  )
+
+  const handleEmployeeDepartmentChange = useCallback(
+    async (employeeId: string, departmentId: string | null) => {
+      try {
+        await updateEmployee(employeeId, { departmentId })
+        const dept = departmentId ? departments.find((d) => d.id === departmentId) : null
+        setEmployees((prev) =>
+          prev.map((e) =>
+            e.id === employeeId ? { ...e, departmentId, departmentName: dept?.name } : e
+          )
+        )
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Не удалось изменить отдел")
+      }
+    },
+    [departments]
   )
 
   const handleRemoveEmployee = useCallback(
@@ -305,10 +321,24 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
       }
       setIsProcessing(false)
       toast.success("Обработка завершена")
-      setGenSelectValue("_")
     },
     [employees, generationState, processOne]
   )
+
+  /** Генерация только для видимых на странице сотрудников (без уже готовых) */
+  const handleGenerateVisible = useCallback(() => {
+    const toProcess = visibleEmployees.filter((e) => generationState[e.id]?.status !== "complete")
+    if (toProcess.length === 0) {
+      toast.info("Нет сотрудников для обработки")
+      return
+    }
+    setIsProcessing(true)
+    ;(async () => {
+      for (const emp of toProcess) await processOne(emp)
+      setIsProcessing(false)
+      toast.success("Обработка завершена")
+    })()
+  }, [visibleEmployees, generationState, processOne])
 
   if (!hasApiKey) {
     return (
@@ -332,9 +362,21 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
     )
   }
 
+  const handleAddEmployeesInModal = useCallback(
+    async (files: FileList | File[]) => {
+      await handleDropOrSelect(
+        files,
+        filterDepartmentId === "_all" ? null : filterDepartmentId
+      )
+      setAddEmployeesOpen(false)
+    },
+    [handleDropOrSelect, filterDepartmentId]
+  )
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Первая строка: три кнопки */}
+      <div className="flex flex-wrap items-center gap-3">
         <Button
           type="button"
           variant="outline"
@@ -345,36 +387,73 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
           <FolderPlus className="mr-2 size-4" />
           Добавить отдел
         </Button>
-        <Select
-          value={genSelectValue}
-          onValueChange={(v) => {
-            setGenSelectValue(v)
-            if (v === "_all") processBatch("all")
-            else if (v === "_root") processBatch("root")
-            else if (v.startsWith("dept_")) processBatch("department", v.slice(5))
-          }}
-          disabled={isProcessing || employees.length === 0}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setAddEmployeesOpen(true)}
+          disabled={isProcessing}
         >
-          <SelectTrigger className="w-[220px]">
-            <SelectValue placeholder="Сгенерировать…" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_">Сгенерировать…</SelectItem>
-            <SelectItem value="_all">Сгенерировать все</SelectItem>
-            <SelectItem value="_root">Только без отдела</SelectItem>
-            {departments.map((d) => (
-              <SelectItem key={d.id} value={`dept_${d.id}`}>
-                Отдел: {d.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {allEmployees.length > 0 && (
-          <Badge variant="secondary" className="text-xs">
-            {completedCount}/{allEmployees.length} готово
-          </Badge>
-        )}
+          <UserPlus className="mr-2 size-4" />
+          Добавить сотрудников
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          onClick={handleGenerateVisible}
+          disabled={isProcessing || visibleEmployees.length === 0}
+        >
+          {isProcessing ? (
+            <Loader2 className="mr-2 size-4 animate-spin" />
+          ) : (
+            <Sparkles className="mr-2 size-4" />
+          )}
+          Сгенерировать
+        </Button>
       </div>
+
+      {/* Карточки отделов одинакового размера, справа внизу — количество сотрудников */}
+      <div className="my-6 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        <button
+          type="button"
+          onClick={() => setFilterDepartmentId("_all")}
+          disabled={isProcessing}
+          className={cn(
+            "flex min-h-[88px] flex-col items-stretch justify-between rounded-lg border px-3 py-2 text-left transition-colors",
+            filterDepartmentId === "_all"
+              ? "border-primary bg-primary/15 text-primary"
+              : "border-border bg-card hover:bg-muted/50"
+          )}
+        >
+          <span className="text-sm font-medium">Все сотрудники</span>
+          <span className="mt-1 self-end text-2xl font-semibold tabular-nums text-muted-foreground">
+            {allEmployees.length}
+          </span>
+        </button>
+        {departments.map((d) => {
+          const count = employees.filter((e) => e.departmentId === d.id).length
+          return (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => setFilterDepartmentId(d.id)}
+              disabled={isProcessing}
+              className={cn(
+                "flex min-h-[88px] flex-col items-stretch justify-between rounded-lg border px-3 py-2 text-left transition-colors",
+                filterDepartmentId === d.id
+                  ? "border-primary bg-primary/15 text-primary"
+                  : "border-border bg-card hover:bg-muted/50"
+              )}
+            >
+              <span className="line-clamp-2 text-sm font-medium">{d.name}</span>
+              <span className="mt-1 self-end text-2xl font-semibold tabular-nums text-muted-foreground">
+                {count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
       <input
         ref={inputRefDept}
         type="file"
@@ -389,121 +468,63 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
           setAddToDepartmentId(null)
         }}
       />
+      <input
+        ref={inputRefRoot}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files?.length) handleDropOrSelect(e.target.files, null)
+          e.target.value = ""
+        }}
+      />
+      <input
+        ref={inputRefAddEmployees}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        multiple
+        className="hidden"
+        aria-hidden
+        onChange={(e) => {
+          if (e.target.files?.length) handleAddEmployeesInModal(e.target.files)
+          e.target.value = ""
+        }}
+      />
 
-      {allEmployees.length > 0 && (
-        <div className="flex flex-col gap-1">
-          <Progress value={progressPercent} className="h-1.5" />
-        </div>
-      )}
-
-      {/* Без отдела */}
-      <div className="space-y-2">
-        <h3 className="text-sm font-medium text-muted-foreground">Без отдела</h3>
-        <div
-          className="flex min-h-[100px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-muted/20 py-4 transition-colors hover:border-primary/40 hover:bg-muted/40"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault()
-            if (e.dataTransfer.files?.length) handleDropOrSelect(e.dataTransfer.files, null)
-          }}
-          onClick={() => inputRefRoot.current?.click()}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") inputRefRoot.current?.click()
-          }}
-        >
-          <input
-            ref={inputRefRoot}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              if (e.target.files?.length) handleDropOrSelect(e.target.files, null)
-              e.target.value = ""
-            }}
-          />
-          <UserPlus className="size-5 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">Добавить сотрудника (фото)</span>
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {rootEmployees.map((emp) => {
-            const gen = generationState[emp.id]
-            return (
-              <BatchPortraitCard
-                key={emp.id}
-                item={{
-                  id: emp.id,
-                  name: emp.name,
-                  preview: emp.photoUrl,
-                  status: gen?.status ?? "pending",
-                  medicalUrl: gen?.medicalUrl ?? null,
-                  corporateUrl: gen?.corporateUrl ?? null,
-                  error: gen?.error,
-                }}
-                index={rootEmployees.findIndex((e) => e.id === emp.id)}
-                isCurrent={currentId === emp.id}
-                isProcessing={isProcessing}
-                onRemove={() => handleRemoveEmployee(emp.id)}
-                onNameChange={(name) => handleEmployeeNameChange(emp.id, name)}
-                showNameInput
-                onGenerate={gen?.status !== "complete" ? () => processBatch("one", undefined, emp.id) : undefined}
-              />
-            )
-          })}
-        </div>
+      <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-2 lg:gap-3">
+        {visibleEmployees.map((emp) => {
+          const gen = generationState[emp.id]
+          return (
+            <BatchPortraitCard
+              key={emp.id}
+              item={{
+                id: emp.id,
+                name: emp.name,
+                preview: emp.photoUrl,
+                status: gen?.status ?? "pending",
+                medicalUrl: gen?.medicalUrl ?? null,
+                corporateUrl: gen?.corporateUrl ?? null,
+                error: gen?.error,
+                departmentId: emp.departmentId ?? undefined,
+                departmentName: emp.departmentName,
+              }}
+              index={visibleEmployees.findIndex((e) => e.id === emp.id)}
+              isCurrent={currentId === emp.id}
+              isProcessing={isProcessing}
+              departments={departments}
+              onRemove={() => handleRemoveEmployee(emp.id)}
+              onNameChange={(name) => handleEmployeeNameChange(emp.id, name)}
+              onDepartmentChange={(_, departmentId) =>
+                handleEmployeeDepartmentChange(emp.id, departmentId || null)
+              }
+              showNameInput
+              onGenerate={gen?.status !== "complete" ? () => processBatch("one", undefined, emp.id) : undefined}
+              onRegenerate={gen?.status === "complete" ? () => processOne(emp) : undefined}
+            />
+          )
+        })}
       </div>
-
-      {/* По отделам */}
-      {employeesByDept.map(({ department, employees: deptEmployees }) => (
-        <div key={department.id} className="space-y-2">
-          <h3 className="text-sm font-medium text-muted-foreground">{department.name}</h3>
-          <div
-            className="flex min-h-[80px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-muted/20 py-3 transition-colors hover:border-primary/40 hover:bg-muted/40"
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault()
-              if (e.dataTransfer.files?.length) handleDropOrSelect(e.dataTransfer.files, department.id)
-            }}
-            onClick={() => {
-              setAddToDepartmentId(department.id)
-              setTimeout(() => inputRefDept.current?.click(), 0)
-            }}
-            role="button"
-            tabIndex={0}
-          >
-            <UserPlus className="size-4 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">Добавить в отдел</span>
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {deptEmployees.map((emp) => {
-              const gen = generationState[emp.id]
-              return (
-                <BatchPortraitCard
-                  key={emp.id}
-                  item={{
-                    id: emp.id,
-                    name: emp.name,
-                    preview: emp.photoUrl,
-                    status: gen?.status ?? "pending",
-                    medicalUrl: gen?.medicalUrl ?? null,
-                    corporateUrl: gen?.corporateUrl ?? null,
-                    error: gen?.error,
-                  }}
-                  index={deptEmployees.findIndex((e) => e.id === emp.id)}
-                  isCurrent={currentId === emp.id}
-                  isProcessing={isProcessing}
-                  onRemove={() => handleRemoveEmployee(emp.id)}
-                  onNameChange={(name) => handleEmployeeNameChange(emp.id, name)}
-                  showNameInput
-                  onGenerate={gen?.status !== "complete" ? () => processBatch("one", undefined, emp.id) : undefined}
-                />
-              )
-            })}
-          </div>
-        </div>
-      ))}
 
       <Dialog open={addDeptOpen} onOpenChange={setAddDeptOpen}>
         <DialogContent>
@@ -522,6 +543,44 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
             </Button>
             <Button onClick={handleAddDepartment}>Создать</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addEmployeesOpen} onOpenChange={setAddEmployeesOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Добавить сотрудников</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Перетащите сюда сразу несколько фотографий сотрудников или нажмите для выбора файлов. Каждое фото будет добавлено как отдельный сотрудник.
+          </p>
+          <div
+            className="flex min-h-[180px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-muted/20 py-6 transition-colors hover:border-primary/40 hover:bg-muted/40"
+            onDragOver={(e) => {
+              e.preventDefault()
+              e.currentTarget.classList.add("border-primary/50", "bg-primary/5")
+            }}
+            onDragLeave={(e) => {
+              e.currentTarget.classList.remove("border-primary/50", "bg-primary/5")
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              e.currentTarget.classList.remove("border-primary/50", "bg-primary/5")
+              if (e.dataTransfer.files?.length)
+                handleAddEmployeesInModal(e.dataTransfer.files)
+            }}
+            onClick={() => inputRefAddEmployees.current?.click()}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") inputRefAddEmployees.current?.click()
+            }}
+          >
+            <UserPlus className="size-10 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">
+              Перетащите фото сюда или нажмите для выбора
+            </span>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
