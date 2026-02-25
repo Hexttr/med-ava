@@ -229,7 +229,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
                   />
                 </div>
               </TabsContent>
-              <TabsContent value="image" className="mt-3 flex flex-col gap-3">
+              <TabsContent value="image" className="mt-3 flex flex-col gap-5">
                 <p className="text-xs text-muted-foreground">
                   Изображения имеют высший приоритет. Если загружены — используются вместо описания.
                 </p>
