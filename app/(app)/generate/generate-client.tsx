@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
-import { Sparkles, AlertCircle, Settings, Loader2 } from "lucide-react"
+import { useState, useCallback, useEffect, useRef } from "react"
+import { Sparkles, AlertCircle, Settings, Loader2, Upload, X } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -15,7 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { PhotoUploader } from "@/components/photo-uploader"
 import { PortraitCard } from "@/components/portrait-card"
 import { Progress } from "@/components/ui/progress"
 import type { ProcessingStatus } from "@/lib/types"
@@ -35,11 +34,10 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
   const [status, setStatus] = useState<ProcessingStatus>("idle")
   const [medicalUrl, setMedicalUrl] = useState<string | null>(null)
   const [corporateUrl, setCorporateUrl] = useState<string | null>(null)
-  const [medicalPrompt, setMedicalPrompt] = useState<string>("")
-  const [corporatePrompt, setCorporatePrompt] = useState<string>("")
   const [progress, setProgress] = useState(0)
   const [departments, setDepartments] = useState<Department[]>([])
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>("")
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetchDepartments().then(setDepartments).catch(() => [])
@@ -51,8 +49,6 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
     setPreview(url)
     setMedicalUrl(null)
     setCorporateUrl(null)
-    setMedicalPrompt("")
-    setCorporatePrompt("")
     setStatus("idle")
     setProgress(0)
   }, [])
@@ -63,8 +59,6 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
     setPreview(null)
     setMedicalUrl(null)
     setCorporateUrl(null)
-    setMedicalPrompt("")
-    setCorporatePrompt("")
     setStatus("idle")
     setProgress(0)
   }, [preview])
@@ -115,8 +109,6 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
       }
 
       const analysis = await analyzeRes.json()
-      setMedicalPrompt(analysis.medicalPrompt)
-      setCorporatePrompt(analysis.corporatePrompt)
       setProgress(30)
 
       const reference = await fileToBase64(file)
@@ -225,11 +217,13 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
   }
 
   const isProcessing = status === "analyzing" || status === "generating"
+  const medicalStatus = medicalUrl ? "complete" : status === "generating" && !medicalUrl ? "generating" : status === "analyzing" ? "analyzing" : "idle"
+  const corporateStatus = corporateUrl ? "complete" : status === "generating" && medicalUrl && !corporateUrl ? "generating" : status
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col">
       {isProcessing && (
-        <div className="flex flex-col gap-2">
+        <div className="mb-6 flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
               {status === "analyzing" ? "Анализ фото..." : "Генерация портретов..."}
@@ -240,27 +234,28 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
-        {/* Left: Upload */}
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="employee-name">Имя сотрудника</Label>
+      {/* Верхняя строка: ФИО и Отдел горизонтально + кнопка */}
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="employee-name">ФИО сотрудника</Label>
             <Input
               id="employee-name"
-              placeholder="Введите имя (необязательно)"
+              placeholder="Введите имя (необяз)"
               value={employeeName}
               onChange={(e) => setEmployeeName(e.target.value)}
               disabled={isProcessing}
+              className="w-full min-w-[180px]"
             />
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             <Label>Отдел</Label>
             <Select
               value={selectedDepartmentId || "_none"}
               onValueChange={(v) => setSelectedDepartmentId(v === "_none" ? "" : v)}
               disabled={isProcessing}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Без отдела" />
               </SelectTrigger>
               <SelectContent>
@@ -272,20 +267,10 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
-              После генерации сотрудник будет добавлен в выбранный отдел или в корень
-            </p>
           </div>
-          <PhotoUploader
-            onFileSelect={handleFileSelect}
-            currentPreview={preview}
-            onClear={handleClear}
-            disabled={isProcessing}
-          />
           <Button
             onClick={handleGenerate}
             disabled={!file || isProcessing}
-            className="w-full"
             size="lg"
           >
             {isProcessing ? (
@@ -301,22 +286,90 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
             )}
           </Button>
         </div>
+      </div>
 
-        {/* Right: Results */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <PortraitCard
-            style="medical"
-            imageUrl={medicalUrl}
-            status={medicalUrl ? "complete" : status === "generating" && !medicalUrl ? "generating" : status === "analyzing" ? "analyzing" : "idle"}
-            prompt={medicalPrompt}
-          />
-          <PortraitCard
-            style="corporate"
-            imageUrl={corporateUrl}
-            status={corporateUrl ? "complete" : status === "generating" && medicalUrl && !corporateUrl ? "generating" : status}
-            prompt={corporatePrompt}
-          />
-        </div>
+      {/* Было — Стало */}
+      <div className="mt-8 grid max-w-[70%] grid-cols-1 gap-4 sm:grid-cols-3">
+        {/* Было: вставка фото, после загрузки — превью */}
+        <Card className="overflow-hidden gap-0">
+          <div className="flex items-center justify-between border-b border-border px-3 py-2">
+            <span className="text-xs font-medium text-muted-foreground">Было</span>
+            {preview && !isProcessing && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={(e) => {
+                  e.preventDefault()
+                  handleClear()
+                }}
+              >
+                <X className="size-3.5" />
+                <span className="sr-only">Удалить фото</span>
+              </Button>
+            )}
+          </div>
+          <div
+            className="relative aspect-[3/4] w-full overflow-hidden bg-muted/30"
+            onDragOver={(e) => {
+              e.preventDefault()
+              if (isProcessing) return
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              if (isProcessing) return
+              const f = e.dataTransfer.files?.[0]
+              if (f?.type.startsWith("image/")) handleFileSelect(f)
+            }}
+            onClick={() => {
+              if (isProcessing) return
+              if (!preview) fileInputRef.current?.click()
+            }}
+            role={preview ? undefined : "button"}
+            tabIndex={preview ? undefined : 0}
+            onKeyDown={(e) => {
+              if (preview) return
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault()
+                fileInputRef.current?.click()
+              }
+            }}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) handleFileSelect(f)
+                e.target.value = ""
+              }}
+            />
+            {preview ? (
+              <img src={preview} alt="Исходное фото" className="size-full object-cover" />
+            ) : (
+              <div className="flex size-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                <Upload className="size-8 opacity-50" />
+                <span className="text-xs">Вставьте или перетащите фото</span>
+              </div>
+            )}
+          </div>
+        </Card>
+        <PortraitCard
+          style="medical"
+          imageUrl={medicalUrl}
+          status={medicalStatus}
+          labelLeft="Стало"
+          labelRight="Белый халат"
+        />
+        <PortraitCard
+          style="corporate"
+          imageUrl={corporateUrl}
+          status={corporateStatus}
+          labelLeft="Стало"
+          labelRight="Деловой"
+        />
       </div>
     </div>
   )

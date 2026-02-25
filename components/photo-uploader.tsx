@@ -123,10 +123,10 @@ export function PhotoUploader({ onFileSelect, currentPreview, onClear, disabled 
         )}
       </div>
       <p className="mt-3 text-sm font-medium text-foreground">
-        {isDragging ? "Отпустите фото здесь" : "Загрузите фото сотрудника"}
+        {isDragging ? "Отпустите фото здесь" : "Загрузите фотографию PNG, JPG до 10 МБ"}
       </p>
       <p className="mt-1 text-xs text-muted-foreground">
-        Перетащите файл или нажмите для выбора. JPG, PNG, WebP.
+        Перетащите файл или нажмите для выбора
       </p>
     </div>
   )

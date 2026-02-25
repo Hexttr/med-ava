@@ -2,25 +2,33 @@
 
 import { Download, Loader2, ImageIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
 import type { PortraitStyle, ProcessingStatus } from "@/lib/types"
 
 interface PortraitCardProps {
   style: PortraitStyle
   imageUrl: string | null
   status: ProcessingStatus
-  prompt?: string
+  /** Левая метка (например «Стало») */
+  labelLeft?: string
+  /** Правая метка (например «Белый халат») */
+  labelRight: string
+  showDownload?: boolean
 }
 
-const styleLabels: Record<PortraitStyle, { title: string; badge: string }> = {
-  medical: { title: "Медицинский портрет", badge: "Белый халат" },
-  corporate: { title: "Корпоративный портрет", badge: "Деловой" },
+const styleLabels: Record<PortraitStyle, { labelRight: string }> = {
+  medical: { labelRight: "Белый халат" },
+  corporate: { labelRight: "Деловой" },
 }
 
-export function PortraitCard({ style, imageUrl, status, prompt }: PortraitCardProps) {
-  const label = styleLabels[style]
-
+export function PortraitCard({
+  style,
+  imageUrl,
+  status,
+  labelLeft = "Стало",
+  labelRight = styleLabels[style].labelRight,
+  showDownload = true,
+}: PortraitCardProps) {
   function handleDownload() {
     if (!imageUrl) return
     const a = document.createElement("a")
@@ -30,21 +38,21 @@ export function PortraitCard({ style, imageUrl, status, prompt }: PortraitCardPr
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <div className="flex items-center gap-2">
-          <CardTitle className="text-sm">{label.title}</CardTitle>
-          <Badge variant="secondary" className="text-[10px]">{label.badge}</Badge>
+    <Card className="overflow-hidden gap-0">
+      <CardContent className="p-0">
+        <div className="flex items-center justify-between border-b border-border px-3 py-2">
+          <span className="text-xs font-medium text-muted-foreground">{labelLeft}</span>
+          <div className="flex items-center gap-1">
+            <span className="text-xs font-medium text-foreground">{labelRight}</span>
+            {showDownload && imageUrl && (
+              <Button variant="ghost" size="icon" className="size-7" onClick={handleDownload}>
+                <Download className="size-3.5" />
+                <span className="sr-only">Скачать</span>
+              </Button>
+            )}
+          </div>
         </div>
-        {imageUrl && (
-          <Button variant="ghost" size="icon" className="size-8" onClick={handleDownload}>
-            <Download className="size-4" />
-            <span className="sr-only">Скачать портрет</span>
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent>
-        <div className="relative aspect-[3/4] overflow-hidden rounded-lg border border-border bg-muted/30">
+        <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted/30">
           {status === "generating" && (
             <div className="flex size-full flex-col items-center justify-center gap-2">
               <Loader2 className="size-6 animate-spin text-primary" />
@@ -53,39 +61,29 @@ export function PortraitCard({ style, imageUrl, status, prompt }: PortraitCardPr
           )}
           {status === "analyzing" && (
             <div className="flex size-full flex-col items-center justify-center gap-2">
-              <Loader2 className="size-6 animate-spin text-accent" />
-              <span className="text-xs text-muted-foreground">Анализ фото...</span>
+              <Loader2 className="size-6 animate-spin text-primary" />
+              <span className="text-xs text-muted-foreground">Анализ...</span>
             </div>
           )}
           {status === "idle" && !imageUrl && (
             <div className="flex size-full flex-col items-center justify-center gap-2">
-              <ImageIcon className="size-6 text-muted-foreground/40" />
-              <span className="text-xs text-muted-foreground">Ожидание генерации</span>
+              <ImageIcon className="size-8 text-muted-foreground/40" />
+              <span className="text-xs text-muted-foreground">Ожидание</span>
             </div>
           )}
           {status === "complete" && imageUrl && (
             <img
               src={imageUrl}
-              alt={style === "medical" ? "Сгенерированный медицинский портрет" : "Сгенерированный корпоративный портрет"}
+              alt={style === "medical" ? "Медицинский портрет" : "Корпоративный портрет"}
               className="size-full object-cover"
             />
           )}
           {status === "error" && (
             <div className="flex size-full flex-col items-center justify-center gap-2 p-4">
-              <span className="text-xs text-destructive">Ошибка генерации</span>
+              <span className="text-xs text-destructive">Ошибка</span>
             </div>
           )}
         </div>
-        {prompt && status === "complete" && (
-          <details className="mt-2">
-            <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
-              Показать промпт
-            </summary>
-            <p className="mt-1 rounded border border-border bg-muted/30 p-2 font-mono text-[10px] leading-relaxed text-muted-foreground">
-              {prompt}
-            </p>
-          </details>
-        )}
       </CardContent>
     </Card>
   )
