@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import { Sparkles, AlertCircle, Settings, Loader2, Upload, X } from "lucide-react"
+import { Sparkles, AlertCircle, Settings, Loader2, Upload, Download } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -292,22 +292,8 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
       <div className="mt-8 grid max-w-[70%] grid-cols-1 gap-4 sm:grid-cols-3">
         {/* Было: вставка фото, после загрузки — превью */}
         <Card className="overflow-hidden gap-0">
-          <div className="flex items-center justify-between border-b border-border px-3 py-2">
+          <div className="flex items-center border-b border-border px-3 py-2">
             <span className="text-xs font-medium text-muted-foreground">Было</span>
-            {preview && !isProcessing && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7"
-                onClick={(e) => {
-                  e.preventDefault()
-                  handleClear()
-                }}
-              >
-                <X className="size-3.5" />
-                <span className="sr-only">Удалить фото</span>
-              </Button>
-            )}
           </div>
           <div
             className="relative aspect-[3/4] w-full overflow-hidden bg-muted/30"
@@ -347,7 +333,27 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
               }}
             />
             {preview ? (
-              <img src={preview} alt="Исходное фото" className="size-full object-cover" />
+              <>
+                <img src={preview} alt="Исходное фото" className="size-full object-cover object-top" />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  className="absolute right-1.5 bottom-1.5 z-10 size-7 rounded-none shadow-md opacity-90 hover:opacity-100"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    const a = document.createElement("a")
+                    a.href = preview
+                    a.download = "original.jpg"
+                    a.click()
+                  }}
+                  aria-label="Скачать"
+                  title="Скачать"
+                >
+                  <Download className="size-3.5" />
+                </Button>
+              </>
             ) : (
               <div className="flex size-full flex-col items-center justify-center gap-2 text-muted-foreground">
                 <Upload className="size-8 opacity-50" />
@@ -361,14 +367,12 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
           imageUrl={medicalUrl}
           status={medicalStatus}
           labelLeft="Стало"
-          labelRight="Белый халат"
         />
         <PortraitCard
           style="corporate"
           imageUrl={corporateUrl}
           status={corporateStatus}
           labelLeft="Стало"
-          labelRight="Деловой"
         />
       </div>
     </div>

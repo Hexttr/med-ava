@@ -11,14 +11,7 @@ interface PortraitCardProps {
   status: ProcessingStatus
   /** Левая метка (например «Стало») */
   labelLeft?: string
-  /** Правая метка (например «Белый халат») */
-  labelRight: string
   showDownload?: boolean
-}
-
-const styleLabels: Record<PortraitStyle, { labelRight: string }> = {
-  medical: { labelRight: "Белый халат" },
-  corporate: { labelRight: "Деловой" },
 }
 
 export function PortraitCard({
@@ -26,7 +19,6 @@ export function PortraitCard({
   imageUrl,
   status,
   labelLeft = "Стало",
-  labelRight = styleLabels[style].labelRight,
   showDownload = true,
 }: PortraitCardProps) {
   function handleDownload() {
@@ -40,17 +32,8 @@ export function PortraitCard({
   return (
     <Card className="overflow-hidden gap-0">
       <CardContent className="p-0">
-        <div className="flex items-center justify-between border-b border-border px-3 py-2">
+        <div className="flex items-center border-b border-border px-3 py-2">
           <span className="text-xs font-medium text-muted-foreground">{labelLeft}</span>
-          <div className="flex items-center gap-1">
-            <span className="text-xs font-medium text-foreground">{labelRight}</span>
-            {showDownload && imageUrl && (
-              <Button variant="ghost" size="icon" className="size-7" onClick={handleDownload}>
-                <Download className="size-3.5" />
-                <span className="sr-only">Скачать</span>
-              </Button>
-            )}
-          </div>
         </div>
         <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted/30">
           {status === "generating" && (
@@ -72,11 +55,26 @@ export function PortraitCard({
             </div>
           )}
           {status === "complete" && imageUrl && (
-            <img
-              src={imageUrl}
-              alt={style === "medical" ? "Медицинский портрет" : "Корпоративный портрет"}
-              className="size-full object-cover"
-            />
+            <>
+              <img
+                src={imageUrl}
+                alt={style === "medical" ? "Медицинский портрет" : "Корпоративный портрет"}
+                className="size-full object-cover object-top"
+              />
+              {showDownload && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  className="absolute right-1.5 bottom-1.5 z-10 size-7 rounded-none shadow-md opacity-90 hover:opacity-100"
+                  onClick={handleDownload}
+                  aria-label="Скачать"
+                  title="Скачать"
+                >
+                  <Download className="size-3.5" />
+                </Button>
+              )}
+            </>
           )}
           {status === "error" && (
             <div className="flex size-full flex-col items-center justify-center gap-2 p-4">
