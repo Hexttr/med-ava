@@ -2,9 +2,18 @@ import { NextRequest, NextResponse } from "next/server"
 import { getGeminiKey } from "@/lib/settings"
 import { fetchWithProxy } from "@/lib/fetch-proxy"
 import { logger } from "@/lib/logger"
+import { getAnalysisPrompt } from "@/lib/prompts"
+import { checkRateLimit } from "@/lib/rate-limit"
+import { validateImageFile } from "@/lib/upload-validation"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
+
+function getClientIp(request: NextRequest): string {
+  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown"
+}
 
 function toBase64(bytes: ArrayBuffer): string {
   if (typeof Buffer !== "undefined") {
@@ -18,10 +27,19 @@ function toBase64(bytes: ArrayBuffer): string {
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request)
+    const { allowed, remaining, resetIn } = checkRateLimit(`analyze:${ip}`)
+    if (!allowed) {
+      return NextResponse.json(
+        { error: `Превышен лимит запросов. Повторите через ${resetIn} сек.` },
+        { status: 429, headers: { "Retry-After": String(resetIn) } }
+      )
+    }
+
     const geminiKey = await getGeminiKey()
     if (!geminiKey) {
       return NextResponse.json(
-        { error: "API-ключ Gemini не настроен" },
+        { error: "API-ключ Gemini не настроен. Добавьте GEMINI_API_KEY в .env" },
         { status: 401 }
       )
     }
@@ -37,38 +55,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const validation = validateImageFile(photo)
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.error }, { status: 400 })
+    }
+
     const bytes = await (photo as Blob).arrayBuffer()
     const base64 = toBase64(bytes)
     const mimeType = (photo as File).type || "image/jpeg"
 
-    // Call Gemini API for analysis
-    const analysisPrompt = `You are a professional portrait photography prompt engineer for an AI image generation system. Your goal is to produce text prompts that will generate portraits where the face is MAXIMUM LIKENESS to the source photo.
-
-Analyze this photo of a person named "${employeeName}". You MUST describe the face in precise, unambiguous detail:
-- Exact face shape (oval, round, square, heart, etc.)
-- Skin tone and texture (specific shade, any visible features)
-- Hair: color, exact style, length, parting, any distinctive detail
-- Eyes: color, shape, spacing, eyebrows (shape and color)
-- Nose and mouth: shape, lip fullness, any distinctive traits
-- Approximate age and gender presentation
-- Any distinguishing features (moles, freckles, scars, glasses imprint, etc.)
-
-Based on your analysis, create TWO detailed prompts for generating professional portraits. Each prompt MUST start with a full, precise description of this person's face and head so the generated image looks like the SAME person.
-
-UNIVERSAL FRAMING RULE (applies to every portrait in the system—single and batch, medical and corporate): All generated portraits MUST use the exact same composition. You MUST include this exact phrase in both prompts: "Standard portrait framing: head and upper torso only, bust-length, shoulders visible, same head-to-body scale as all other portraits in the system." This ensures every portrait across all sessions has identical proportions.
-
-1. MEDICAL PORTRAIT: First describe the person's face and appearance in full detail (so the portrait is unmistakably the same person), then include the standard portrait framing phrase above, then: wearing a crisp white medical doctor's coat, professional medical setting. Clean, well-lit studio backdrop in light gray or white. Warm, approachable expression. High-quality studio photography lighting.
-
-2. CORPORATE PORTRAIT: First describe the person's face and appearance in full detail (same as above—identical person), then include the same standard portrait framing phrase (identical wording), then: in professional business attire (dark suit/blazer). Clean corporate background in dark navy or charcoal gray. Confident, professional expression. Studio photography with rim lighting.
-
-CRITICAL: Both prompts must describe the EXACT SAME person from the photo. The face in the generated image must be recognizable as this person. Lead each prompt with a detailed facial description so the AI image model preserves identity and likeness. The framing phrase must be identical in both prompts so that every portrait ever generated in this app has the same proportions.
-
-Respond with ONLY one valid JSON object (no markdown, no \`\`\` code fences, no extra text). Use double quotes for keys and strings; escape any " inside strings as \". Required keys: description, medicalPrompt, corporatePrompt. Example structure:
-{
-  "description": "Brief description of the person",
-  "medicalPrompt": "Full prompt for medical portrait...",
-  "corporatePrompt": "Full prompt for corporate portrait..."
-}`
+    const analysisPrompt = getAnalysisPrompt(employeeName)
 
     // Анализ фото: Gemini 2.5 Flash (запрос через fetchWithProxy для поддержки VPN/прокси)
     const geminiResponse = await fetchWithProxy(

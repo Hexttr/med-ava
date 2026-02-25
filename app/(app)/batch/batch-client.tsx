@@ -435,16 +435,24 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         <Button
           type="button"
           size="sm"
-          className={cn("h-9", isProcessing && "disabled:!opacity-90")}
+          className={cn(
+            "h-9 min-w-[140px]",
+            isProcessing && "cursor-wait !opacity-100"
+          )}
           onClick={handleGenerateVisible}
           disabled={isProcessing || visibleEmployees.length === 0}
         >
           {isProcessing ? (
-            <Loader2 className="mr-2 size-4 shrink-0 animate-spin" />
+            <>
+              <Loader2 className="mr-2 size-4 shrink-0 animate-spin" />
+              Генерация...
+            </>
           ) : (
-            <Sparkles className="mr-2 size-4" />
+            <>
+              <Sparkles className="mr-2 size-4" />
+              Сгенерировать
+            </>
           )}
-          Сгенерировать
         </Button>
       </div>
 

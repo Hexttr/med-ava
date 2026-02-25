@@ -11,6 +11,7 @@ import {
   ImageIcon,
   Stethoscope,
   X,
+  LogOut,
 } from "lucide-react"
 
 import {
@@ -151,6 +152,17 @@ export function AppSidebar({ initialOrganizationName }: AppSidebarProps) {
               <Link href="/settings">
                 <Settings className="size-4" />
                 <span>Настройки</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              tooltip="Выйти"
+            >
+              <Link href="/api/auth/logout" className="text-muted-foreground hover:text-foreground">
+                <LogOut className="size-4" />
+                <span>Выйти</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

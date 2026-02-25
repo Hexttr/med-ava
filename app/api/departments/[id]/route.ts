@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
+import { logger } from "@/lib/logger"
 
 function toResponse(row: { id: string; name: string; created_at: number }) {
   return {
@@ -24,7 +25,7 @@ export async function GET(
     }
     return NextResponse.json(toResponse(row))
   } catch (e) {
-    console.error("[API] departments/[id] GET", e)
+    logger.error("DEPARTMENTS", "GET by id error", { error: e instanceof Error ? e.message : String(e) })
     return NextResponse.json({ error: "Не удалось загрузить отдел" }, { status: 500 })
   }
 }
@@ -53,7 +54,7 @@ export async function PATCH(
     }
     return NextResponse.json(toResponse(row))
   } catch (e) {
-    console.error("[API] departments/[id] PATCH", e)
+    logger.error("DEPARTMENTS", "PATCH error", { error: e instanceof Error ? e.message : String(e) })
     return NextResponse.json({ error: "Не удалось обновить отдел" }, { status: 500 })
   }
 }
@@ -74,7 +75,7 @@ export async function DELETE(
     database.prepare("DELETE FROM departments WHERE id = ?").run(id)
     return NextResponse.json({ success: true })
   } catch (e) {
-    console.error("[API] departments/[id] DELETE", e)
+    logger.error("DEPARTMENTS", "DELETE error", { error: e instanceof Error ? e.message : String(e) })
     return NextResponse.json({ error: "Не удалось удалить отдел" }, { status: 500 })
   }
 }

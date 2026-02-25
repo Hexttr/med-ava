@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
+import { logger } from "@/lib/logger"
 
 function toResponse(row: { id: string; name: string; created_at: number }) {
   return {
@@ -17,7 +18,7 @@ export async function GET() {
       .all() as Array<{ id: string; name: string; created_at: number }>
     return NextResponse.json(rows.map(toResponse))
   } catch (e) {
-    console.error("[API] departments GET", e)
+    logger.error("DEPARTMENTS", "GET error", { error: e instanceof Error ? e.message : String(e) })
     return NextResponse.json({ error: "Не удалось загрузить отделы" }, { status: 500 })
   }
 }
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json(toResponse(row))
   } catch (e) {
-    console.error("[API] departments POST", e)
+    logger.error("DEPARTMENTS", "POST error", { error: e instanceof Error ? e.message : String(e) })
     return NextResponse.json({ error: "Не удалось создать отдел" }, { status: 500 })
   }
 }

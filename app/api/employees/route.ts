@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
 import { saveBase64Image } from "@/lib/storage"
-import path from "path"
+import { validateBase64Image } from "@/lib/upload-validation"
+import { logger } from "@/lib/logger"
 
 function toResponse(row: {
   id: string
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json(rows.map(toResponse))
   } catch (e) {
-    console.error("[API] employees GET", e)
+    logger.error("EMPLOYEES", "GET error", { error: e instanceof Error ? e.message : String(e) })
     return NextResponse.json({ error: "Не удалось загрузить сотрудников" }, { status: 500 })
   }
 }
@@ -69,6 +70,8 @@ export async function POST(request: NextRequest) {
     if (!photoUrl || typeof photoUrl !== "string") {
       return NextResponse.json({ error: "Требуется photoUrl" }, { status: 400 })
     }
+    const valid = validateBase64Image(photoUrl)
+    if (!valid.ok) return NextResponse.json({ error: valid.error }, { status: 400 })
     const departmentId = body?.departmentId ?? null
     const database = getDb()
     if (departmentId) {
@@ -106,7 +109,7 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json(toResponse(row))
   } catch (e) {
-    console.error("[API] employees POST", e)
+    logger.error("EMPLOYEES", "POST error", { error: e instanceof Error ? e.message : String(e) })
     return NextResponse.json({ error: "Не удалось добавить сотрудника" }, { status: 500 })
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
 import { removeFile } from "@/lib/storage"
+import { logger } from "@/lib/logger"
 
 export async function DELETE(
   _request: NextRequest,
@@ -20,7 +21,7 @@ export async function DELETE(
     database.prepare("DELETE FROM gallery_items WHERE id = ?").run(id)
     return NextResponse.json({ success: true })
   } catch (e) {
-    console.error("[API] gallery/[id] DELETE", e)
+    logger.error("GALLERY", "DELETE error", { error: e instanceof Error ? e.message : String(e) })
     return NextResponse.json({ error: "Не удалось удалить" }, { status: 500 })
   }
 }

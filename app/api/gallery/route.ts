@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
 import { saveBase64Image } from "@/lib/storage"
+import { validateBase64Image } from "@/lib/upload-validation"
+import { logger } from "@/lib/logger"
 
 function toItemResponse(row: {
   id: string
@@ -65,7 +67,7 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json(rows.map(toItemResponse))
   } catch (e) {
-    console.error("[API] gallery GET", e)
+    logger.error("GALLERY", "GET error", { error: e instanceof Error ? e.message : String(e) })
     return NextResponse.json({ error: "Не удалось загрузить галерею" }, { status: 500 })
   }
 }
@@ -79,6 +81,10 @@ export async function POST(request: NextRequest) {
     if (!medicalUrl || !corporateUrl || typeof medicalUrl !== "string" || typeof corporateUrl !== "string") {
       return NextResponse.json({ error: "Требуются medicalUrl и corporateUrl" }, { status: 400 })
     }
+    const medValid = validateBase64Image(medicalUrl)
+    const corpValid = validateBase64Image(corporateUrl)
+    if (!medValid.ok) return NextResponse.json({ error: medValid.error }, { status: 400 })
+    if (!corpValid.ok) return NextResponse.json({ error: corpValid.error }, { status: 400 })
     const employeeId = body?.employeeId ?? null
     const database = getDb()
     let departmentId: string | null = null
@@ -123,7 +129,7 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json(toItemResponse(row))
   } catch (e) {
-    console.error("[API] gallery POST", e)
+    logger.error("GALLERY", "POST error", { error: e instanceof Error ? e.message : String(e) })
     return NextResponse.json({ error: "Не удалось добавить в галерею" }, { status: 500 })
   }
 }

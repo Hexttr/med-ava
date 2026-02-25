@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import { getGeminiKey } from "@/lib/settings"
 import { logger } from "@/lib/logger"
+import { getRateLimitStats } from "@/lib/rate-limit"
+import { getDb } from "@/lib/db"
+import fs from "fs"
+import path from "path"
 import net from "net"
 
 export const runtime = "nodejs"
@@ -29,14 +33,26 @@ function checkTcpPort(host: string, port: number, timeoutMs = 2000): Promise<{ o
 export async function GET() {
   const report: {
     timestamp: string
-    env: { EAM_HTTPS_PROXY_set: boolean; proxy_type?: string; proxy_host_port?: string }
+    env: {
+      EAM_HTTPS_PROXY_set: boolean
+      GEMINI_API_KEY_set: boolean
+      NODE_ENV: string
+      proxy_type?: string
+      proxy_host_port?: string
+    }
     proxy_ports: { socks5_10808: { open: boolean; error?: string }; http_10809: { open: boolean; error?: string } }
     api_key: { configured: boolean }
+    health: { database: string; uptimeSeconds?: number }
+    storage: { dataDirExists: boolean; dbExists: boolean; uploadsExists: boolean }
+    rateLimit: { totalTracked: number }
     recommendations: string[]
   } = {
     timestamp: new Date().toISOString(),
     env: {
       EAM_HTTPS_PROXY_set: !!process.env.EAM_HTTPS_PROXY,
+      GEMINI_API_KEY_set: !!process.env.GEMINI_API_KEY?.trim(),
+      EAM_PASSWORD_set: !!process.env.EAM_PASSWORD?.trim(),
+      NODE_ENV: process.env.NODE_ENV || "development",
       proxy_type: undefined,
       proxy_host_port: undefined,
     },
@@ -45,6 +61,9 @@ export async function GET() {
       http_10809: { open: false },
     },
     api_key: { configured: false },
+    health: { database: "unknown" },
+    storage: { dataDirExists: false, dbExists: false, uploadsExists: false },
+    rateLimit: { totalTracked: 0 },
     recommendations: [],
   }
 
@@ -65,9 +84,30 @@ export async function GET() {
   report.proxy_ports.http_10809 = await checkTcpPort("127.0.0.1", 10809)
   const key = await getGeminiKey()
   report.api_key.configured = !!key
+  report.env.GEMINI_API_KEY_set = !!key
+
+  try {
+    const db = getDb()
+    db.prepare("SELECT 1").get()
+    report.health.database = "ok"
+  } catch {
+    report.health.database = "error"
+    report.recommendations.push("Ошибка подключения к БД. Проверьте папку data/.")
+  }
+
+  try {
+    const dataDir = path.join(process.cwd(), "data")
+    report.storage.dataDirExists = fs.existsSync(dataDir)
+    report.storage.dbExists = fs.existsSync(path.join(dataDir, "eam.db"))
+    report.storage.uploadsExists = fs.existsSync(path.join(dataDir, "uploads"))
+  } catch {
+    report.storage.dataDirExists = false
+  }
+
+  report.rateLimit = getRateLimitStats()
 
   if (!report.api_key.configured) {
-    report.recommendations.push("Добавьте API-ключ Gemini в Настройках.")
+    report.recommendations.push("Добавьте GEMINI_API_KEY в .env.local")
   }
 
   if (!report.env.EAM_HTTPS_PROXY_set) {

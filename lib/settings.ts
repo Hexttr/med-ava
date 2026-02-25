@@ -1,27 +1,51 @@
 "use server"
 
-import { cookies } from "next/headers"
+import fs from "fs"
+import path from "path"
 
-const GEMINI_KEY_COOKIE = "eam_gemini_key"
+const GEMINI_KEY_FILE = path.join(process.cwd(), "data", "gemini-key")
 
+function ensureDataDir() {
+  const dataDir = path.join(process.cwd(), "data")
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true })
+  }
+}
+
+/**
+ * API-ключ Gemini: сначала из файла data/gemini-key (сохранённый в настройках),
+ * затем из переменной окружения GEMINI_API_KEY.
+ */
 export async function getGeminiKey(): Promise<string | null> {
-  const cookieStore = await cookies()
-  const key = cookieStore.get(GEMINI_KEY_COOKIE)
-  return key?.value ?? null
+  try {
+    if (fs.existsSync(GEMINI_KEY_FILE)) {
+      const key = fs.readFileSync(GEMINI_KEY_FILE, "utf-8").trim()
+      if (key) return key
+    }
+  } catch {
+    // ignore
+  }
+  const key = process.env.GEMINI_API_KEY?.trim()
+  return key || null
 }
 
-export async function setGeminiKey(key: string): Promise<void> {
-  const cookieStore = await cookies()
-  cookieStore.set(GEMINI_KEY_COOKIE, key, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 365, // 1 year
-    path: "/",
-  })
+/** Сохраняет ключ в data/gemini-key (приоритет над .env). */
+export async function saveGeminiKey(key: string): Promise<void> {
+  const trimmed = key.trim()
+  if (!trimmed || trimmed.length < 10) {
+    throw new Error("Неверный формат ключа")
+  }
+  ensureDataDir()
+  fs.writeFileSync(GEMINI_KEY_FILE, trimmed, "utf-8")
 }
 
+/** Удаляет сохранённый ключ (приложение будет использовать GEMINI_API_KEY из .env). */
 export async function removeGeminiKey(): Promise<void> {
-  const cookieStore = await cookies()
-  cookieStore.delete(GEMINI_KEY_COOKIE)
+  try {
+    if (fs.existsSync(GEMINI_KEY_FILE)) {
+      fs.unlinkSync(GEMINI_KEY_FILE)
+    }
+  } catch {
+    // ignore
+  }
 }

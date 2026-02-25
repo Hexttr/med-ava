@@ -1,15 +1,18 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { RefreshCw, CheckCircle2, XCircle, AlertCircle, Play } from "lucide-react"
+import { RefreshCw, CheckCircle2, XCircle, AlertCircle, Play, Copy, Terminal } from "lucide-react"
 
 interface Report {
   timestamp: string
   env: {
     EAM_HTTPS_PROXY_set: boolean
+    GEMINI_API_KEY_set: boolean
+    EAM_PASSWORD_set: boolean
+    NODE_ENV: string
     proxy_type?: string
     proxy_host_port?: string
   }
@@ -18,6 +21,9 @@ interface Report {
     http_10809: { open: boolean; error?: string }
   }
   api_key: { configured: boolean }
+  health: { database: string; uptimeSeconds?: number }
+  storage: { dataDirExists: boolean; dbExists: boolean; uploadsExists: boolean }
+  rateLimit: { totalTracked: number }
   recommendations: string[]
 }
 
@@ -30,12 +36,24 @@ type TestResult = {
   recommendation?: string
 } | null
 
+interface LogEntry {
+  id: string
+  ts: string
+  level: string
+  tag: string
+  message: string
+  data?: Record<string, unknown>
+  raw: string
+}
+
 export function DiagnosticClient() {
   const [report, setReport] = useState<Report | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [testResult, setTestResult] = useState<TestResult>(null)
   const [testLoading, setTestLoading] = useState(false)
+  const [logs, setLogs] = useState<LogEntry[]>([])
+  const [logsLoading, setLogsLoading] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -66,9 +84,35 @@ export function DiagnosticClient() {
     }
   }
 
+  const loadLogs = useCallback(async () => {
+    setLogsLoading(true)
+    try {
+      const res = await fetch("/api/diagnostic/logs?limit=100", { cache: "no-store" })
+      if (res.ok) {
+        const data = await res.json()
+        setLogs(data.logs ?? [])
+      }
+    } catch {
+      setLogs([])
+    } finally {
+      setLogsLoading(false)
+    }
+  }, [])
+
+  const copyLogs = useCallback(() => {
+    const text = logs.map((l) => l.raw).join("\n")
+    void navigator.clipboard.writeText(text)
+  }, [logs])
+
   useEffect(() => {
     load()
   }, [])
+
+  useEffect(() => {
+    loadLogs()
+    const interval = setInterval(loadLogs, 5000)
+    return () => clearInterval(interval)
+  }, [loadLogs])
 
   if (loading && !report) {
     return (
@@ -96,7 +140,7 @@ export function DiagnosticClient() {
 
   if (!report) return null
 
-  const { env, proxy_ports, api_key, recommendations } = report
+  const { env, proxy_ports, api_key, health, storage, rateLimit, recommendations } = report
 
   return (
     <div className="space-y-6">
@@ -110,13 +154,21 @@ export function DiagnosticClient() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Переменные окружения</CardTitle>
-            <CardDescription>Прокси задан в .env.local или start.bat</CardDescription>
+            <CardDescription>.env.local</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
+            <div className="flex items-center gap-2">
+              {env.GEMINI_API_KEY_set ? (
+                <CheckCircle2 className="size-4 text-success" />
+              ) : (
+                <XCircle className="size-4 text-destructive" />
+              )}
+              <span>GEMINI_API_KEY</span>
+            </div>
             <div className="flex items-center gap-2">
               {env.EAM_HTTPS_PROXY_set ? (
                 <CheckCircle2 className="size-4 text-success" />
@@ -133,6 +185,15 @@ export function DiagnosticClient() {
             {env.proxy_host_port && (
               <p className="text-xs text-muted-foreground font-mono">{env.proxy_host_port}</p>
             )}
+            <div className="flex items-center gap-2">
+              {env.EAM_PASSWORD_set ? (
+                <CheckCircle2 className="size-4 text-success" />
+              ) : (
+                <span className="size-4 text-muted-foreground">—</span>
+              )}
+              <span className="text-xs">EAM_PASSWORD (Basic Auth)</span>
+            </div>
+            <p className="text-xs text-muted-foreground">NODE_ENV: {env.NODE_ENV}</p>
           </CardContent>
         </Card>
 
@@ -164,6 +225,50 @@ export function DiagnosticClient() {
                 <span className="text-xs text-muted-foreground">{proxy_ports.http_10809.error}</span>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Проверки</CardTitle>
+            <CardDescription>БД, хранилище, rate limit</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center gap-2">
+              {health.database === "ok" ? (
+                <CheckCircle2 className="size-4 text-success" />
+              ) : (
+                <XCircle className="size-4 text-destructive" />
+              )}
+              <span>БД: {health.database}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {storage.dataDirExists ? (
+                <CheckCircle2 className="size-4 text-success" />
+              ) : (
+                <XCircle className="size-4 text-destructive" />
+              )}
+              <span>data/</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {storage.dbExists ? (
+                <CheckCircle2 className="size-4 text-success" />
+              ) : (
+                <XCircle className="size-4 text-muted-foreground" />
+              )}
+              <span>eam.db</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {storage.uploadsExists ? (
+                <CheckCircle2 className="size-4 text-success" />
+              ) : (
+                <XCircle className="size-4 text-muted-foreground" />
+              )}
+              <span>uploads/</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Rate limit: {rateLimit.totalTracked} IP в окне
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -247,13 +352,54 @@ export function DiagnosticClient() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-primary/30">
         <CardHeader>
-          <CardTitle className="text-base">Логи приложения</CardTitle>
-          <CardDescription>
-            В окне терминала, где запущен start.bat, при каждом запросе к Google выводятся строки [EAM] с типом запроса, прокси, статусом и телом ошибки (если есть). Запустите генерацию и посмотрите вывод.
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Terminal className="size-4" />
+                Логи и мониторинг
+              </CardTitle>
+              <CardDescription>
+                Последние записи логов приложения. Обновляются каждые 5 сек. Запустите генерацию — здесь появятся запросы к API, статусы и ошибки.
+              </CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={loadLogs} disabled={logsLoading}>
+                <RefreshCw className={`mr-2 size-4 ${logsLoading ? "animate-spin" : ""}`} />
+                Обновить
+              </Button>
+              <Button variant="outline" size="sm" onClick={copyLogs} disabled={logs.length === 0}>
+                <Copy className="mr-2 size-4" />
+                Копировать
+              </Button>
+            </div>
+          </div>
         </CardHeader>
+        <CardContent>
+          <div className="max-h-[320px] overflow-y-auto rounded-none border border-border bg-muted/20 font-mono text-xs">
+            {logs.length === 0 && !logsLoading ? (
+              <p className="p-4 text-muted-foreground">Логов пока нет. Выполните генерацию или проверку API.</p>
+            ) : (
+              <div className="divide-y divide-border">
+                {logs.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className={`px-3 py-1.5 hover:bg-muted/40 ${
+                      entry.level === "error" ? "text-destructive" : entry.level === "warn" ? "text-amber-600 dark:text-amber-400" : ""
+                    }`}
+                  >
+                    <span className="text-muted-foreground">{entry.ts}</span>{" "}
+                    <span className="font-medium">[{entry.tag}]</span> {entry.message}
+                    {entry.data && Object.keys(entry.data).length > 0 && (
+                      <span className="text-muted-foreground"> {JSON.stringify(entry.data)}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
       </Card>
     </div>
   )

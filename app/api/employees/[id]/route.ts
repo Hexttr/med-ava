@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
 import { saveBase64Image, removeFile } from "@/lib/storage"
+import { validateBase64Image } from "@/lib/upload-validation"
+import { logger } from "@/lib/logger"
 
 function toResponse(row: {
   id: string
@@ -47,7 +49,7 @@ export async function GET(
     }
     return NextResponse.json(toResponse(row))
   } catch (e) {
-    console.error("[API] employees/[id] GET", e)
+    logger.error("EMPLOYEES", "GET by id error", { error: e instanceof Error ? e.message : String(e) })
     return NextResponse.json({ error: "Не удалось загрузить сотрудника" }, { status: 500 })
   }
 }
@@ -74,6 +76,8 @@ export async function PATCH(
     if (body.photoUrl !== undefined) {
       await removeFile(existing.photo_path)
       if (body.photoUrl && typeof body.photoUrl === "string") {
+        const valid = validateBase64Image(body.photoUrl)
+        if (!valid.ok) return NextResponse.json({ error: valid.error }, { status: 400 })
         photoPath = await saveBase64Image(body.photoUrl, "employees", id)
       }
     }
@@ -110,7 +114,7 @@ export async function PATCH(
     }
     return NextResponse.json(toResponse(row))
   } catch (e) {
-    console.error("[API] employees/[id] PATCH", e)
+    logger.error("EMPLOYEES", "PATCH error", { error: e instanceof Error ? e.message : String(e) })
     return NextResponse.json({ error: "Не удалось обновить сотрудника" }, { status: 500 })
   }
 }
@@ -141,7 +145,7 @@ export async function DELETE(
     database.prepare("DELETE FROM employees WHERE id = ?").run(id)
     return NextResponse.json({ success: true })
   } catch (e) {
-    console.error("[API] employees/[id] DELETE", e)
+    logger.error("EMPLOYEES", "DELETE error", { error: e instanceof Error ? e.message : String(e) })
     return NextResponse.json({ error: "Не удалось удалить сотрудника" }, { status: 500 })
   }
 }

@@ -1,53 +1,36 @@
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
+import { saveGeminiKey, removeGeminiKey } from "@/lib/settings"
+import { logger } from "@/lib/logger"
 
-const GEMINI_KEY_COOKIE = "eam_gemini_key"
-
-function isValidGeminiKey(key: string): boolean {
+function isValidKey(key: string): boolean {
   const trimmed = key.trim()
-  // Gemini keys: обычно AIza... (≈39 символов), допускаем разные форматы
   if (trimmed.length < 10 || trimmed.length > 500) return false
-  // Безопасные символы для cookie (без ; , пробелов)
   return /^[A-Za-z0-9_.-]+$/.test(trimmed)
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const key = typeof body?.key === "string" ? body.key.trim() : ""
+    const key = typeof body?.key === "string" ? body.key : ""
 
-    if (!key) {
+    if (!key.trim()) {
+      return NextResponse.json({ success: false, error: "Введите API-ключ" }, { status: 400 })
+    }
+
+    if (!isValidKey(key)) {
       return NextResponse.json(
-        { success: false, error: "Введите API-ключ" },
+        { success: false, error: "Неверный формат. Ожидается ключ Gemini (например, AIza...)" },
         { status: 400 }
       )
     }
 
-    if (!isValidGeminiKey(key)) {
-      return NextResponse.json(
-        { success: false, error: "Неверный формат ключа. Ожидается ключ Gemini (например, AIza...)" },
-        { status: 400 }
-      )
-    }
-
-    const cookieStore = await cookies()
-    cookieStore.set(GEMINI_KEY_COOKIE, key, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 365,
-      path: "/",
-    })
-    await cookies()
-
+    await saveGeminiKey(key)
+    logger.info("SETTINGS", "API-ключ сохранён в data/gemini-key")
     return NextResponse.json({ success: true })
-  } catch (err) {
-    console.error("[EAM] Save API key error:", err)
+  } catch (e) {
+    logger.error("SETTINGS", "Save key error", { error: e instanceof Error ? e.message : String(e) })
     return NextResponse.json(
-      {
-        success: false,
-        error: err instanceof Error ? err.message : "Не удалось сохранить ключ",
-      },
+      { success: false, error: e instanceof Error ? e.message : "Не удалось сохранить ключ" },
       { status: 500 }
     )
   }
@@ -55,16 +38,11 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE() {
   try {
-    const cookieStore = await cookies()
-    cookieStore.delete(GEMINI_KEY_COOKIE)
-    await cookies()
-
+    await removeGeminiKey()
+    logger.info("SETTINGS", "API-ключ удалён из data/gemini-key")
     return NextResponse.json({ success: true })
-  } catch (err) {
-    console.error("[EAM] Remove API key error:", err)
-    return NextResponse.json(
-      { success: false, error: "Не удалось удалить ключ" },
-      { status: 500 }
-    )
+  } catch (e) {
+    logger.error("SETTINGS", "Remove key error", { error: e instanceof Error ? e.message : String(e) })
+    return NextResponse.json({ success: false, error: "Не удалось удалить ключ" }, { status: 500 })
   }
 }
