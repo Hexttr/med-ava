@@ -31,6 +31,7 @@ export function getDb(): Database.Database {
 }
 
 function runMigrations(database: Database.Database) {
+  database.exec(`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT);`)
   // Schema version: 1 = old, 2 = new (departments + employees + gallery_items with employee_id)
   database.exec(`
     CREATE TABLE IF NOT EXISTS _schema_version (version INTEGER NOT NULL);

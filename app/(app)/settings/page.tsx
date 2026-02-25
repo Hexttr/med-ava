@@ -1,9 +1,10 @@
 import { getGeminiKey } from "@/lib/settings"
+import { getAppSettings } from "@/lib/app-settings"
 import { PageHeader } from "@/components/page-header"
 import { SettingsForm } from "./settings-form"
 
 export default async function SettingsPage() {
-  const geminiKey = await getGeminiKey()
+  const [geminiKey, appSettings] = await Promise.all([getGeminiKey(), getAppSettings()])
 
   return (
     <>
@@ -13,7 +14,11 @@ export default async function SettingsPage() {
         breadcrumbs={[{ label: "EAM", href: "/" }, { label: "Настройки" }]}
       />
       <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-        <SettingsForm hasKey={!!geminiKey} maskedKey={geminiKey ? maskKey(geminiKey) : null} />
+        <SettingsForm
+          hasKey={!!geminiKey}
+          maskedKey={geminiKey ? maskKey(geminiKey) : null}
+          appSettings={appSettings}
+        />
       </div>
     </>
   )

@@ -1,25 +1,45 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useTransition, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Key, Save, Trash2, CheckCircle2, ExternalLink, Stethoscope } from "lucide-react"
+import { Key, Save, Trash2, CheckCircle2, ExternalLink, Stethoscope, Building2 } from "lucide-react"
 import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
+
+interface AppSettingsData {
+  organizationName: string
+  backgroundMedical: string
+  backgroundCorporate: string
+}
 
 interface SettingsFormProps {
   hasKey: boolean
   maskedKey: string | null
+  appSettings?: AppSettingsData
 }
 
-export function SettingsForm({ hasKey, maskedKey }: SettingsFormProps) {
+export function SettingsForm({ hasKey, maskedKey, appSettings: initialAppSettings }: SettingsFormProps) {
   const router = useRouter()
   const [apiKey, setApiKey] = useState("")
   const [isPending, startTransition] = useTransition()
+  const [orgName, setOrgName] = useState(initialAppSettings?.organizationName ?? "")
+  const [bgMedical, setBgMedical] = useState(initialAppSettings?.backgroundMedical ?? "")
+  const [bgCorporate, setBgCorporate] = useState(initialAppSettings?.backgroundCorporate ?? "")
+  const [appPending, setAppPending] = useState(false)
+
+  useEffect(() => {
+    if (initialAppSettings) {
+      setOrgName(initialAppSettings.organizationName)
+      setBgMedical(initialAppSettings.backgroundMedical)
+      setBgCorporate(initialAppSettings.backgroundCorporate)
+    }
+  }, [initialAppSettings])
 
   function handleSave() {
     if (!apiKey.trim()) {
@@ -47,6 +67,32 @@ export function SettingsForm({ hasKey, maskedKey }: SettingsFormProps) {
     })
   }
 
+  async function handleSaveAppSettings() {
+    setAppPending(true)
+    try {
+      const res = await fetch("/api/settings/app", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationName: orgName.trim(),
+          backgroundMedical: bgMedical.trim(),
+          backgroundCorporate: bgCorporate.trim(),
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        toast.success("Настройки приложения сохранены")
+        router.refresh()
+      } else {
+        toast.error(data.error || "Не удалось сохранить")
+      }
+    } catch {
+      toast.error("Ошибка сети")
+    } finally {
+      setAppPending(false)
+    }
+  }
+
   function handleRemove() {
     startTransition(async () => {
       try {
@@ -66,6 +112,59 @@ export function SettingsForm({ hasKey, maskedKey }: SettingsFormProps) {
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+              <Building2 className="size-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Название организации</CardTitle>
+              <CardDescription>
+                Отображается в левой колонке сверху вместо подзаголовка
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="org-name">Название</Label>
+            <Input
+              id="org-name"
+              placeholder="Корпоративный генератор портретов"
+              value={orgName}
+              onChange={(e) => setOrgName(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="bg-medical">Фон 1 — для медицинского портрета</Label>
+            <Textarea
+              id="bg-medical"
+              placeholder="Оставьте пустым, чтобы модель сама выбирала фон (светло-серый/белый)"
+              value={bgMedical}
+              onChange={(e) => setBgMedical(e.target.value)}
+              rows={2}
+              className="resize-none"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="bg-corporate">Фон 2 — для корпоративного портрета</Label>
+            <Textarea
+              id="bg-corporate"
+              placeholder="Оставьте пустым, чтобы модель сама выбирала фон (тёмно-серый/синий)"
+              value={bgCorporate}
+              onChange={(e) => setBgCorporate(e.target.value)}
+              rows={2}
+              className="resize-none"
+            />
+          </div>
+          <Button onClick={handleSaveAppSettings} disabled={appPending}>
+            <Save className="mr-2 size-4" />
+            Сохранить настройки приложения
+          </Button>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">

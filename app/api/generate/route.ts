@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getGeminiKey } from "@/lib/settings"
+import { getAppSettings } from "@/lib/app-settings"
 import { fetchWithProxy } from "@/lib/fetch-proxy"
 import { logger } from "@/lib/logger"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
+
+/** Единое кадрирование для всех портретов в приложении (одиночные, пакетные, любые сессии). */
+const UNIVERSAL_FRAMING =
+  "Standard portrait framing: head and upper torso only, bust-length, shoulders visible, same head-to-body scale as all other portraits in the system. Do not crop tighter or wider."
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,19 +36,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const appSettings = getAppSettings()
+    const backgroundMedical = appSettings.backgroundMedical.trim()
+    const backgroundCorporate = appSettings.backgroundCorporate.trim()
+    const defaultBackdropMedical = "Clean, well-lit studio backdrop in light gray or white."
+    const defaultBackdropCorporate = "Clean corporate background in dark navy or charcoal gray."
+    const backdropMedical = backgroundMedical ? `Background: ${backgroundMedical}` : defaultBackdropMedical
+    const backdropCorporate = backgroundCorporate ? `Background: ${backgroundCorporate}` : defaultBackdropCorporate
+
     const settingInstruction =
       style === "medical"
-        ? "Show this person in a crisp white medical doctor's coat. Clean, well-lit studio backdrop in light gray or white. Professional headshot, shoulders up. Warm, approachable expression."
-        : "Show this person in professional business attire (dark suit/blazer). Clean corporate background in dark navy or charcoal gray. Professional headshot, shoulders up. Confident, professional expression."
+        ? `${UNIVERSAL_FRAMING} Show this person in a crisp white medical doctor's coat. ${backdropMedical} Warm, approachable expression.`
+        : `${UNIVERSAL_FRAMING} Show this person in professional business attire (dark suit/blazer). ${backdropCorporate} Confident, professional expression.`
 
     const hasReferencePhoto = Boolean(referencePhotoBase64?.trim())
 
     const geminiImagePrompt = hasReferencePhoto
       ? `The attached image is the REFERENCE PHOTO of the person. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON — the face must be the same person, same identity, same likeness. Do NOT change the face, do NOT generate a different person. Only change the setting and clothing as follows: ${settingInstruction}. Keep the person's face, skin tone, hair, and all facial features identical to the reference. Output the generated portrait image.`
-      : `Professional studio headshot portrait photo. ${prompt}. CRITICAL: The face in the image MUST match the person described above exactly. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture. ${
+      : `Professional studio portrait photo. ${UNIVERSAL_FRAMING} ${prompt}. CRITICAL: The face in the image MUST match the person described above exactly. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture. ${
           style === "medical"
-            ? "Clean white/light gray backdrop, medical professional aesthetic."
-            : "Dark corporate backdrop, business professional aesthetic."
+            ? (backgroundMedical ? `${backdropMedical} Medical professional aesthetic.` : "Clean white/light gray backdrop, medical professional aesthetic.")
+            : (backgroundCorporate ? `${backdropCorporate} Business professional aesthetic.` : "Dark corporate backdrop, business professional aesthetic.")
         }`
 
     let gemini3ErrorText = ""
@@ -93,10 +106,10 @@ export async function POST(request: NextRequest) {
     }
 
     // 2) Imagen 3 (запасной вариант; не поддерживает эталонное фото — только текст)
-    const imagenPrompt = `Professional studio headshot portrait photo. ${prompt}. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture. ${
+    const imagenPrompt = `Professional studio portrait photo. ${UNIVERSAL_FRAMING} ${prompt}. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture. ${
       style === "medical"
-        ? "Clean white/light gray backdrop, medical professional aesthetic."
-        : "Dark corporate backdrop, business professional aesthetic."
+        ? (backgroundMedical ? `${backdropMedical} Medical professional aesthetic.` : "Clean white/light gray backdrop, medical professional aesthetic.")
+        : (backgroundCorporate ? `${backdropCorporate} Business professional aesthetic.` : "Dark corporate backdrop, business professional aesthetic.")
     }`
     const imagenResponse = await fetchWithProxy(
       `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${geminiKey}`,

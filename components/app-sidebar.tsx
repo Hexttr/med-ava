@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -53,8 +54,20 @@ const navItems = [
   },
 ]
 
+const DEFAULT_SUBTITLE = "Корпоративный генератор портретов"
+
 export function AppSidebar() {
   const pathname = usePathname()
+  const [subtitle, setSubtitle] = useState(DEFAULT_SUBTITLE)
+
+  useEffect(() => {
+    fetch("/api/settings/app")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.organizationName?.trim()) setSubtitle(data.organizationName.trim())
+      })
+      .catch(() => {})
+  }, [])
 
   return (
     <Sidebar collapsible="icon">
@@ -65,7 +78,7 @@ export function AppSidebar() {
           </div>
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
             <span className="text-sm font-semibold text-sidebar-foreground leading-none">EAM</span>
-            <span className="text-[11px] text-sidebar-foreground/60 leading-tight">Корпоративный генератор портретов</span>
+            <span className="text-[11px] text-sidebar-foreground/60 leading-tight">{subtitle}</span>
           </div>
         </Link>
       </SidebarHeader>
