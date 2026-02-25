@@ -71,7 +71,7 @@ export function EmployeeCards({
         onDragOver={handleDrag}
         onDrop={handleDrop}
         className={cn(
-          "rounded-lg border-2 border-dashed p-4 transition-colors",
+          "rounded-none border-2 border-dashed p-4 transition-colors",
           isDragging ? "border-primary bg-primary/5" : "border-border bg-muted/30"
         )}
       >
@@ -84,7 +84,7 @@ export function EmployeeCards({
             disabled={disabled}
             multiple
           />
-          <div className="flex size-10 items-center justify-center rounded-full bg-muted">
+          <div className="flex size-10 items-center justify-center rounded-none bg-muted">
             <Upload className="size-5 text-muted-foreground" />
           </div>
           <span className="text-sm text-muted-foreground">
@@ -97,18 +97,18 @@ export function EmployeeCards({
         {items.map((item) => (
           <div
             key={item.id}
-            className="relative flex flex-col gap-2 rounded-lg border border-border bg-card p-2"
+            className="relative flex flex-col gap-2 rounded-none border border-border bg-card p-2"
           >
             <button
               type="button"
               onClick={() => onRemove(item.id)}
               disabled={disabled}
-              className="absolute right-2 top-2 z-10 flex size-7 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
+              className="absolute right-2 top-2 z-10 flex size-7 items-center justify-center rounded-none bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
               aria-label="Удалить"
             >
               <X className="size-3.5" />
             </button>
-            <div className="aspect-[3/4] overflow-hidden rounded-md bg-muted">
+            <div className="aspect-[3/4] overflow-hidden rounded-none bg-muted">
               {item.photoUrl ? (
                 <img
                   src={item.photoUrl}

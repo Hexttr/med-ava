@@ -70,7 +70,7 @@ const howItWorksSteps = [
   },
   {
     step: "04",
-    title: "Результат",
+    title: "Результаты",
     description: "Скачайте портреты в медицинском и корпоративном стиле",
     icon: Download,
   },
@@ -122,7 +122,7 @@ export default async function DashboardPage() {
                 <CardContent className="flex flex-col gap-3 p-5">
                   <div className="flex items-center gap-3">
                     <div
-                      className={`flex size-12 shrink-0 items-center justify-center rounded-xl ${item.iconBg} ${item.iconColor}`}
+                      className={`flex size-12 shrink-0 items-center justify-center rounded-none ${item.iconBg} ${item.iconColor}`}
                     >
                       <Icon className="size-6" />
                     </div>
@@ -144,6 +144,15 @@ export default async function DashboardPage() {
           })}
         </section>
 
+        {/* Панорамное изображение — медицинская тематика */}
+        <section className="overflow-hidden rounded-none border border-border bg-muted/30">
+          <img
+            src="/medical-panorama.jpg"
+            alt="Медицинская тематика"
+            className="h-40 w-full object-cover object-center sm:h-52 md:h-64"
+          />
+        </section>
+
         {/* Как это работает */}
         <Card className="border border-border bg-card shadow-sm">
           <CardContent className="flex flex-col gap-6 p-5">
@@ -154,17 +163,19 @@ export default async function DashboardPage() {
               const isLast = index === howItWorksSteps.length - 1
               return (
                 <React.Fragment key={item.step}>
-                  <div className="flex min-w-0 flex-1 flex-col gap-2">
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <div className="flex min-w-0 flex-1 flex-col gap-2 overflow-hidden">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2 gap-y-1 sm:gap-3">
+                      <div className="flex size-11 shrink-0 items-center justify-center rounded-none bg-primary/10 text-primary">
                         <Icon className="size-5" />
                       </div>
-                      <span className="font-mono text-2xl font-light tabular-nums text-muted-foreground">
+                      <span className="shrink-0 font-mono text-2xl font-light tabular-nums text-muted-foreground">
                         {item.step}
                       </span>
-                      <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
+                      <h3 className="min-w-0 shrink text-sm font-semibold text-foreground break-words">
+                        {item.title}
+                      </h3>
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
+                    <p className="min-w-0 text-xs text-muted-foreground leading-relaxed break-words">
                       {item.description}
                     </p>
                   </div>

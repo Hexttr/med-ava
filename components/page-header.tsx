@@ -1,4 +1,6 @@
-import { SidebarTrigger } from "@/components/ui/sidebar"
+"use client"
+
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import {
   Breadcrumb,
@@ -8,6 +10,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
+import { Button } from "@/components/ui/button"
+import { Menu } from "lucide-react"
 
 interface PageHeaderProps {
   title: string
@@ -17,6 +21,8 @@ interface PageHeaderProps {
 }
 
 export function PageHeader({ title, description, breadcrumbs, actions }: PageHeaderProps) {
+  const { toggleSidebar } = useSidebar()
+
   return (
     <header className="flex flex-col gap-4 border-b border-border bg-card px-4 py-4 md:px-6">
       <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -38,8 +44,18 @@ export function PageHeader({ title, description, breadcrumbs, actions }: PageHea
                 </span>
               ))}
             </BreadcrumbList>
-          </Breadcrumb>
-        )}
+            </Breadcrumb>
+          )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="ml-auto min-h-11 min-w-11 touch-manipulation md:hidden"
+          onClick={() => toggleSidebar()}
+          aria-label="Открыть меню"
+        >
+          <Menu className="size-6" />
+        </Button>
       </div>
       <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
         <div>

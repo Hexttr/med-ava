@@ -115,7 +115,7 @@ export function SettingsForm({ hasKey, maskedKey, appSettings: initialAppSetting
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+            <div className="flex size-10 items-center justify-center rounded-none bg-primary/10">
               <Building2 className="size-5 text-primary" />
             </div>
             <div>
@@ -168,7 +168,7 @@ export function SettingsForm({ hasKey, maskedKey, appSettings: initialAppSetting
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+            <div className="flex size-10 items-center justify-center rounded-none bg-primary/10">
               <Key className="size-5 text-primary" />
             </div>
             <div>
@@ -181,7 +181,7 @@ export function SettingsForm({ hasKey, maskedKey, appSettings: initialAppSetting
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {hasKey && (
-            <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 px-4 py-3">
+            <div className="flex items-center justify-between rounded-none border border-border bg-muted/50 px-4 py-3">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="size-4 text-success" />
                 <span className="text-sm text-foreground">Текущий ключ:</span>
@@ -249,11 +249,11 @@ export function SettingsForm({ hasKey, maskedKey, appSettings: initialAppSetting
             затем NanoBanano генерирует два варианта портрета по этому промпту.
           </p>
           <div className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-lg border border-border bg-muted/30 p-3">
+            <div className="rounded-none border border-border bg-muted/30 p-3">
               <p className="mb-1 text-xs font-medium text-foreground">Медицинский стиль</p>
               <p className="text-xs leading-relaxed">Белый халат, медицинская обстановка, нейтральный фон</p>
             </div>
-            <div className="rounded-lg border border-border bg-muted/30 p-3">
+            <div className="rounded-none border border-border bg-muted/30 p-3">
               <p className="mb-1 text-xs font-medium text-foreground">Корпоративный стиль</p>
               <p className="text-xs leading-relaxed">Деловой костюм, студийный свет, профессиональный портрет</p>
             </div>

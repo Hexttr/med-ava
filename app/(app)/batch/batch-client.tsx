@@ -455,7 +455,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
           onClick={() => setFilterDepartmentId("_all")}
           disabled={isProcessing}
           className={cn(
-            "flex min-h-[88px] flex-col items-stretch justify-between rounded-lg border px-3 py-2 text-left transition-colors",
+            "flex min-h-[88px] flex-col items-stretch justify-between rounded-none border px-3 py-2 text-left transition-colors",
             filterDepartmentId === "_all"
               ? "border-primary bg-primary/15 text-primary"
               : "border-border bg-card hover:bg-muted/50"
@@ -472,7 +472,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
             <div
               key={d.id}
               className={cn(
-                "relative flex min-h-[88px] flex-col items-stretch justify-between rounded-lg border px-3 py-2 text-left transition-colors",
+                "relative flex min-h-[88px] flex-col items-stretch justify-between rounded-none border px-3 py-2 text-left transition-colors",
                 filterDepartmentId === d.id
                   ? "border-primary bg-primary/15 text-primary"
                   : "border-border bg-card hover:bg-muted/50"
@@ -482,7 +482,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
                 type="button"
                 onClick={() => setFilterDepartmentId(d.id)}
                 disabled={isProcessing}
-                className="absolute inset-0 z-0 rounded-lg"
+                className="absolute inset-0 z-0 rounded-none"
                 aria-label={`Выбрать отдел ${d.name}`}
               />
               <div className="relative z-10 flex flex-1 flex-col justify-between pointer-events-none">
@@ -649,7 +649,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
             Перетащите сюда сразу несколько фотографий сотрудников или нажмите для выбора файлов. Каждое фото будет добавлено как отдельный сотрудник.
           </p>
           <div
-            className="flex min-h-[180px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-muted/20 py-6 transition-colors hover:border-primary/40 hover:bg-muted/40"
+            className="flex min-h-[180px] cursor-pointer flex-col items-center justify-center gap-2 rounded-none border-2 border-dashed border-border bg-muted/20 py-6 transition-colors hover:border-primary/40 hover:bg-muted/40"
             onDragOver={(e) => {
               e.preventDefault()
               e.currentTarget.classList.add("border-primary/50", "bg-primary/5")

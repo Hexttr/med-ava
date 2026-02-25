@@ -75,7 +75,7 @@ export function BatchPortraitCard({
           type="button"
           variant="ghost"
           size="icon"
-          className="absolute right-1.5 top-1.5 z-10 size-6 rounded-full bg-red-500 text-white hover:bg-red-600"
+          className="absolute right-1.5 top-1.5 z-10 size-6 rounded-none bg-red-500 text-white hover:bg-red-600"
           onClick={onRemove}
           aria-label="Удалить сотрудника"
         >
@@ -100,7 +100,7 @@ export function BatchPortraitCard({
                 type="button"
                 variant="secondary"
                 size="icon"
-                className="absolute right-1.5 bottom-1.5 z-10 size-7 rounded-full shadow-md opacity-90 hover:opacity-100"
+                className="absolute right-1.5 bottom-1.5 z-10 size-7 rounded-none shadow-md opacity-90 hover:opacity-100"
                 onClick={() => {
                   const url = resolvePreviewUrl(item.preview)
                   const a = document.createElement("a")
@@ -129,7 +129,7 @@ export function BatchPortraitCard({
                     type="button"
                     variant="secondary"
                     size="icon"
-                    className="absolute right-1.5 bottom-1.5 z-10 size-7 rounded-full shadow-md opacity-90 hover:opacity-100"
+                    className="absolute right-1.5 bottom-1.5 z-10 size-7 rounded-none shadow-md opacity-90 hover:opacity-100"
                     onClick={() => {
                       const a = document.createElement("a")
                       a.href = item.medicalUrl!
@@ -172,7 +172,7 @@ export function BatchPortraitCard({
                     type="button"
                     variant="secondary"
                     size="icon"
-                    className="absolute right-1.5 bottom-1.5 z-10 size-7 rounded-full shadow-md opacity-90 hover:opacity-100"
+                    className="absolute right-1.5 bottom-1.5 z-10 size-7 rounded-none shadow-md opacity-90 hover:opacity-100"
                     onClick={() => {
                       const a = document.createElement("a")
                       a.href = item.corporateUrl!

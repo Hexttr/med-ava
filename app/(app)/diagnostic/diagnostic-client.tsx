@@ -197,7 +197,7 @@ export function DiagnosticClient() {
             {testLoading ? "Проверка..." : "Проверить запрос к Google"}
           </Button>
           {testResult && (
-            <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm space-y-2">
+            <div className="rounded-none border border-border bg-muted/30 p-3 text-sm space-y-2">
               {testResult.success ? (
                 <p className="text-success flex items-center gap-2">
                   <CheckCircle2 className="size-4 shrink-0" />

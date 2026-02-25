@@ -13,7 +13,7 @@ export default async function SettingsPage() {
         description="API-ключи и параметры генерации"
         breadcrumbs={[{ label: "EAM", href: "/" }, { label: "Настройки" }]}
       />
-      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+      <div className="flex flex-1 flex-col gap-6 px-6 py-6 md:px-10 md:py-8">
         <SettingsForm
           hasKey={!!geminiKey}
           maskedKey={geminiKey ? maskKey(geminiKey) : null}

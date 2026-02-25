@@ -224,7 +224,7 @@ export function OrganizationsClient() {
       <>
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
-            <div className="flex size-16 items-center justify-center rounded-full bg-muted">
+            <div className="flex size-16 items-center justify-center rounded-none bg-muted">
               <Building2 className="size-8 text-muted-foreground/50" />
             </div>
             <div>
@@ -307,7 +307,7 @@ export function OrganizationsClient() {
                 </div>
               </div>
               {org.photoUrl && (
-                <div className="aspect-video overflow-hidden rounded-md border border-border bg-muted">
+                <div className="aspect-video overflow-hidden rounded-none border border-border bg-muted">
                   <img src={org.photoUrl} alt="" className="size-full object-cover" />
                 </div>
               )}
@@ -398,7 +398,7 @@ function OrgForm({
         <Label>Фото организации (необязательно)</Label>
         {formPhotoUrl ? (
           <div className="relative inline-block">
-            <img src={formPhotoUrl} alt="" className="max-h-32 rounded-md border object-cover" />
+            <img src={formPhotoUrl} alt="" className="max-h-32 rounded-none border object-cover" />
             <Button type="button" variant="secondary" size="icon" className="absolute right-1 top-1 size-7" onClick={clearOrgPhoto}>
               ×
             </Button>

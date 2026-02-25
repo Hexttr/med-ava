@@ -61,19 +61,19 @@ export function PhotoUploader({ onFileSelect, currentPreview, onClear, disabled 
 
   if (currentPreview) {
     return (
-      <div className="relative overflow-hidden rounded-lg border border-border bg-muted/30">
+      <div className="relative overflow-hidden rounded-none border border-border bg-muted/30">
         <div className="relative aspect-[3/4] w-full max-w-xs mx-auto">
           <img
             src={currentPreview}
             alt="Загруженное фото"
-            className="size-full object-cover rounded-lg"
+            className="size-full object-cover rounded-none"
           />
         </div>
         {!disabled && (
           <Button
             variant="secondary"
             size="icon"
-            className="absolute top-2 right-2 size-8 rounded-full"
+            className="absolute top-2 right-2 size-8 rounded-none"
             onClick={onClear}
           >
             <X className="size-4" />
@@ -89,7 +89,7 @@ export function PhotoUploader({ onFileSelect, currentPreview, onClear, disabled 
       role="button"
       tabIndex={0}
       className={cn(
-        "flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors",
+        "flex cursor-pointer flex-col items-center justify-center rounded-none border-2 border-dashed transition-colors",
         "px-6 py-12 text-center",
         isDragging
           ? "border-primary bg-primary/5"
@@ -115,7 +115,7 @@ export function PhotoUploader({ onFileSelect, currentPreview, onClear, disabled 
         onChange={handleFileInput}
         disabled={disabled}
       />
-      <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+      <div className="flex size-12 items-center justify-center rounded-none bg-muted">
         {isDragging ? (
           <ImageIcon className="size-6 text-primary" />
         ) : (

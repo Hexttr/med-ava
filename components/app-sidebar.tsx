@@ -18,7 +18,6 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -101,19 +100,27 @@ export function AppSidebar({ initialOrganizationName }: AppSidebarProps) {
           </Button>
         )}
         <Link href="/" className="flex items-center gap-3 pr-8">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary">
-            <span className="text-sm font-bold text-sidebar-primary-foreground">E</span>
+          {/* Свёрнутое состояние: аббревиатура */}
+          <div className="hidden size-8 shrink-0 items-center justify-center rounded-none bg-sidebar-primary group-data-[collapsible=icon]:flex">
+            <span className="text-xs font-bold tracking-tight text-sidebar-primary-foreground">PH</span>
           </div>
-          <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-            <span className="text-sm font-semibold text-sidebar-foreground leading-none">EAM</span>
-            <span className="text-[11px] text-sidebar-foreground/60 leading-tight">{subtitle}</span>
+          {/* Развёрнутое состояние: название и название организации */}
+          <div className="flex min-w-0 flex-col gap-2 group-data-[collapsible=icon]:hidden w-full">
+            <div className="flex flex-col items-center gap-0 text-center">
+              <span className="text-lg font-semibold tracking-tight text-sidebar-foreground leading-tight">PhotoHUB</span>
+              <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-sidebar-foreground/60 leading-tight">ENTERPRISE</span>
+            </div>
+            <div className="mt-3 rounded-none border border-sidebar-border/60 bg-sidebar-accent/30 px-2.5 py-1.5">
+              <p className="text-[11px] font-medium leading-tight text-sidebar-foreground/90 truncate" title={subtitle}>
+                {subtitle}
+              </p>
+            </div>
           </div>
         </Link>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Навигация</SidebarGroupLabel>
-          <SidebarGroupContent>
+          <SidebarGroupContent className="pt-4">
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.href}>

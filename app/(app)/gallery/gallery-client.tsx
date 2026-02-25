@@ -179,7 +179,7 @@ export function GalleryClient() {
     return (
       <Card>
         <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
-          <div className="flex size-16 items-center justify-center rounded-full bg-muted">
+          <div className="flex size-16 items-center justify-center rounded-none bg-muted">
             <ImageIcon className="size-8 text-muted-foreground/50" />
           </div>
           <div>
@@ -213,7 +213,7 @@ export function GalleryClient() {
         <button
           type="button"
           onClick={() => removeItem(item.id)}
-          className="absolute right-2 top-2 z-10 flex size-8 items-center justify-center rounded-full bg-red-500 text-white shadow hover:bg-red-600"
+          className="absolute right-2 top-2 z-10 flex size-8 items-center justify-center rounded-none bg-red-500 text-white shadow hover:bg-red-600"
           aria-label="Удалить"
         >
           <X className="size-4" />
@@ -226,7 +226,7 @@ export function GalleryClient() {
                 <button
                   type="button"
                   onClick={() => setLightboxUrl(item.medicalUrl)}
-                  className="aspect-[3/4] w-full overflow-hidden rounded-md border border-border text-left transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="aspect-[3/4] w-full overflow-hidden rounded-none border border-border text-left transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <img
                     src={item.medicalUrl}
@@ -242,7 +242,7 @@ export function GalleryClient() {
                 <button
                   type="button"
                   onClick={() => setLightboxUrl(item.corporateUrl)}
-                  className="aspect-[3/4] w-full overflow-hidden rounded-md border border-border text-left transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="aspect-[3/4] w-full overflow-hidden rounded-none border border-border text-left transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <img
                     src={item.corporateUrl}
@@ -309,7 +309,7 @@ export function GalleryClient() {
             <button
               type="button"
               onClick={() => setLightboxUrl(null)}
-              className="absolute right-2 top-2 z-10 rounded-full bg-white/20 p-1.5 text-white hover:bg-white/30"
+              className="absolute right-2 top-2 z-10 rounded-none bg-white/20 p-1.5 text-white hover:bg-white/30"
               aria-label="Закрыть"
             >
               <X className="size-5" />
