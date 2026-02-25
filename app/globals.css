@@ -138,7 +138,3 @@
     margin-top: calc(var(--spacing) * 10);
   }
 }
-
-.data-\[orientation\=horizontal\]\:w-full[data-orientation="horizontal"] {
-  width: 97%;
-}

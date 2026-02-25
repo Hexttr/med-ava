@@ -221,16 +221,16 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
   const corporateStatus = corporateUrl ? "complete" : status === "generating" && medicalUrl && !corporateUrl ? "generating" : status
 
   return (
-    <div className="flex flex-col">
+    <div className="flex min-w-0 flex-col overflow-x-hidden">
       {isProcessing && (
-        <div className="mb-6 flex flex-col gap-2">
+        <div className="mb-6 min-w-0 flex flex-col gap-2 overflow-hidden">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
               {status === "analyzing" ? "Анализ фото..." : "Генерация портретов..."}
             </span>
             <span className="text-sm font-mono text-muted-foreground">{progress}%</span>
           </div>
-          <Progress value={progress} className="h-1.5" />
+          <Progress value={progress} className="h-1.5 min-w-0" />
         </div>
       )}
 

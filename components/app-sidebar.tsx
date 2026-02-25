@@ -23,7 +23,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
-  SidebarSeparator,
 } from "@/components/ui/sidebar"
 
 const navItems = [
@@ -56,9 +55,15 @@ const navItems = [
 
 const DEFAULT_SUBTITLE = "Корпоративный генератор портретов"
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  initialOrganizationName?: string
+}
+
+export function AppSidebar({ initialOrganizationName }: AppSidebarProps) {
   const pathname = usePathname()
-  const [subtitle, setSubtitle] = useState(DEFAULT_SUBTITLE)
+  const [subtitle, setSubtitle] = useState(
+    initialOrganizationName?.trim() || DEFAULT_SUBTITLE
+  )
 
   useEffect(() => {
     fetch("/api/settings/app")
@@ -82,7 +87,6 @@ export function AppSidebar() {
           </div>
         </Link>
       </SidebarHeader>
-      <SidebarSeparator />
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Навигация</SidebarGroupLabel>
