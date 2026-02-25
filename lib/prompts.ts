@@ -26,7 +26,7 @@ UNIVERSAL FRAMING RULE: All portraits MUST use identical composition. Include th
 
 1. MEDICAL PORTRAIT: First describe the person's face in full detail (same person identity), then the framing phrase, then: wearing a premium-quality crisp white medical doctor's coat (expensive fabric, luxury tailoring), professional medical setting. Clean, well-lit studio backdrop in light gray or white. Warm, approachable expression. High-quality studio photography lighting.
 
-2. CORPORATE PORTRAIT: First describe the person's face in full detail (identical person), then the same framing phrase (identical wording), then: in premium professional business attire (expensive dark suit or blazer, designer quality, luxury tailoring). Clean corporate background in dark navy or charcoal gray. Confident, professional expression. Studio photography with rim lighting.
+2. CORPORATE PORTRAIT: First describe the person's face in full detail (identical person), then the same framing phrase (identical wording), then: in premium professional business attire (expensive dark suit or blazer, designer quality, luxury tailoring). Clean corporate background in medium gray or soft slate, well-lit. Confident, professional expression. Studio photography with rim lighting.
 
 CRITICAL: Both prompts must describe the EXACT SAME person. The face must be identical — recognizable at first glance. Lead with exhaustive facial description. Clothing must be described as premium/expensive/high-quality in both. Framing must be identical in both prompts.
 

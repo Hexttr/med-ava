@@ -61,7 +61,7 @@ export async function saveEmployeePhoto(
   } catch {
     return { path: path.join(dir, finalName), thumbnailPath: path.join(dir, finalName) }
   }
-  return { path: path.join(dir, finalName), thumbnailPath }
+  return { path: path.join(dir, finalName), thumbnailPath: thumbPath }
 }
 
 /**
@@ -92,7 +92,7 @@ export async function saveEmployeePhotoFromBuffer(
   } catch {
     return { path: path.join(dir, finalName), thumbnailPath: path.join(dir, finalName) }
   }
-  return { path: path.join(dir, finalName), thumbnailPath }
+  return { path: path.join(dir, finalName), thumbnailPath: thumbPath }
 }
 
 /**

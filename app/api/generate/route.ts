@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
 
     const appSettings = getAppSettings()
     const defaultBackdropMedical = "Clean, well-lit studio backdrop in light gray or white."
-    const defaultBackdropCorporate = "Clean corporate background in dark navy or charcoal gray."
+    const defaultBackdropCorporate = "Clean corporate background in medium gray or soft slate, well-lit."
 
     // Приоритет: изображение > текст > базовые настройки
     const bgMedicalImagePath = appSettings.backgroundMedicalImage?.trim()
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
       geminiImagePrompt = `Professional studio portrait photo. ${universalFraming} ${prompt}. CRITICAL IDENTITY: The face MUST match the person described above exactly — maximum likeness, same person. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture. Clothing must look premium and high-quality. ${
         style === "medical"
           ? (backgroundMedical ? `${backdropMedical} Medical professional aesthetic.` : "Clean white/light gray backdrop, medical professional aesthetic.")
-          : (backgroundCorporate ? `${backdropCorporate} Business professional aesthetic.` : "Dark corporate backdrop, business professional aesthetic.")
+          : (backgroundCorporate ? `${backdropCorporate} Business professional aesthetic.` : "Medium gray corporate backdrop, business professional aesthetic.")
       }${negativeSuffix}`
     }
 
@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
     const imagenPrompt = `Professional studio portrait photo. ${universalFraming} ${prompt}. CRITICAL: Face must match the person described exactly. Clothing must look premium and high-quality. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture. ${
       style === "medical"
         ? (backgroundMedical ? `${backdropMedical} Medical professional aesthetic.` : "Clean white/light gray backdrop, medical professional aesthetic.")
-        : (backgroundCorporate ? `${backdropCorporate} Business professional aesthetic.` : "Dark corporate backdrop, business professional aesthetic.")
+        : (backgroundCorporate ? `${backdropCorporate} Business professional aesthetic.` : "Medium gray corporate backdrop, business professional aesthetic.")
     }${negativeSuffix}`
     const imagenResponse = await fetchWithProxy(
       `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${geminiKey}`,

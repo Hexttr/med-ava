@@ -362,11 +362,14 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         return
       }
       setIsProcessing(true)
-      for (const emp of toProcess) {
-        await processOne(emp)
+      try {
+        for (const emp of toProcess) await processOne(emp)
+        toast.success("Обработка завершена")
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Ошибка обработки")
+      } finally {
+        setIsProcessing(false)
       }
-      setIsProcessing(false)
-      toast.success("Обработка завершена")
     },
     [employees, generationState, processOne]
   )
@@ -380,9 +383,14 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
     }
     setIsProcessing(true)
     ;(async () => {
-      for (const emp of toProcess) await processOne(emp)
-      setIsProcessing(false)
-      toast.success("Обработка завершена")
+      try {
+        for (const emp of toProcess) await processOne(emp)
+        toast.success("Обработка завершена")
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Ошибка обработки")
+      } finally {
+        setIsProcessing(false)
+      }
     })()
   }, [visibleEmployees, generationState, processOne])
 
