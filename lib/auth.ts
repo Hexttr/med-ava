@@ -61,7 +61,7 @@ export async function setSessionCookie(): Promise<void> {
   const cookieStore = await cookies()
   cookieStore.set(SESSION_COOKIE, signed, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.EAM_HTTPS === "true",
     sameSite: "lax",
     maxAge: SESSION_MAX_AGE,
     path: "/",
@@ -81,7 +81,7 @@ export async function setCsrfCookie(token: string): Promise<void> {
   const cookieStore = await cookies()
   cookieStore.set(CSRF_COOKIE, token, {
     httpOnly: false,
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.EAM_HTTPS === "true",
     sameSite: "lax",
     maxAge: 60 * 30,
     path: "/",
