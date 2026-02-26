@@ -41,8 +41,7 @@ export function LoginForm() {
       if (res.ok && data.success) {
         toast.success("Вход выполнен")
         const redirect = searchParams.get("redirect") || "/"
-        router.push(redirect)
-        router.refresh()
+        window.location.assign(redirect)
       } else {
         toast.error(data.error || "Неверный пароль")
         setPassword("")
