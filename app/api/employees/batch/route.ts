@@ -68,6 +68,11 @@ export async function POST(request: NextRequest) {
     const results: Array<{ id: string; name: string; photoUrl: string; thumbnailUrl: string; departmentId: string | null; createdAt: number; departmentName?: string }> = []
     const errors: string[] = []
 
+    function nameFromFilename(filename: string): string {
+      const base = filename.replace(/\.[^.]+$/, "").trim()
+      return base || "Сотрудник"
+    }
+
     for (const file of validFiles) {
       try {
         const validation = validateImageFile(file)
@@ -80,11 +85,12 @@ export async function POST(request: NextRequest) {
         const empId = crypto.randomUUID()
         const { path: photoPath, thumbnailPath } = await saveEmployeePhotoFromBuffer(buf, empId, mime)
         const now = Date.now()
+        const empName = nameFromFilename(file.name)
         database
           .prepare(
             "INSERT INTO employees (id, name, photo_path, thumbnail_path, department_id, created_at) VALUES (?, ?, ?, ?, ?, ?)"
           )
-          .run(empId, "Сотрудник", photoPath, thumbnailPath, departmentId, now)
+          .run(empId, empName, photoPath, thumbnailPath, departmentId, now)
         const row = database
           .prepare(
             `SELECT e.id, e.name, e.photo_path, e.thumbnail_path, e.department_id, e.created_at, d.name AS department_name

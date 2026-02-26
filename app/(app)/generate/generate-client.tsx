@@ -56,6 +56,8 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
     setGalleryItemId(null)
     setStatus("idle")
     setProgress(0)
+    const nameFromFile = selectedFile.name.replace(/\.[^.]+$/, "").trim()
+    if (nameFromFile) setEmployeeName(nameFromFile)
   }, [])
 
   const handleClear = useCallback(() => {

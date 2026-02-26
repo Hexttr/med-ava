@@ -554,10 +554,17 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
     }
     try {
       const zip = new JSZip()
+      const usedFolders = new Set<string>()
       for (const emp of toDownload) {
         const gen = generationState[emp.id]
         if (!gen) continue
-        const folderName = sanitizeFileName(emp.name)
+        let folderName = sanitizeFileName(emp.name)
+        if (usedFolders.has(folderName)) {
+          let suffix = 2
+          while (usedFolders.has(`${folderName}_${suffix}`)) suffix++
+          folderName = `${folderName}_${suffix}`
+        }
+        usedFolders.add(folderName)
         if (gen.medicalUrl) {
           const blob = await urlToBlob(gen.medicalUrl)
           const ext = getExtension(blob.type || "image/png")
