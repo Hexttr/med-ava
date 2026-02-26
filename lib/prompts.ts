@@ -24,7 +24,7 @@ Based on your analysis, create TWO detailed prompts. Each prompt MUST start with
 
 UNIVERSAL FRAMING RULE: All portraits MUST use identical composition. Include this phrase in BOTH prompts: "Identical portrait framing: head and upper torso only, bust-length, shoulders visible, same head-to-body scale as all other portraits in the system." Medical and corporate must have the SAME crop and proportions.
 
-1. MEDICAL PORTRAIT: First describe the person's face in full detail (same person identity), then the framing phrase, then: wearing a premium-quality crisp white medical doctor's coat (expensive fabric, luxury tailoring), professional medical setting. Clean, well-lit studio backdrop in light gray or white. Warm, approachable expression. High-quality studio photography lighting.
+1. MEDICAL PORTRAIT: First describe the person's face in full detail (same person identity), then the framing phrase, then: wearing a premium-quality crisp white medical doctor's coat (expensive fabric, luxury tailoring). NO stethoscope, NO medical accessories — only the white coat. Professional medical setting. Clean, well-lit studio backdrop in light gray or white. Warm, approachable expression. High-quality studio photography lighting.
 
 2. CORPORATE PORTRAIT: First describe the person's face in full detail (identical person), then the same framing phrase (identical wording), then: in premium professional business attire (expensive dark suit or blazer, designer quality, luxury tailoring). Clean corporate background in medium gray or soft slate, well-lit. Confident, professional expression. Studio photography with rim lighting.
 
@@ -38,13 +38,13 @@ Respond with ONLY one valid JSON object (no markdown, no \`\`\` code fences, no 
 }`
 
 const DEFAULT_MEDICAL_INSTRUCTION =
-  "Show this person in a premium-quality crisp white medical doctor's coat (expensive fabric, luxury tailoring). {backdrop} Warm, approachable expression. Preserve exact facial likeness."
+  "Show this person in a premium-quality crisp white medical doctor's coat (expensive fabric, luxury tailoring). No stethoscope, no medical accessories — only the white coat. {backdrop} Warm, approachable expression. Preserve exact facial likeness."
 
 const DEFAULT_CORPORATE_INSTRUCTION =
   "Show this person in premium professional business attire (expensive dark suit or blazer, designer quality, luxury tailoring). {backdrop} Confident, professional expression. Preserve exact facial likeness."
 
 const DEFAULT_NEGATIVE_PROMPT =
-  "Avoid: blurry, distorted face, different identity, different person, over-smoothing, artificial skin, wrong proportions, cheap-looking clothing, plastic skin, unnatural lighting."
+  "Avoid: blurry, distorted face, different identity, different person, over-smoothing, artificial skin, wrong proportions, cheap-looking clothing, plastic skin, unnatural lighting, stethoscope, medical accessories."
 
 /** Значения по умолчанию для отображения в настройках (когда поле пустое в БД). */
 export function getPromptDefaults() {
