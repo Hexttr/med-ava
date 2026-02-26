@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { setSessionCookie, verifyCsrf, checkLoginRateLimit, clearLoginRateLimit } from "@/lib/auth"
+import { createSessionToken, SESSION_COOKIE, SESSION_MAX_AGE, verifyCsrf, checkLoginRateLimit, clearLoginRateLimit } from "@/lib/auth"
 import { logger } from "@/lib/logger"
 
 export const dynamic = "force-dynamic"
@@ -55,9 +55,16 @@ export async function POST(request: NextRequest) {
     }
 
     clearLoginRateLimit(ip)
-    await setSessionCookie()
     logger.info("AUTH", "Login successful", { ip })
-    return NextResponse.json({ success: true })
+    const response = NextResponse.json({ success: true })
+    response.cookies.set(SESSION_COOKIE, createSessionToken(), {
+      httpOnly: true,
+      secure: process.env.EAM_HTTPS === "true",
+      sameSite: "lax",
+      maxAge: SESSION_MAX_AGE,
+      path: "/",
+    })
+    return response
   } catch (e) {
     logger.error("AUTH", "Login error", { error: e instanceof Error ? e.message : String(e) })
     return NextResponse.json(

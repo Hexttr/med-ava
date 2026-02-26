@@ -17,7 +17,7 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    fetch("/api/auth/csrf")
+    fetch("/api/auth/csrf", { credentials: "include" })
       .then((r) => r.json())
       .then((d) => d.token && setCsrfToken(d.token))
       .catch(() => {})
@@ -34,6 +34,7 @@ export function LoginForm() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ password: password.trim(), csrfToken }),
       })
       const data = await res.json().catch(() => ({}))
