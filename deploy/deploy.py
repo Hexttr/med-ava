@@ -90,6 +90,7 @@ def main():
     # 3. Установка зависимостей
     print("\n--- 3. npm install ---")
     run_ssh(ssh, f"cd {APP_DIR} && npm install")
+    run_ssh(ssh, f"cd {APP_DIR} && npm rebuild better-sqlite3")
     steps.append("npm_ok")
 
     # 4. .env
@@ -130,7 +131,7 @@ User=root
 WorkingDirectory={APP_DIR}
 Environment=NODE_ENV=production
 Environment=PATH=/usr/bin:/usr/local/bin
-ExecStart=/usr/bin/node {APP_DIR}/node_modules/.bin/next start -p {PORT}
+ExecStart=/usr/local/bin/node {APP_DIR}/node_modules/.bin/next start -p {PORT}
 Restart=on-failure
 RestartSec=5
 
