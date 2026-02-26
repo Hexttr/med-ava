@@ -160,7 +160,7 @@ export function AppSidebar({ initialOrganizationName }: AppSidebarProps) {
               asChild
               tooltip="Выйти"
             >
-              <Link href="/api/auth/logout" className="text-muted-foreground hover:text-foreground">
+              <Link href="/api/auth/logout" prefetch={false} className="text-muted-foreground hover:text-foreground">
                 <LogOut className="size-4" />
                 <span>Выйти</span>
               </Link>

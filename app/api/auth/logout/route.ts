@@ -1,14 +1,23 @@
-import { NextRequest, NextResponse } from "next/server"
-import { clearSessionCookie } from "@/lib/auth"
+import { NextResponse } from "next/server"
+import { SESSION_COOKIE } from "@/lib/auth"
 
 export const dynamic = "force-dynamic"
 
+function logoutResponse(redirect: boolean) {
+  if (redirect) {
+    const res = NextResponse.redirect("/login", 303)
+    res.cookies.set(SESSION_COOKIE, "", { maxAge: 0, path: "/" })
+    return res
+  }
+  const res = NextResponse.json({ success: true })
+  res.cookies.set(SESSION_COOKIE, "", { maxAge: 0, path: "/" })
+  return res
+}
+
 export async function GET() {
-  await clearSessionCookie()
-  return NextResponse.redirect("/login", 303)
+  return logoutResponse(true)
 }
 
 export async function POST() {
-  await clearSessionCookie()
-  return NextResponse.json({ success: true })
+  return logoutResponse(false)
 }

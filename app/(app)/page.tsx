@@ -146,11 +146,12 @@ export default async function DashboardPage() {
 
         {/* Панорамное изображение — медицинская тематика */}
         <section className="overflow-hidden rounded-none border border-border bg-muted/30">
-          <img
-            src="/medical-panorama.jpg"
-            alt="Медицинская тематика"
-            className="h-40 w-full object-cover object-center sm:h-52 md:h-64"
-          />
+          <div
+            className="h-40 w-full object-cover object-center sm:h-52 md:h-64 flex items-center justify-center bg-muted"
+            aria-hidden
+          >
+            <span className="text-muted-foreground text-sm">Медицинская тематика</span>
+          </div>
         </section>
 
         {/* Как это работает */}
