@@ -97,6 +97,8 @@ def main():
     print("\n--- 4. Конфигурация .env ---")
     run_ssh(ssh, f"cd {APP_DIR} && test -f .env || cp .env.example .env")
     run_ssh(ssh, f"cd {APP_DIR} && grep -q GEMINI_API_KEY .env && echo '.env существует' || true", check=False)
+    public_url = f"http://{args.host}:{PORT}"
+    run_ssh(ssh, f"cd {APP_DIR} && grep -q '^EAM_PUBLIC_URL=' .env || echo 'EAM_PUBLIC_URL={public_url}' >> .env", check=False)
     steps.append("env_ok")
 
     # 5. Создание data/

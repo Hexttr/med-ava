@@ -29,7 +29,16 @@ export function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
-  const loginUrl = new URL("/login", request.url)
+  const url = new URL(request.url)
+  const isLocalhost = url.hostname === "localhost" || url.hostname === "127.0.0.1"
+  const forwardedHost = request.headers.get("x-forwarded-host")
+  const forwardedProto = request.headers.get("x-forwarded-proto")
+  const origin =
+    process.env.EAM_PUBLIC_URL?.trim() ||
+    (forwardedHost && forwardedProto ? `${forwardedProto}://${forwardedHost}` : null) ||
+    (!isLocalhost ? request.url : null) ||
+    request.url
+  const loginUrl = new URL("/login", origin)
   loginUrl.searchParams.set("redirect", pathname + request.nextUrl.search)
 
   if (pathname.startsWith("/api/")) {
