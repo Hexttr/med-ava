@@ -1,14 +1,19 @@
 /**
  * Система логирования EAM: консоль с меткой времени и контекстом.
  * В development все уровни; в production — только warn/error.
- * Буфер для отображения логов в разделе Диагностика.
+ * Логи пишутся в файл data/eam-logs.jsonl для отображения в разделе Диагностика
+ * (сохраняются между запросами, в т.ч. при serverless).
  */
+
+import fs from "fs"
+import path from "path"
 
 const LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3 } as const
 const isDev = process.env.NODE_ENV === "development"
 const minLevel = isDev ? LOG_LEVELS.debug : LOG_LEVELS.warn
 
 const MAX_BUFFER_SIZE = 200
+const MAX_LOG_FILE_LINES = 5000
 
 export interface LogEntry {
   id: string
@@ -23,6 +28,10 @@ export interface LogEntry {
 const logBuffer: LogEntry[] = []
 let logIdCounter = 0
 
+function getLogFilePath(): string {
+  return path.join(process.cwd(), "data", "eam-logs.jsonl")
+}
+
 function ts(): string {
   return new Date().toISOString()
 }
@@ -30,6 +39,25 @@ function ts(): string {
 function formatMsg(level: string, tag: string, message: string, data?: Record<string, unknown>): string {
   const dataStr = data && Object.keys(data).length > 0 ? " " + JSON.stringify(data) : ""
   return `${ts()} [EAM] [${level.toUpperCase()}] ${tag} ${message}${dataStr}`
+}
+
+function appendToFile(entry: LogEntry): void {
+  try {
+    const filePath = getLogFilePath()
+    const dir = path.dirname(filePath)
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+    const line = JSON.stringify(entry) + "\n"
+    fs.appendFileSync(filePath, line)
+    // Ротация: если файл слишком большой, оставляем последние строки
+    const content = fs.readFileSync(filePath, "utf-8")
+    const lines = content.split("\n").filter(Boolean)
+    if (lines.length > MAX_LOG_FILE_LINES) {
+      const keep = lines.slice(-MAX_LOG_FILE_LINES)
+      fs.writeFileSync(filePath, keep.join("\n") + "\n")
+    }
+  } catch {
+    // Игнорируем ошибки записи (например, read-only FS на Vercel)
+  }
 }
 
 function pushToBuffer(level: string, tag: string, message: string, data?: Record<string, unknown>): void {
@@ -47,6 +75,7 @@ function pushToBuffer(level: string, tag: string, message: string, data?: Record
   if (logBuffer.length > MAX_BUFFER_SIZE) {
     logBuffer.shift()
   }
+  appendToFile(entry)
 }
 
 function log(level: keyof typeof LOG_LEVELS, tag: string, message: string, data?: Record<string, unknown>): void {
@@ -67,7 +96,24 @@ export const logger = {
 
 /** Возвращает последние N записей из буфера логов (для раздела Диагностика). */
 export function getLogBuffer(limit = 100): LogEntry[] {
-  return logBuffer.slice(-limit)
+  try {
+    const filePath = getLogFilePath()
+    if (!fs.existsSync(filePath)) return logBuffer.slice(-limit)
+    const content = fs.readFileSync(filePath, "utf-8")
+    const lines = content.split("\n").filter(Boolean)
+    const entries: LogEntry[] = []
+    for (let i = Math.max(0, lines.length - limit); i < lines.length; i++) {
+      try {
+        const e = JSON.parse(lines[i]) as LogEntry
+        if (e.ts && e.tag && e.message) entries.push(e)
+      } catch {
+        /* ignore malformed lines */
+      }
+    }
+    return entries.length > 0 ? entries : logBuffer.slice(-limit)
+  } catch {
+    return logBuffer.slice(-limit)
+  }
 }
 
 /** Санитизация URL: убираем ключ из query */

@@ -10,7 +10,9 @@ import {
   Sparkles,
   Pencil,
   Trash2,
+  Download,
 } from "lucide-react"
+import JSZip from "jszip"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -62,6 +64,29 @@ async function urlToBase64(url: string): Promise<{ base64: string; mimeType: str
     reader.onerror = () => reject(reader.error)
     reader.readAsDataURL(blob)
   })
+}
+
+function sanitizeFileName(name: string): string {
+  return name.replace(/[/\\:*?"<>|]/g, "_").trim() || "portrait"
+}
+
+async function urlToBlob(url: string): Promise<Blob> {
+  const match = url.match(/^data:([^;]+);base64,(.+)$/)
+  if (match) {
+    const mime = match[1]
+    const binary = atob(match[2])
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    return new Blob([bytes], { type: mime })
+  }
+  const res = await fetch(url)
+  return res.blob()
+}
+
+function getExtension(mime: string): string {
+  if (mime.includes("png")) return "png"
+  if (mime.includes("webp")) return "webp"
+  return "jpg"
 }
 
 export function BatchClient({ hasApiKey }: BatchClientProps) {
@@ -517,6 +542,46 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
     })()
   }, [visibleEmployees, processOne, generateMode, needsGeneration])
 
+  /** Скачать все успешно сгенерированные изображения (по текущему фильтру) */
+  const handleDownloadAll = useCallback(async () => {
+    const toDownload = visibleEmployees.filter((emp) => {
+      const gen = generationState[emp.id]
+      return gen?.status === "complete" && (gen.medicalUrl || gen.corporateUrl)
+    })
+    if (toDownload.length === 0) {
+      toast.info("Нет готовых портретов для скачивания")
+      return
+    }
+    try {
+      const zip = new JSZip()
+      for (const emp of toDownload) {
+        const gen = generationState[emp.id]
+        if (!gen) continue
+        const folderName = sanitizeFileName(emp.name)
+        if (gen.medicalUrl) {
+          const blob = await urlToBlob(gen.medicalUrl)
+          const ext = getExtension(blob.type || "image/png")
+          zip.file(`${folderName}/medical.${ext}`, blob)
+        }
+        if (gen.corporateUrl) {
+          const blob = await urlToBlob(gen.corporateUrl)
+          const ext = getExtension(blob.type || "image/png")
+          zip.file(`${folderName}/corporate.${ext}`, blob)
+        }
+      }
+      const content = await zip.generateAsync({ type: "blob" })
+      const url = URL.createObjectURL(content)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = "portraits.zip"
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(`Скачано ${toDownload.length} портретов`)
+    } catch {
+      toast.error("Не удалось создать архив")
+    }
+  }, [visibleEmployees, generationState])
+
   if (!hasApiKey) {
     return (
       <Card className="border-destructive/30 bg-destructive/5">
@@ -608,6 +673,16 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
             </>
           )}
         </Button>
+        <Button
+          type="button"
+          size="sm"
+          className="h-9 shrink-0"
+          onClick={handleDownloadAll}
+          disabled={isProcessing}
+        >
+          <Download className="mr-2 size-4 shrink-0" />
+          Скачать все
+        </Button>
         </div>
         <GenerateModeSwitch
           value={generateMode}
@@ -616,8 +691,8 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         />
       </div>
 
-      {/* Карточки отделов одинакового размера, справа внизу — количество сотрудников */}
-      <div className="my-6 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+      {/* Карточки отделов */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         <button
           type="button"
           onClick={() => setFilterDepartmentId("_all")}

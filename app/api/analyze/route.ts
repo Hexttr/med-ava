@@ -195,6 +195,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    logger.info("ANALYZE", "Анализ выполнен", { employeeName })
     return NextResponse.json({
       description: parsed.description || "Person analyzed",
       medicalPrompt: parsed.medicalPrompt || "Professional medical portrait",

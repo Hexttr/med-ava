@@ -63,6 +63,21 @@ export function PortraitCard({
               <Loader2 className="size-6 animate-spin text-primary" />
               <span className="text-xs text-muted-foreground">Генерирую...</span>
             </div>
+          ) : !imageUrl && onRegenerate ? (
+            <div className="flex size-full flex-col items-center justify-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                className="size-10 rounded-none shadow-md"
+                onClick={() => onRegenerate(style)}
+                aria-label="Сгенерировать"
+                title="Сгенерировать"
+              >
+                <RotateCcw className="size-5" />
+              </Button>
+              <span className="text-xs text-muted-foreground">Сгенерировать</span>
+            </div>
           ) : imageUrl ? (
             <>
               <img

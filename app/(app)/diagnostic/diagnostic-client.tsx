@@ -382,9 +382,9 @@ export function DiagnosticClient() {
               <p className="p-4 text-muted-foreground">Логов пока нет. Выполните генерацию или проверку API.</p>
             ) : (
               <div className="divide-y divide-border">
-                {logs.map((entry) => (
+                {logs.map((entry, i) => (
                   <div
-                    key={entry.id}
+                    key={`${entry.ts}-${i}`}
                     className={`px-3 py-1.5 hover:bg-muted/40 ${
                       entry.level === "error" ? "text-destructive" : entry.level === "warn" ? "text-amber-600 dark:text-amber-400" : ""
                     }`}

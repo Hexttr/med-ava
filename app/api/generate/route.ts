@@ -176,6 +176,7 @@ export async function POST(request: NextRequest) {
         for (const part of parts) {
           if (part.inlineData?.data) {
             const imageUrl = `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}`
+            logger.info("GENERATE", "Изображение сгенерировано", { style, model: modelGeneration })
             return NextResponse.json({ imageUrl })
           }
         }
@@ -185,37 +186,34 @@ export async function POST(request: NextRequest) {
       logger.warn("GENERATE", "Модель генерации не вернула изображение", { model: modelGeneration, status: geminiResponse.status, body: gemini3ErrorText.slice(0, 400) })
     }
 
-    // 2) Imagen 3 (запасной вариант; не поддерживает эталонное фото — только текст)
-    const imagenPrompt = `Professional studio portrait photo. ${universalFraming} ${prompt}. CRITICAL: Face must match the person described exactly. Clothing must look premium and high-quality. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture. ${
-      style === "medical"
-        ? (backgroundMedical ? `${backdropMedical} Medical professional aesthetic.` : "Clean white/light gray backdrop, medical professional aesthetic.")
-        : (backgroundCorporate ? `${backdropCorporate} Business professional aesthetic.` : "Medium gray corporate backdrop, business professional aesthetic.")
-    }${negativeSuffix}`
-    const imagenResponse = await fetchWithProxy(
-      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${geminiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          instances: [{ prompt: imagenPrompt }],
-          parameters: {
-            sampleCount: 1,
-            aspectRatio: "3:4",
-            personGeneration: "allow_all",
-          },
-        }),
-      }
-    )
+    // 2) Fallback: gemini-2.5-flash-image (тот же API generateContent)
+    const fallbackModel = "gemini-2.5-flash-image"
+    if (modelGeneration !== fallbackModel) {
+      const fallbackResponse = await fetchWithProxy(
+        `https://generativelanguage.googleapis.com/v1beta/models/${fallbackModel}:generateContent?key=${geminiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(geminiBody),
+        }
+      )
 
-    if (imagenResponse.ok) {
-      const imagenData = await imagenResponse.json()
-      const imageBytes = imagenData.predictions?.[0]?.bytesBase64Encoded
-      if (imageBytes) {
-        return NextResponse.json({ imageUrl: `data:image/png;base64,${imageBytes}` })
+      if (fallbackResponse.ok) {
+        const fallbackData = await fallbackResponse.json()
+        const fallbackParts = fallbackData.candidates?.[0]?.content?.parts
+        if (fallbackParts) {
+          for (const part of fallbackParts) {
+            if (part.inlineData?.data) {
+              const imageUrl = `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}`
+              logger.info("GENERATE", "Изображение сгенерировано (fallback)", { style, model: fallbackModel })
+              return NextResponse.json({ imageUrl })
+            }
+          }
+        }
       }
     }
 
-    // Оба варианта не дали картинку — возвращаем ошибку от Gemini 3 или общую
+    // Оба варианта не дали картинку — возвращаем ошибку
     const lastError = gemini3ErrorText
     let userMessage = "Изображение не сгенерировано. Попробуйте другое фото или промпт."
     try {
@@ -230,7 +228,7 @@ export async function POST(request: NextRequest) {
     } catch {
       if (lastError.length < 300) userMessage = lastError
     }
-    logger.error("GENERATE", "Ни выбранная модель, ни Imagen 3 не вернули изображение", { model: modelGeneration, geminiStatus: geminiResponse.status })
+    logger.error("GENERATE", "Ни выбранная модель, ни fallback не вернули изображение", { model: modelGeneration, geminiStatus: geminiResponse.status })
     return NextResponse.json(
       { error: userMessage },
       { status: 500 }

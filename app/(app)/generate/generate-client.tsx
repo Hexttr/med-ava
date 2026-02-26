@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { PortraitCard } from "@/components/portrait-card"
+import { GenerateModeSwitch } from "@/components/generate-mode-switch"
 import { Progress } from "@/components/ui/progress"
 import type { ProcessingStatus } from "@/lib/types"
 import type { Department } from "@/lib/types"
@@ -39,6 +40,7 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>("")
   const [galleryItemId, setGalleryItemId] = useState<string | null>(null)
   const [regeneratingStyle, setRegeneratingStyle] = useState<"medical" | "corporate" | null>(null)
+  const [generateMode, setGenerateMode] = useState<"all" | "medical" | "corporate">("all")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -108,49 +110,53 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
 
       const reference = await fileToBase64(file)
 
-      // Step 2: Generate medical portrait (с эталонным фото — тот же человек)
+      const genMedical = generateMode === "all" || generateMode === "medical"
+      const genCorporate = generateMode === "all" || generateMode === "corporate"
+
       setStatus("generating")
       setProgress(40)
 
-      const medicalRes = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: analysis.medicalPrompt,
-          style: "medical",
-          referencePhotoBase64: reference.base64,
-          referencePhotoMimeType: reference.mimeType,
-        }),
-      })
+      let medicalData: { imageUrl: string } | null = null
+      let corporateData: { imageUrl: string } | null = null
 
-      if (!medicalRes.ok) {
-        const err = await medicalRes.json()
-        throw new Error(err.error || "Ошибка генерации медицинского портрета")
+      if (genMedical) {
+        const medicalRes = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: analysis.medicalPrompt,
+            style: "medical",
+            referencePhotoBase64: reference.base64,
+            referencePhotoMimeType: reference.mimeType,
+          }),
+        })
+        if (!medicalRes.ok) {
+          const err = await medicalRes.json()
+          throw new Error(err.error || "Ошибка генерации медицинского портрета")
+        }
+        medicalData = await medicalRes.json()
+        setMedicalUrl(medicalData.imageUrl)
       }
+      setProgress(genMedical && genCorporate ? 70 : 100)
 
-      const medicalData = await medicalRes.json()
-      setMedicalUrl(medicalData.imageUrl)
-      setProgress(70)
-
-      // Step 3: Generate corporate portrait
-      const corporateRes = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: analysis.corporatePrompt,
-          style: "corporate",
-          referencePhotoBase64: reference.base64,
-          referencePhotoMimeType: reference.mimeType,
-        }),
-      })
-
-      if (!corporateRes.ok) {
-        const err = await corporateRes.json()
-        throw new Error(err.error || "Ошибка генерации корпоративного портрета")
+      if (genCorporate) {
+        const corporateRes = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: analysis.corporatePrompt,
+            style: "corporate",
+            referencePhotoBase64: reference.base64,
+            referencePhotoMimeType: reference.mimeType,
+          }),
+        })
+        if (!corporateRes.ok) {
+          const err = await corporateRes.json()
+          throw new Error(err.error || "Ошибка генерации корпоративного портрета")
+        }
+        corporateData = await corporateRes.json()
+        setCorporateUrl(corporateData.imageUrl)
       }
-
-      const corporateData = await corporateRes.json()
-      setCorporateUrl(corporateData.imageUrl)
       setProgress(100)
       setStatus("complete")
 
@@ -171,16 +177,18 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
         }
       }
 
-      try {
-        const item = await addGalleryItem({
-          name,
-          medicalUrl: medicalData.imageUrl,
-          corporateUrl: corporateData.imageUrl,
-          employeeId,
-        })
-        setGalleryItemId(item.id)
-      } catch {
-        // ignore
+      if (medicalData?.imageUrl || corporateData?.imageUrl) {
+        try {
+          const item = await addGalleryItem({
+            name,
+            medicalUrl: medicalData?.imageUrl,
+            corporateUrl: corporateData?.imageUrl,
+            employeeId,
+          })
+          setGalleryItemId(item.id)
+        } catch {
+          // ignore
+        }
       }
 
       toast.success("Портреты успешно сгенерированы")
@@ -257,8 +265,10 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
   )
 
   const isProcessing = status === "analyzing" || status === "generating"
-  const medicalStatus = medicalUrl ? "complete" : status === "generating" && !medicalUrl ? "generating" : status === "analyzing" ? "analyzing" : "idle"
-  const corporateStatus = corporateUrl ? "complete" : status === "generating" && medicalUrl && !corporateUrl ? "generating" : status
+  const genMedical = generateMode === "all" || generateMode === "medical"
+  const genCorporate = generateMode === "all" || generateMode === "corporate"
+  const medicalStatus = medicalUrl ? "complete" : genMedical && status === "generating" ? "generating" : status === "analyzing" ? "analyzing" : "idle"
+  const corporateStatus = corporateUrl ? "complete" : genCorporate && status === "generating" ? "generating" : status
 
   return (
     <div className="flex min-w-0 flex-col overflow-x-hidden">
@@ -274,9 +284,10 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
         </div>
       )}
 
-      {/* Верхняя строка: ФИО и Отдел горизонтально + кнопка */}
+      {/* Верхняя строка: ФИО, Отдел, кнопка, фильтр режима */}
       <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-end gap-4">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex flex-wrap items-end gap-4">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="employee-name">ФИО сотрудника</Label>
             <Input
@@ -325,6 +336,12 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
               </>
             )}
           </Button>
+          </div>
+          <GenerateModeSwitch
+            value={generateMode}
+            onChange={(v) => setGenerateMode(v)}
+            disabled={isProcessing}
+          />
         </div>
       </div>
 

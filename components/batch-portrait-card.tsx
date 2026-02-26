@@ -321,16 +321,21 @@ export function BatchPortraitCard({
             )}
           </div>
           <div className="flex min-h-8 min-w-0 items-center">
-            {item.status === "pending" && onGenerate && (
-              <Button
-                type="button"
-                size="sm"
-                className="h-8 w-full shrink-0 text-sm"
-                onClick={onGenerate}
-                disabled={isProcessing}
-              >
-                Сгенерировать
-              </Button>
+            {(item.status === "pending" || item.status === "error") && onGenerate && (
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                {item.status === "error" && (
+                  <AlertCircle className="size-3.5 shrink-0 text-destructive" title={item.error} />
+                )}
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 flex-1 shrink-0 text-sm"
+                  onClick={onGenerate}
+                  disabled={isProcessing}
+                >
+                  {item.status === "error" ? "Повторить" : "Сгенерировать"}
+                </Button>
+              </div>
             )}
             {(item.status === "analyzing" || item.status === "generating") && (
               <Button type="button" size="sm" className="h-8 w-full shrink-0 text-sm" disabled>
@@ -358,9 +363,6 @@ export function BatchPortraitCard({
                   </>
                 )}
               </Button>
-            )}
-            {item.status === "error" && (
-              <AlertCircle className="size-3.5 shrink-0 text-destructive" title={item.error} />
             )}
           </div>
         </div>
