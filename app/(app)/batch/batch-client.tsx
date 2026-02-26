@@ -35,7 +35,7 @@ import {
   updateDepartment,
   deleteDepartment,
 } from "@/lib/structure-api"
-import { fetchGallery, addGalleryItem } from "@/lib/gallery-api"
+import { fetchGallery, addGalleryItem, fetchGalleryByEmployeeId, updateGalleryItem } from "@/lib/gallery-api"
 import { cn } from "@/lib/utils"
 
 const UPLOAD_BATCH_LIMIT = 50
@@ -80,6 +80,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<string | null>(null)
   const [cardsPage, setCardsPage] = useState(1)
+  const [regeneratingCard, setRegeneratingCard] = useState<{ employeeId: string; style: "medical" | "corporate" } | null>(null)
   const inputRefRoot = useRef<HTMLInputElement>(null)
   const inputRefDept = useRef<HTMLInputElement>(null)
   const inputRefAddEmployees = useRef<HTMLInputElement>(null)
@@ -342,6 +343,64 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
       }
     },
     []
+  )
+
+  const handleRegenerateOne = useCallback(
+    async (employeeId: string, style: "medical" | "corporate") => {
+      const emp = employees.find((e) => e.id === employeeId)
+      if (!emp) return
+      const gen = generationState[employeeId]
+      if (!gen?.medicalUrl || !gen?.corporateUrl) return
+      setRegeneratingCard({ employeeId, style })
+      try {
+        const photoUrl = emp.photoUrl.startsWith("http") || emp.photoUrl.startsWith("data:") ? emp.photoUrl : `${window.location.origin}${emp.photoUrl}`
+        const reference = await urlToBase64(photoUrl)
+        const formData = new FormData()
+        formData.append("employeeName", emp.name)
+        const blobRes = await fetch(photoUrl)
+        const blob = await blobRes.blob()
+        const file = new File([blob], `${emp.name}.jpg`, { type: blob.type || "image/jpeg" })
+        formData.append("photo", file)
+        const analyzeRes = await fetch("/api/analyze", { method: "POST", body: formData })
+        if (!analyzeRes.ok) throw new Error("Ошибка анализа")
+        const analysis = await analyzeRes.json()
+        const prompt = style === "medical" ? analysis.medicalPrompt : analysis.corporatePrompt
+        const genRes = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt,
+            style,
+            referencePhotoBase64: reference.base64,
+            referencePhotoMimeType: reference.mimeType,
+          }),
+        })
+        if (!genRes.ok) {
+          const err = await genRes.json().catch(() => ({}))
+          throw new Error(err.error || "Ошибка генерации")
+        }
+        const data = await genRes.json()
+        const newUrl = data.imageUrl
+        setGenerationState((prev) => ({
+          ...prev,
+          [employeeId]: {
+            ...prev[employeeId],
+            [style === "medical" ? "medicalUrl" : "corporateUrl"]: newUrl,
+          },
+        }))
+        const galleryItems = await fetchGalleryByEmployeeId(employeeId)
+        const item = galleryItems[0]
+        if (item?.id) {
+          await updateGalleryItem(item.id, { [style === "medical" ? "medicalUrl" : "corporateUrl"]: newUrl })
+        }
+        toast.success("Портрет перегенерирован")
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Ошибка")
+      } finally {
+        setRegeneratingCard(null)
+      }
+    },
+    [employees, generationState]
   )
 
   const processBatch = useCallback(
@@ -634,6 +693,8 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
               showNameInput
               onGenerate={gen?.status !== "complete" ? () => processBatch("one", undefined, emp.id) : undefined}
               onRegenerate={gen?.status === "complete" ? () => processOne(emp) : undefined}
+              onRegenerateOne={gen?.status === "complete" ? (style) => handleRegenerateOne(emp.id, style) : undefined}
+              regeneratingStyle={regeneratingCard?.employeeId === emp.id ? regeneratingCard.style : null}
             />
           )
         })}

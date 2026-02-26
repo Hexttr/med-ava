@@ -20,7 +20,7 @@ import { Progress } from "@/components/ui/progress"
 import type { ProcessingStatus } from "@/lib/types"
 import type { Department } from "@/lib/types"
 import { fetchDepartments, createEmployee } from "@/lib/structure-api"
-import { addGalleryItem } from "@/lib/gallery-api"
+import { addGalleryItem, updateGalleryItem } from "@/lib/gallery-api"
 import { fileToDataUrl } from "@/lib/file-utils"
 
 interface GenerateClientProps {
@@ -37,6 +37,8 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
   const [progress, setProgress] = useState(0)
   const [departments, setDepartments] = useState<Department[]>([])
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>("")
+  const [galleryItemId, setGalleryItemId] = useState<string | null>(null)
+  const [regeneratingStyle, setRegeneratingStyle] = useState<"medical" | "corporate" | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -49,6 +51,7 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
     setPreview(url)
     setMedicalUrl(null)
     setCorporateUrl(null)
+    setGalleryItemId(null)
     setStatus("idle")
     setProgress(0)
   }, [])
@@ -59,6 +62,7 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
     setPreview(null)
     setMedicalUrl(null)
     setCorporateUrl(null)
+    setGalleryItemId(null)
     setStatus("idle")
     setProgress(0)
   }, [preview])
@@ -168,12 +172,13 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
       }
 
       try {
-        await addGalleryItem({
+        const item = await addGalleryItem({
           name,
           medicalUrl: medicalData.imageUrl,
           corporateUrl: corporateData.imageUrl,
           employeeId,
         })
+        setGalleryItemId(item.id)
       } catch {
         // ignore
       }
@@ -206,6 +211,50 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
       </Card>
     )
   }
+
+  const handleRegenerateOne = useCallback(
+    async (style: "medical" | "corporate") => {
+      if (!file) return
+      setRegeneratingStyle(style)
+      try {
+        const formData = new FormData()
+        formData.append("photo", file)
+        formData.append("employeeName", employeeName || "Сотрудник")
+        const analyzeRes = await fetch("/api/analyze", { method: "POST", body: formData })
+        if (!analyzeRes.ok) throw new Error("Ошибка анализа")
+        const analysis = await analyzeRes.json()
+        const reference = await fileToBase64(file)
+        const prompt = style === "medical" ? analysis.medicalPrompt : analysis.corporatePrompt
+        const genRes = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt,
+            style,
+            referencePhotoBase64: reference.base64,
+            referencePhotoMimeType: reference.mimeType,
+          }),
+        })
+        if (!genRes.ok) {
+          const err = await genRes.json().catch(() => ({}))
+          throw new Error(err.error || "Ошибка генерации")
+        }
+        const data = await genRes.json()
+        const newUrl = data.imageUrl
+        if (style === "medical") setMedicalUrl(newUrl)
+        else setCorporateUrl(newUrl)
+        if (galleryItemId) {
+          await updateGalleryItem(galleryItemId, { [style === "medical" ? "medicalUrl" : "corporateUrl"]: newUrl })
+        }
+        toast.success("Портрет перегенерирован")
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Ошибка")
+      } finally {
+        setRegeneratingStyle(null)
+      }
+    },
+    [file, employeeName, galleryItemId]
+  )
 
   const isProcessing = status === "analyzing" || status === "generating"
   const medicalStatus = medicalUrl ? "complete" : status === "generating" && !medicalUrl ? "generating" : status === "analyzing" ? "analyzing" : "idle"
@@ -358,12 +407,16 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
           imageUrl={medicalUrl}
           status={medicalStatus}
           labelLeft="Стало"
+          onRegenerate={status === "complete" ? handleRegenerateOne : undefined}
+          regeneratingStyle={regeneratingStyle}
         />
         <PortraitCard
           style="corporate"
           imageUrl={corporateUrl}
           status={corporateStatus}
           labelLeft="Стало"
+          onRegenerate={status === "complete" ? handleRegenerateOne : undefined}
+          regeneratingStyle={regeneratingStyle}
         />
       </div>
     </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { X, Download, Loader2, AlertCircle, CheckCircle2 } from "lucide-react"
+import { X, Download, Loader2, AlertCircle, CheckCircle2, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -45,6 +45,8 @@ interface BatchPortraitCardProps {
   showNameInput?: boolean
   onGenerate?: () => void
   onRegenerate?: () => void
+  onRegenerateOne?: (style: "medical" | "corporate") => void
+  regeneratingStyle?: "medical" | "corporate" | null
 }
 
 function resolvePreviewUrl(preview: string): string {
@@ -63,6 +65,8 @@ export function BatchPortraitCard({
   showNameInput = false,
   onGenerate,
   onRegenerate,
+  onRegenerateOne,
+  regeneratingStyle = null,
 }: BatchPortraitCardProps) {
   const isActive = isCurrent && (item.status === "analyzing" || item.status === "generating")
 
@@ -125,25 +129,45 @@ export function BatchPortraitCard({
               <span className="text-xs font-medium text-muted-foreground">Стало</span>
             </div>
             <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted/30">
-              {item.medicalUrl ? (
+              {regeneratingStyle === "medical" ? (
+                <div className="flex size-full flex-col items-center justify-center gap-1">
+                  <Loader2 className="size-4 animate-spin text-primary" />
+                  <span className="text-[10px] text-muted-foreground">Генерирую...</span>
+                </div>
+              ) : item.medicalUrl ? (
                 <>
                   <img src={item.medicalUrl} alt="Медицинский" className="size-full object-cover object-top" />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon"
-                    className="absolute right-1.5 bottom-1.5 z-10 size-7 rounded-none shadow-md opacity-90 hover:opacity-100"
-                    onClick={() => {
-                      const a = document.createElement("a")
-                      a.href = item.medicalUrl!
-                      a.download = `${item.name || "photo"}-medical.png`
-                      a.click()
-                    }}
-                    aria-label="Скачать медицинский портрет"
-                    title="Скачать"
-                  >
-                    <Download className="size-3.5" />
-                  </Button>
+                  <div className="absolute right-1.5 bottom-1.5 z-10 flex gap-1">
+                    {onRegenerateOne && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="icon"
+                        className="size-7 rounded-none shadow-md opacity-90 hover:opacity-100"
+                        onClick={() => onRegenerateOne("medical")}
+                        aria-label="Повторить"
+                        title="Повторить"
+                      >
+                        <RotateCcw className="size-3.5" />
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      className="size-7 rounded-none shadow-md opacity-90 hover:opacity-100"
+                      onClick={() => {
+                        const a = document.createElement("a")
+                        a.href = item.medicalUrl!
+                        a.download = `${item.name || "photo"}-medical.png`
+                        a.click()
+                      }}
+                      aria-label="Скачать"
+                      title="Скачать"
+                    >
+                      <Download className="size-3.5" />
+                    </Button>
+                  </div>
                 </>
               ) : (
                 <div
@@ -168,25 +192,45 @@ export function BatchPortraitCard({
               <span className="text-xs font-medium text-muted-foreground">Стало</span>
             </div>
             <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted/30">
-              {item.corporateUrl ? (
+              {regeneratingStyle === "corporate" ? (
+                <div className="flex size-full flex-col items-center justify-center gap-1">
+                  <Loader2 className="size-4 animate-spin text-primary" />
+                  <span className="text-[10px] text-muted-foreground">Генерирую...</span>
+                </div>
+              ) : item.corporateUrl ? (
                 <>
                   <img src={item.corporateUrl} alt="Корпоративный" className="size-full object-cover object-top" />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon"
-                    className="absolute right-1.5 bottom-1.5 z-10 size-7 rounded-none shadow-md opacity-90 hover:opacity-100"
-                    onClick={() => {
-                      const a = document.createElement("a")
-                      a.href = item.corporateUrl!
-                      a.download = `${item.name || "photo"}-corporate.png`
-                      a.click()
-                    }}
-                    aria-label="Скачать корпоративный портрет"
-                    title="Скачать"
-                  >
-                    <Download className="size-3.5" />
-                  </Button>
+                  <div className="absolute right-1.5 bottom-1.5 z-10 flex gap-1">
+                    {onRegenerateOne && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="icon"
+                        className="size-7 rounded-none shadow-md opacity-90 hover:opacity-100"
+                        onClick={() => onRegenerateOne("corporate")}
+                        aria-label="Повторить"
+                        title="Повторить"
+                      >
+                        <RotateCcw className="size-3.5" />
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      className="size-7 rounded-none shadow-md opacity-90 hover:opacity-100"
+                      onClick={() => {
+                        const a = document.createElement("a")
+                        a.href = item.corporateUrl!
+                        a.download = `${item.name || "photo"}-corporate.png`
+                        a.click()
+                      }}
+                      aria-label="Скачать"
+                      title="Скачать"
+                    >
+                      <Download className="size-3.5" />
+                    </Button>
+                  </div>
                 </>
               ) : (
                 <div
@@ -270,10 +314,19 @@ export function BatchPortraitCard({
                 size="sm"
                 className="h-8 w-full shrink-0 text-sm"
                 onClick={onRegenerate}
-                disabled={isProcessing}
+                disabled={isProcessing || !!regeneratingStyle}
               >
-                <CheckCircle2 className="mr-2 size-4 shrink-0" />
-                <span className="truncate">Перегенерировать</span>
+                {regeneratingStyle ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 shrink-0 animate-spin" />
+                    <span className="truncate">Генерирую...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="mr-2 size-4 shrink-0" />
+                    <span className="truncate">Перегенерировать</span>
+                  </>
+                )}
               </Button>
             )}
             {item.status === "error" && (

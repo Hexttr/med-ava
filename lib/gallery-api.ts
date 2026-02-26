@@ -34,3 +34,25 @@ export async function deleteGalleryItem(id: string): Promise<void> {
   const res = await fetch(`${BASE}/${id}`, { method: "DELETE" })
   if (!res.ok) throw new Error("Не удалось удалить")
 }
+
+export async function fetchGalleryByEmployeeId(employeeId: string): Promise<GalleryItem[]> {
+  const res = await fetch(`${BASE}?employeeId=${encodeURIComponent(employeeId)}`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function updateGalleryItem(
+  id: string,
+  body: { medicalUrl?: string; corporateUrl?: string }
+): Promise<GalleryItem> {
+  const res = await fetch(`${BASE}/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || "Не удалось обновить")
+  }
+  return res.json()
+}

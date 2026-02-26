@@ -1,6 +1,6 @@
 "use client"
 
-import { Download, Loader2, ImageIcon } from "lucide-react"
+import { Download, Loader2, ImageIcon, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import type { PortraitStyle, ProcessingStatus } from "@/lib/types"
@@ -12,6 +12,8 @@ interface PortraitCardProps {
   /** Левая метка (например «Стало») */
   labelLeft?: string
   showDownload?: boolean
+  onRegenerate?: (style: PortraitStyle) => void
+  regeneratingStyle?: PortraitStyle | null
 }
 
 export function PortraitCard({
@@ -20,6 +22,8 @@ export function PortraitCard({
   status,
   labelLeft = "Стало",
   showDownload = true,
+  onRegenerate,
+  regeneratingStyle = null,
 }: PortraitCardProps) {
   function handleDownload() {
     if (!imageUrl) return
@@ -54,28 +58,48 @@ export function PortraitCard({
               <span className="text-xs text-muted-foreground">Ожидание</span>
             </div>
           )}
-          {status === "complete" && imageUrl && (
+          {status === "complete" && (regeneratingStyle === style ? (
+            <div className="flex size-full flex-col items-center justify-center gap-2">
+              <Loader2 className="size-6 animate-spin text-primary" />
+              <span className="text-xs text-muted-foreground">Генерирую...</span>
+            </div>
+          ) : imageUrl ? (
             <>
               <img
                 src={imageUrl}
                 alt={style === "medical" ? "Медицинский портрет" : "Корпоративный портрет"}
                 className="size-full object-cover object-top"
               />
-              {showDownload && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon"
-                  className="absolute right-1.5 bottom-1.5 z-10 size-7 rounded-none shadow-md opacity-90 hover:opacity-100"
-                  onClick={handleDownload}
-                  aria-label="Скачать"
-                  title="Скачать"
-                >
-                  <Download className="size-3.5" />
-                </Button>
-              )}
+              <div className="absolute right-1.5 bottom-1.5 z-10 flex gap-1">
+                {onRegenerate && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="size-7 rounded-none shadow-md opacity-90 hover:opacity-100"
+                    onClick={() => onRegenerate(style)}
+                    aria-label="Повторить"
+                    title="Повторить"
+                  >
+                    <RotateCcw className="size-3.5" />
+                  </Button>
+                )}
+                {showDownload && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="size-7 rounded-none shadow-md opacity-90 hover:opacity-100"
+                    onClick={handleDownload}
+                    aria-label="Скачать"
+                    title="Скачать"
+                  >
+                    <Download className="size-3.5" />
+                  </Button>
+                )}
+              </div>
             </>
-          )}
+          ) : null)}
           {status === "error" && (
             <div className="flex size-full flex-col items-center justify-center gap-2 p-4">
               <span className="text-xs text-destructive">Ошибка</span>

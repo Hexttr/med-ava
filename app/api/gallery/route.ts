@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const departmentId = searchParams.get("departmentId") ?? undefined
+    const employeeId = searchParams.get("employeeId") ?? undefined
     const database = getDb()
     let rows: Array<{
       id: string
@@ -43,7 +44,18 @@ export async function GET(request: NextRequest) {
       department_name: string | null
       created_at: number
     }>
-    if (departmentId && departmentId !== "") {
+    if (employeeId && employeeId !== "") {
+      rows = database
+        .prepare(
+          `SELECT g.id, g.name, g.medical_path, g.corporate_path, g.employee_id, e.name AS employee_name, e.department_id AS department_id, d.name AS department_name, g.created_at
+           FROM gallery_items g
+           LEFT JOIN employees e ON g.employee_id = e.id
+           LEFT JOIN departments d ON e.department_id = d.id
+           WHERE g.employee_id = ?
+           ORDER BY g.created_at DESC`
+        )
+        .all(employeeId) as typeof rows
+    } else if (departmentId && departmentId !== "") {
       rows = database
         .prepare(
           `SELECT g.id, g.name, g.medical_path, g.corporate_path, g.employee_id, e.name AS employee_name, e.department_id AS department_id, d.name AS department_name, g.created_at
