@@ -133,6 +133,8 @@ User=root
 WorkingDirectory={APP_DIR}
 Environment=NODE_ENV=production
 Environment=PATH=/usr/bin:/usr/local/bin
+Environment=EAM_PUBLIC_URL=http://{args.host}:{PORT}
+EnvironmentFile={APP_DIR}/.env
 ExecStart=/usr/local/bin/node {APP_DIR}/node_modules/.bin/next start -p {PORT}
 Restart=on-failure
 RestartSec=5
