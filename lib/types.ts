@@ -68,8 +68,8 @@ export interface Employee {
 export interface GalleryItem {
   id: string
   name: string
-  medicalUrl: string
-  corporateUrl: string
+  medicalUrl: string | null
+  corporateUrl: string | null
   createdAt: number
   /** Для фильтра по отделу в галерее. */
   employeeId?: string

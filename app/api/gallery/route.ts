@@ -8,8 +8,8 @@ function toItemResponse(row: {
   id: string
   name: string
   employee_name: string | null
-  medical_path: string
-  corporate_path: string
+  medical_path: string | null
+  corporate_path: string | null
   employee_id: string | null
   department_id: string | null
   department_name: string | null
@@ -18,8 +18,8 @@ function toItemResponse(row: {
   return {
     id: row.id,
     name: row.employee_name ?? row.name,
-    medicalUrl: `/api/files/${row.medical_path.replace(/\\/g, "/")}`,
-    corporateUrl: `/api/files/${row.corporate_path.replace(/\\/g, "/")}`,
+    medicalUrl: row.medical_path ? `/api/files/${row.medical_path.replace(/\\/g, "/")}` : null,
+    corporateUrl: row.corporate_path ? `/api/files/${row.corporate_path.replace(/\\/g, "/")}` : null,
     employeeId: row.employee_id ?? undefined,
     departmentId: row.department_id ?? undefined,
     departmentName: row.department_name ?? undefined,
@@ -90,13 +90,19 @@ export async function POST(request: NextRequest) {
     const name = String(body?.name ?? "Сотрудник").trim()
     const medicalUrl = body?.medicalUrl
     const corporateUrl = body?.corporateUrl
-    if (!medicalUrl || !corporateUrl || typeof medicalUrl !== "string" || typeof corporateUrl !== "string") {
-      return NextResponse.json({ error: "Требуются medicalUrl и corporateUrl" }, { status: 400 })
+    const hasMedical = medicalUrl && typeof medicalUrl === "string"
+    const hasCorporate = corporateUrl && typeof corporateUrl === "string"
+    if (!hasMedical && !hasCorporate) {
+      return NextResponse.json({ error: "Требуется medicalUrl или corporateUrl" }, { status: 400 })
     }
-    const medValid = validateBase64Image(medicalUrl)
-    const corpValid = validateBase64Image(corporateUrl)
-    if (!medValid.ok) return NextResponse.json({ error: medValid.error }, { status: 400 })
-    if (!corpValid.ok) return NextResponse.json({ error: corpValid.error }, { status: 400 })
+    if (hasMedical) {
+      const medValid = validateBase64Image(medicalUrl)
+      if (!medValid.ok) return NextResponse.json({ error: medValid.error }, { status: 400 })
+    }
+    if (hasCorporate) {
+      const corpValid = validateBase64Image(corporateUrl)
+      if (!corpValid.ok) return NextResponse.json({ error: corpValid.error }, { status: 400 })
+    }
     const employeeId = body?.employeeId ?? null
     const database = getDb()
     let departmentId: string | null = null
@@ -114,8 +120,10 @@ export async function POST(request: NextRequest) {
     }
     const id = crypto.randomUUID()
     const now = Date.now()
-    const medicalPath = await saveBase64Image(medicalUrl, "gallery", `${id}_medical`)
-    const corporatePath = await saveBase64Image(corporateUrl, "gallery", `${id}_corporate`)
+    let medicalPath: string | null = null
+    let corporatePath: string | null = null
+    if (hasMedical) medicalPath = await saveBase64Image(medicalUrl!, "gallery", `${id}_medical`)
+    if (hasCorporate) corporatePath = await saveBase64Image(corporateUrl!, "gallery", `${id}_corporate`)
     database
       .prepare(
         "INSERT INTO gallery_items (id, name, medical_path, corporate_path, employee_id, created_at) VALUES (?, ?, ?, ?, ?, ?)"

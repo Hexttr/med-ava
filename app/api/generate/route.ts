@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     const appSettings = getAppSettings()
+    const modelGeneration = appSettings.modelGeneration || "gemini-3-pro-image-preview"
     const defaultBackdropMedical = "Clean, well-lit studio backdrop in light gray or white."
     const defaultBackdropCorporate = "Clean corporate background in medium gray or soft slate, well-lit."
 
@@ -152,26 +153,25 @@ export async function POST(request: NextRequest) {
     }
     parts.push({ text: `Generate a professional portrait photo. ${geminiImagePrompt}` })
 
-    // 1) Gemini 3 Pro Image (Nano Banana Pro) — основная модель
-    const gemini3Body = {
+    const geminiBody = {
       contents: [{ parts }],
       generationConfig: {
         responseModalities: ["TEXT", "IMAGE"],
         imageConfig: { aspectRatio: "3:4" },
       },
     }
-    const gemini3Response = await fetchWithProxy(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${geminiKey}`,
+    const geminiResponse = await fetchWithProxy(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelGeneration}:generateContent?key=${geminiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(gemini3Body),
+        body: JSON.stringify(geminiBody),
       }
     )
 
-    if (gemini3Response.ok) {
-      const gemini3Data = await gemini3Response.json()
-      const parts = gemini3Data.candidates?.[0]?.content?.parts
+    if (geminiResponse.ok) {
+      const geminiData = await geminiResponse.json()
+      const parts = geminiData.candidates?.[0]?.content?.parts
       if (parts) {
         for (const part of parts) {
           if (part.inlineData?.data) {
@@ -181,8 +181,8 @@ export async function POST(request: NextRequest) {
         }
       }
     } else {
-      gemini3ErrorText = await gemini3Response.text()
-      logger.warn("GENERATE", "Gemini 3 Pro Image не вернул изображение", { status: gemini3Response.status, body: gemini3ErrorText.slice(0, 400) })
+      gemini3ErrorText = await geminiResponse.text()
+      logger.warn("GENERATE", "Модель генерации не вернула изображение", { model: modelGeneration, status: geminiResponse.status, body: gemini3ErrorText.slice(0, 400) })
     }
 
     // 2) Imagen 3 (запасной вариант; не поддерживает эталонное фото — только текст)
@@ -230,7 +230,7 @@ export async function POST(request: NextRequest) {
     } catch {
       if (lastError.length < 300) userMessage = lastError
     }
-    logger.error("GENERATE", "Ни Gemini 3 Pro Image, ни Imagen 3 не вернули изображение", { gemini3Status: gemini3Response.status })
+    logger.error("GENERATE", "Ни выбранная модель, ни Imagen 3 не вернули изображение", { model: modelGeneration, geminiStatus: geminiResponse.status })
     return NextResponse.json(
       { error: userMessage },
       { status: 500 }

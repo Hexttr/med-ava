@@ -4,7 +4,7 @@
  */
 
 const windowMs = 60 * 1000 // 1 минута
-const maxRequests = 15 // analyze + generate вместе
+const maxRequests = 60 // analyze и generate по отдельности (до 60 сотрудников в минуту)
 
 const store = new Map<string, { count: number; resetAt: number }>()
 

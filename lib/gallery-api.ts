@@ -14,8 +14,8 @@ export async function fetchGallery(params?: { departmentId?: string }): Promise<
 
 export async function addGalleryItem(body: {
   name: string
-  medicalUrl: string
-  corporateUrl: string
+  medicalUrl?: string | null
+  corporateUrl?: string | null
   employeeId?: string
 }): Promise<GalleryItem> {
   const res = await fetch(BASE, {

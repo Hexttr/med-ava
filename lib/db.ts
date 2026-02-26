@@ -149,6 +149,40 @@ function runMigrations(database: Database.Database) {
     }
     database.prepare("UPDATE _schema_version SET version = 3").run()
   }
+
+  if (version < 4) {
+    database.exec(`
+      CREATE TABLE gallery_items_v4 (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        medical_path TEXT,
+        corporate_path TEXT,
+        employee_id TEXT,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL
+      );
+    `)
+    const rows = database.prepare("SELECT id, name, medical_path, corporate_path, employee_id, created_at FROM gallery_items").all() as Array<{
+      id: string
+      name: string
+      medical_path: string
+      corporate_path: string
+      employee_id: string | null
+      created_at: number
+    }>
+    const ins = database.prepare(
+      "INSERT INTO gallery_items_v4 (id, name, medical_path, corporate_path, employee_id, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    )
+    for (const r of rows) {
+      ins.run(r.id, r.name, r.medical_path, r.corporate_path, r.employee_id, r.created_at)
+    }
+    database.exec(`
+      DROP TABLE gallery_items;
+      ALTER TABLE gallery_items_v4 RENAME TO gallery_items;
+      CREATE INDEX IF NOT EXISTS idx_gallery_employee_id ON gallery_items(employee_id);
+    `)
+    database.prepare("UPDATE _schema_version SET version = 4").run()
+  }
 }
 
 export function getUploadsDir(): string {

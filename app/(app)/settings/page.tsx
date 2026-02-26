@@ -10,6 +10,8 @@ export default async function SettingsPage() {
   // Показываем в форме фактические значения: из БД или по умолчанию
   const displaySettings = {
     ...appSettings,
+    modelAnalysis: appSettings.modelAnalysis || "gemini-2.5-flash",
+    modelGeneration: appSettings.modelGeneration || "gemini-3-pro-image-preview",
     promptAnalysis: appSettings.promptAnalysis || defaults.promptAnalysis,
     promptUniversalFraming: appSettings.promptUniversalFraming || defaults.promptUniversalFraming,
     promptMedicalInstruction: appSettings.promptMedicalInstruction || defaults.promptMedicalInstruction,

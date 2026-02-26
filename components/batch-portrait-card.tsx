@@ -169,6 +169,21 @@ export function BatchPortraitCard({
                     </Button>
                   </div>
                 </>
+              ) : onRegenerateOne && item.status === "complete" ? (
+                <div className="flex size-full flex-col items-center justify-center gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="size-10 rounded-none shadow-md"
+                    onClick={() => onRegenerateOne("medical")}
+                    aria-label="Сгенерировать медицинский"
+                    title="Сгенерировать"
+                  >
+                    <RotateCcw className="size-5" />
+                  </Button>
+                  <span className="text-[10px] text-muted-foreground">Сгенерировать</span>
+                </div>
               ) : (
                 <div
                   className={cn(
@@ -232,6 +247,21 @@ export function BatchPortraitCard({
                     </Button>
                   </div>
                 </>
+              ) : onRegenerateOne && item.status === "complete" ? (
+                <div className="flex size-full flex-col items-center justify-center gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="size-10 rounded-none shadow-md"
+                    onClick={() => onRegenerateOne("corporate")}
+                    aria-label="Сгенерировать корпоративный"
+                    title="Сгенерировать"
+                  >
+                    <RotateCcw className="size-5" />
+                  </Button>
+                  <span className="text-[10px] text-muted-foreground">Сгенерировать</span>
+                </div>
               ) : (
                 <div
                   className={cn(

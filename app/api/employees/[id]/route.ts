@@ -146,10 +146,10 @@ export async function DELETE(
     // Удаляем записи галереи этого сотрудника и их файлы
     const galleryRows = database
       .prepare("SELECT id, medical_path, corporate_path FROM gallery_items WHERE employee_id = ?")
-      .all(id) as Array<{ id: string; medical_path: string; corporate_path: string }>
+      .all(id) as Array<{ id: string; medical_path: string | null; corporate_path: string | null }>
     for (const g of galleryRows) {
-      await removeFile(g.medical_path).catch(() => {})
-      await removeFile(g.corporate_path).catch(() => {})
+      if (g.medical_path) await removeFile(g.medical_path).catch(() => {})
+      if (g.corporate_path) await removeFile(g.corporate_path).catch(() => {})
       database.prepare("DELETE FROM gallery_items WHERE id = ?").run(g.id)
     }
     await removeFile(row.photo_path)

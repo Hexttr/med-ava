@@ -15,6 +15,7 @@ import Link from "next/link"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { GenerateModeSwitch } from "@/components/generate-mode-switch"
 import {
   Dialog,
   DialogContent,
@@ -81,6 +82,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
   const [uploadProgress, setUploadProgress] = useState<string | null>(null)
   const [cardsPage, setCardsPage] = useState(1)
   const [regeneratingCard, setRegeneratingCard] = useState<{ employeeId: string; style: "medical" | "corporate" } | null>(null)
+  const [generateMode, setGenerateMode] = useState<"all" | "medical" | "corporate">("all")
   const inputRefRoot = useRef<HTMLInputElement>(null)
   const inputRefDept = useRef<HTMLInputElement>(null)
   const inputRefAddEmployees = useRef<HTMLInputElement>(null)
@@ -95,12 +97,12 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
       setDepartments(depts)
       setEmployees(emps)
       // Показать «Стало» для сотрудников, у которых уже есть результаты в галерее
-      const byEmployee = new Map<string, { medicalUrl: string; corporateUrl: string }>()
+      const byEmployee = new Map<string, { medicalUrl: string | null; corporateUrl: string | null }>()
       for (const item of galleryItems) {
         if (item.employeeId && !byEmployee.has(item.employeeId)) {
           byEmployee.set(item.employeeId, {
-            medicalUrl: item.medicalUrl,
-            corporateUrl: item.corporateUrl,
+            medicalUrl: item.medicalUrl ?? null,
+            corporateUrl: item.corporateUrl ?? null,
           })
         }
       }
@@ -268,7 +270,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
   )
 
   const processOne = useCallback(
-    async (emp: Employee) => {
+    async (emp: Employee, mode: "all" | "medical" | "corporate") => {
       const id = emp.id
       setCurrentId(id)
       setGenerationState((prev) => ({ ...prev, [id]: { ...prev[id], status: "analyzing" } }))
@@ -283,50 +285,86 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         formData.append("photo", file)
 
         const analyzeRes = await fetch("/api/analyze", { method: "POST", body: formData })
-        if (!analyzeRes.ok) throw new Error("Ошибка анализа")
+        if (!analyzeRes.ok) {
+          const err = await analyzeRes.json().catch(() => ({}))
+          throw new Error(err?.error || `Ошибка анализа: ${analyzeRes.status}`)
+        }
         const analysis = await analyzeRes.json()
 
         setGenerationState((prev) => ({ ...prev, [id]: { ...prev[id], status: "generating" } }))
 
-        const [medicalRes, corporateRes] = await Promise.all([
-          fetch("/api/generate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              prompt: analysis.medicalPrompt,
-              style: "medical",
-              referencePhotoBase64: reference.base64,
-              referencePhotoMimeType: reference.mimeType,
-            }),
-          }),
-          fetch("/api/generate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              prompt: analysis.corporatePrompt,
-              style: "corporate",
-              referencePhotoBase64: reference.base64,
-              referencePhotoMimeType: reference.mimeType,
-            }),
-          }),
-        ])
+        const genMedical = mode === "all" || mode === "medical"
+        const genCorporate = mode === "all" || mode === "corporate"
+        const promises: Promise<Response>[] = []
+        if (genMedical) {
+          promises.push(
+            fetch("/api/generate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                prompt: analysis.medicalPrompt,
+                style: "medical",
+                referencePhotoBase64: reference.base64,
+                referencePhotoMimeType: reference.mimeType,
+              }),
+            })
+          )
+        }
+        if (genCorporate) {
+          promises.push(
+            fetch("/api/generate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                prompt: analysis.corporatePrompt,
+                style: "corporate",
+                referencePhotoBase64: reference.base64,
+                referencePhotoMimeType: reference.mimeType,
+              }),
+            })
+          )
+        }
+        const results = await Promise.all(promises)
         let medicalUrl: string | null = null
         let corporateUrl: string | null = null
-        if (medicalRes.ok) {
-          const data = await medicalRes.json()
-          medicalUrl = data.imageUrl
+        let idx = 0
+        if (genMedical && results[idx]) {
+          const res = results[idx]
+          if (res.ok) {
+            const data = await res.json()
+            medicalUrl = data.imageUrl
+          } else {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err?.error || `Ошибка генерации медицинского: ${res.status}`)
+          }
+          idx++
         }
-        if (corporateRes.ok) {
-          const data = await corporateRes.json()
-          corporateUrl = data.imageUrl
+        if (genCorporate && results[idx]) {
+          const res = results[idx]
+          if (res.ok) {
+            const data = await res.json()
+            corporateUrl = data.imageUrl
+          } else {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err?.error || `Ошибка генерации корпоративного: ${res.status}`)
+          }
         }
-        setGenerationState((prev) => ({ ...prev, [id]: { status: "complete", medicalUrl, corporateUrl } }))
-        if (medicalUrl && corporateUrl) {
+        setGenerationState((prev) => ({
+          ...prev,
+          [id]: {
+            status: "complete",
+            medicalUrl: genMedical ? medicalUrl : prev[id]?.medicalUrl ?? null,
+            corporateUrl: genCorporate ? corporateUrl : prev[id]?.corporateUrl ?? null,
+          },
+        }))
+        const finalMedical = genMedical ? medicalUrl : null
+        const finalCorporate = genCorporate ? corporateUrl : null
+        if (finalMedical || finalCorporate) {
           try {
             await addGalleryItem({
               name: emp.name,
-              medicalUrl,
-              corporateUrl,
+              medicalUrl: finalMedical ?? undefined,
+              corporateUrl: finalCorporate ?? undefined,
               employeeId: id,
             })
           } catch {
@@ -350,7 +388,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
       const emp = employees.find((e) => e.id === employeeId)
       if (!emp) return
       const gen = generationState[employeeId]
-      if (!gen?.medicalUrl || !gen?.corporateUrl) return
+      if (gen?.status !== "complete") return
       setRegeneratingCard({ employeeId, style })
       try {
         const photoUrl = emp.photoUrl.startsWith("http") || emp.photoUrl.startsWith("data:") ? emp.photoUrl : `${window.location.origin}${emp.photoUrl}`
@@ -362,7 +400,10 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         const file = new File([blob], `${emp.name}.jpg`, { type: blob.type || "image/jpeg" })
         formData.append("photo", file)
         const analyzeRes = await fetch("/api/analyze", { method: "POST", body: formData })
-        if (!analyzeRes.ok) throw new Error("Ошибка анализа")
+        if (!analyzeRes.ok) {
+          const err = await analyzeRes.json().catch(() => ({}))
+          throw new Error(err?.error || `Ошибка анализа: ${analyzeRes.status}`)
+        }
         const analysis = await analyzeRes.json()
         const prompt = style === "medical" ? analysis.medicalPrompt : analysis.corporatePrompt
         const genRes = await fetch("/api/generate", {
@@ -388,10 +429,23 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
             [style === "medical" ? "medicalUrl" : "corporateUrl"]: newUrl,
           },
         }))
+        const newMedical = style === "medical" ? newUrl : gen?.medicalUrl
+        const newCorporate = style === "corporate" ? newUrl : gen?.corporateUrl
         const galleryItems = await fetchGalleryByEmployeeId(employeeId)
         const item = galleryItems[0]
         if (item?.id) {
           await updateGalleryItem(item.id, { [style === "medical" ? "medicalUrl" : "corporateUrl"]: newUrl })
+        } else if (newMedical && newCorporate) {
+          try {
+            await addGalleryItem({
+              name: emp.name,
+              medicalUrl: newMedical,
+              corporateUrl: newCorporate,
+              employeeId,
+            })
+          } catch {
+            // ignore
+          }
         }
         toast.success("Портрет перегенерирован")
       } catch (e) {
@@ -401,6 +455,16 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
       }
     },
     [employees, generationState]
+  )
+
+  const needsGeneration = useCallback(
+    (employeeId: string) => {
+      const gen = generationState[employeeId]
+      if (generateMode === "all") return !(gen?.medicalUrl && gen?.corporateUrl)
+      if (generateMode === "medical") return !gen?.medicalUrl
+      return !gen?.corporateUrl
+    },
+    [generationState, generateMode]
   )
 
   const processBatch = useCallback(
@@ -415,14 +479,14 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
       } else {
         toProcess = employees
       }
-      toProcess = toProcess.filter((e) => generationState[e.id]?.status !== "complete")
+      toProcess = toProcess.filter((e) => needsGeneration(e.id))
       if (toProcess.length === 0) {
         toast.info(scope === "one" ? "У сотрудника уже есть портреты" : "Нет сотрудников для обработки")
         return
       }
       setIsProcessing(true)
       try {
-        for (const emp of toProcess) await processOne(emp)
+        for (const emp of toProcess) await processOne(emp, generateMode)
         toast.success("Обработка завершена")
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Ошибка обработки")
@@ -430,12 +494,12 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         setIsProcessing(false)
       }
     },
-    [employees, generationState, processOne]
+    [employees, generationState, processOne, generateMode, needsGeneration]
   )
 
   /** Генерация только для видимых на странице сотрудников (без уже готовых) */
   const handleGenerateVisible = useCallback(() => {
-    const toProcess = visibleEmployees.filter((e) => generationState[e.id]?.status !== "complete")
+    const toProcess = visibleEmployees.filter((e) => needsGeneration(e.id))
     if (toProcess.length === 0) {
       toast.info("Нет сотрудников для обработки")
       return
@@ -443,7 +507,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
     setIsProcessing(true)
     ;(async () => {
       try {
-        for (const emp of toProcess) await processOne(emp)
+        for (const emp of toProcess) await processOne(emp, generateMode)
         toast.success("Обработка завершена")
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Ошибка обработки")
@@ -451,7 +515,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         setIsProcessing(false)
       }
     })()
-  }, [visibleEmployees, generationState, processOne])
+  }, [visibleEmployees, processOne, generateMode, needsGeneration])
 
   if (!hasApiKey) {
     return (
@@ -488,8 +552,9 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Первая строка: три кнопки одинаковой высоты */}
-      <div className="flex flex-wrap items-center gap-3">
+      {/* Первая строка: три кнопки + переключатель режима */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
         <Button
           type="button"
           variant="outline"
@@ -543,6 +608,12 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
             </>
           )}
         </Button>
+        </div>
+        <GenerateModeSwitch
+          value={generateMode}
+          onChange={(v) => setGenerateMode(v)}
+          disabled={isProcessing}
+        />
       </div>
 
       {/* Карточки отделов одинакового размера, справа внизу — количество сотрудников */}
@@ -692,7 +763,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
               }
               showNameInput
               onGenerate={gen?.status !== "complete" ? () => processBatch("one", undefined, emp.id) : undefined}
-              onRegenerate={gen?.status === "complete" ? () => processOne(emp) : undefined}
+              onRegenerate={gen?.status === "complete" ? () => processOne(emp, generateMode) : undefined}
               onRegenerateOne={gen?.status === "complete" ? (style) => handleRegenerateOne(emp.id, style) : undefined}
               regeneratingStyle={regeneratingCard?.employeeId === emp.id ? regeneratingCard.style : null}
             />

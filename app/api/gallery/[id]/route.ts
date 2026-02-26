@@ -7,8 +7,8 @@ import { logger } from "@/lib/logger"
 function toItemResponse(row: {
   id: string
   name: string
-  medical_path: string
-  corporate_path: string
+  medical_path: string | null
+  corporate_path: string | null
   employee_id: string | null
   department_id: string | null
   department_name: string | null
@@ -17,8 +17,8 @@ function toItemResponse(row: {
   return {
     id: row.id,
     name: row.name,
-    medicalUrl: `/api/files/${row.medical_path.replace(/\\/g, "/")}`,
-    corporateUrl: `/api/files/${row.corporate_path.replace(/\\/g, "/")}`,
+    medicalUrl: row.medical_path ? `/api/files/${row.medical_path.replace(/\\/g, "/")}` : null,
+    corporateUrl: row.corporate_path ? `/api/files/${row.corporate_path.replace(/\\/g, "/")}` : null,
     employeeId: row.employee_id ?? undefined,
     departmentId: row.department_id ?? undefined,
     departmentName: row.department_name ?? undefined,
@@ -41,7 +41,7 @@ export async function PATCH(
     const database = getDb()
     const row = database
       .prepare("SELECT id, name, medical_path, corporate_path, employee_id FROM gallery_items WHERE id = ?")
-      .get(id) as { id: string; name: string; medical_path: string; corporate_path: string; employee_id: string | null } | undefined
+      .get(id) as { id: string; name: string; medical_path: string | null; corporate_path: string | null; employee_id: string | null } | undefined
     if (!row) {
       return NextResponse.json({ error: "Не найдено" }, { status: 404 })
     }
@@ -51,13 +51,13 @@ export async function PATCH(
     if (medicalUrl) {
       const valid = validateBase64Image(medicalUrl)
       if (!valid.ok) return NextResponse.json({ error: valid.error }, { status: 400 })
-      await removeFile(row.medical_path)
+      if (row.medical_path) await removeFile(row.medical_path)
       medicalPath = await saveBase64Image(medicalUrl, "gallery", `${id}_medical_${ts}`)
     }
     if (corporateUrl) {
       const valid = validateBase64Image(corporateUrl)
       if (!valid.ok) return NextResponse.json({ error: valid.error }, { status: 400 })
-      await removeFile(row.corporate_path)
+      if (row.corporate_path) await removeFile(row.corporate_path)
       corporatePath = await saveBase64Image(corporateUrl, "gallery", `${id}_corporate_${ts}`)
     }
     database
@@ -88,12 +88,12 @@ export async function DELETE(
     const database = getDb()
     const row = database.prepare(
       "SELECT medical_path, corporate_path FROM gallery_items WHERE id = ?"
-    ).get(id) as { medical_path: string; corporate_path: string } | undefined
+    ).get(id) as { medical_path: string | null; corporate_path: string | null } | undefined
     if (!row) {
       return NextResponse.json({ error: "Не найдено" }, { status: 404 })
     }
-    await removeFile(row.medical_path)
-    await removeFile(row.corporate_path)
+    if (row.medical_path) await removeFile(row.medical_path)
+    if (row.corporate_path) await removeFile(row.corporate_path)
     database.prepare("DELETE FROM gallery_items WHERE id = ?").run(id)
     return NextResponse.json({ success: true })
   } catch (e) {

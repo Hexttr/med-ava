@@ -23,6 +23,8 @@ export async function PATCH(request: NextRequest) {
       backgroundMedical?: string
       backgroundCorporate?: string
       backgroundMode?: "description" | "image"
+      modelAnalysis?: string
+      modelGeneration?: string
       promptAnalysis?: string
       promptUniversalFraming?: string
       promptMedicalInstruction?: string
@@ -33,6 +35,8 @@ export async function PATCH(request: NextRequest) {
     if (typeof body?.backgroundMedical === "string") updates.backgroundMedical = body.backgroundMedical
     if (typeof body?.backgroundCorporate === "string") updates.backgroundCorporate = body.backgroundCorporate
     if (body?.backgroundMode === "description" || body?.backgroundMode === "image") updates.backgroundMode = body.backgroundMode
+    if (typeof body?.modelAnalysis === "string") updates.modelAnalysis = body.modelAnalysis
+    if (typeof body?.modelGeneration === "string") updates.modelGeneration = body.modelGeneration
     if (typeof body?.promptAnalysis === "string") updates.promptAnalysis = body.promptAnalysis
     if (typeof body?.promptUniversalFraming === "string") updates.promptUniversalFraming = body.promptUniversalFraming
     if (typeof body?.promptMedicalInstruction === "string") updates.promptMedicalInstruction = body.promptMedicalInstruction

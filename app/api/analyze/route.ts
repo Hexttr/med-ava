@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getGeminiKey } from "@/lib/settings"
+import { getAppSettings } from "@/lib/app-settings"
 import { fetchWithProxy } from "@/lib/fetch-proxy"
 import { logger } from "@/lib/logger"
 import { getAnalysisPrompt } from "@/lib/prompts"
@@ -65,10 +66,11 @@ export async function POST(request: NextRequest) {
     const mimeType = (photo as File).type || "image/jpeg"
 
     const analysisPrompt = getAnalysisPrompt(employeeName)
+    const appSettings = getAppSettings()
+    const model = appSettings.modelAnalysis || "gemini-2.5-flash"
 
-    // Анализ фото: Gemini 2.5 Flash (запрос через fetchWithProxy для поддержки VPN/прокси)
     const geminiResponse = await fetchWithProxy(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

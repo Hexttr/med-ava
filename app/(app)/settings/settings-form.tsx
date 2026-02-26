@@ -12,6 +12,14 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { MODEL_ANALYSIS_OPTIONS, MODEL_GENERATION_OPTIONS } from "@/lib/model-options"
 
 interface AppSettingsData {
   organizationName: string
@@ -20,6 +28,8 @@ interface AppSettingsData {
   backgroundMedicalImage?: string
   backgroundCorporateImage?: string
   backgroundMode?: "description" | "image"
+  modelAnalysis?: string
+  modelGeneration?: string
   promptAnalysis: string
   promptUniversalFraming: string
   promptMedicalInstruction: string
@@ -51,6 +61,8 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
   const [promptMedicalInstruction, setPromptMedicalInstruction] = useState(initialAppSettings?.promptMedicalInstruction ?? "")
   const [promptCorporateInstruction, setPromptCorporateInstruction] = useState(initialAppSettings?.promptCorporateInstruction ?? "")
   const [promptNegative, setPromptNegative] = useState(initialAppSettings?.promptNegative ?? "")
+  const [modelAnalysis, setModelAnalysis] = useState(initialAppSettings?.modelAnalysis ?? "gemini-2.5-flash")
+  const [modelGeneration, setModelGeneration] = useState(initialAppSettings?.modelGeneration ?? "gemini-3-pro-image-preview")
   const [appPending, setAppPending] = useState(false)
 
   useEffect(() => {
@@ -64,6 +76,8 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
       setPromptMedicalInstruction(initialAppSettings.promptMedicalInstruction ?? "")
       setPromptCorporateInstruction(initialAppSettings.promptCorporateInstruction ?? "")
       setPromptNegative(initialAppSettings.promptNegative ?? "")
+      setModelAnalysis(initialAppSettings.modelAnalysis ?? "gemini-2.5-flash")
+      setModelGeneration(initialAppSettings.modelGeneration ?? "gemini-3-pro-image-preview")
     }
   }, [initialAppSettings])
 
@@ -144,6 +158,8 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
           backgroundMedical: bgMedical.trim(),
           backgroundCorporate: bgCorporate.trim(),
           backgroundMode: bgMode,
+          modelAnalysis: modelAnalysis,
+          modelGeneration: modelGeneration,
           promptAnalysis: promptAnalysis.trim(),
           promptUniversalFraming: promptUniversalFraming.trim(),
           promptMedicalInstruction: promptMedicalInstruction.trim(),
@@ -166,7 +182,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
   }
 
   return (
-    <div className="grid w-full max-w-full grid-cols-1 gap-6 lg:grid-cols-[minmax(0,440px)_1fr]">
+    <div className="grid w-full max-w-full grid-cols-1 gap-6 lg:grid-cols-[minmax(0,462px)_1fr]">
       <div className="flex flex-col gap-6">
       <Card>
         <CardHeader>
@@ -377,6 +393,42 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
               </Button>
             </div>
           </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Label>Модель для анализа</Label>
+              <Select value={modelAnalysis} onValueChange={setModelAnalysis}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MODEL_ANALYSIS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label>Модель для генерации</Label>
+              <Select value={modelGeneration} onValueChange={setModelGeneration}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MODEL_GENERATION_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <Button onClick={handleSaveAppSettings} disabled={appPending}>
+            <Save className="mr-2 size-4" />
+            Сохранить модели
+          </Button>
           {hasKey && (
             <Button variant="outline" size="sm" onClick={handleRemoveKey} disabled={isPending}>
               <Trash2 className="mr-2 size-4" />

@@ -1,4 +1,5 @@
 import { getDb } from "./db"
+import { MODEL_ANALYSIS_OPTIONS, MODEL_GENERATION_OPTIONS } from "./model-options"
 
 const KEYS = {
   organizationName: "organization_name",
@@ -7,6 +8,8 @@ const KEYS = {
   backgroundMedicalImage: "background_medical_image",
   backgroundCorporateImage: "background_corporate_image",
   backgroundMode: "background_mode",
+  modelAnalysis: "model_analysis",
+  modelGeneration: "model_generation",
   promptAnalysis: "prompt_analysis",
   promptUniversalFraming: "prompt_universal_framing",
   promptMedicalInstruction: "prompt_medical_instruction",
@@ -21,6 +24,8 @@ export interface AppSettings {
   backgroundMedicalImage: string
   backgroundCorporateImage: string
   backgroundMode: "description" | "image"
+  modelAnalysis: string
+  modelGeneration: string
   promptAnalysis: string
   promptUniversalFraming: string
   promptMedicalInstruction: string
@@ -35,6 +40,8 @@ const ALL_KEYS = [
   KEYS.backgroundMedicalImage,
   KEYS.backgroundCorporateImage,
   KEYS.backgroundMode,
+  KEYS.modelAnalysis,
+  KEYS.modelGeneration,
   KEYS.promptAnalysis,
   KEYS.promptUniversalFraming,
   KEYS.promptMedicalInstruction,
@@ -54,6 +61,8 @@ export function getAppSettings(): AppSettings {
     backgroundMedicalImage: map.get(KEYS.backgroundMedicalImage) ?? "",
     backgroundCorporateImage: map.get(KEYS.backgroundCorporateImage) ?? "",
     backgroundMode: (map.get(KEYS.backgroundMode) === "image" ? "image" : "description") as "description" | "image",
+    modelAnalysis: map.get(KEYS.modelAnalysis) || MODEL_ANALYSIS_OPTIONS[0].value,
+    modelGeneration: map.get(KEYS.modelGeneration) || MODEL_GENERATION_OPTIONS[0].value,
     promptAnalysis: map.get(KEYS.promptAnalysis) ?? "",
     promptUniversalFraming: map.get(KEYS.promptUniversalFraming) ?? "",
     promptMedicalInstruction: map.get(KEYS.promptMedicalInstruction) ?? "",
@@ -72,6 +81,8 @@ export function setAppSettings(updates: Partial<AppSettings>): void {
     [KEYS.backgroundMedicalImage, "backgroundMedicalImage"],
     [KEYS.backgroundCorporateImage, "backgroundCorporateImage"],
     [KEYS.backgroundMode, "backgroundMode"],
+    [KEYS.modelAnalysis, "modelAnalysis"],
+    [KEYS.modelGeneration, "modelGeneration"],
     [KEYS.promptAnalysis, "promptAnalysis"],
     [KEYS.promptUniversalFraming, "promptUniversalFraming"],
     [KEYS.promptMedicalInstruction, "promptMedicalInstruction"],
