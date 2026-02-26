@@ -91,9 +91,14 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
         const res = await fetch("/api/settings/key", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ key: apiKey.trim() }),
         })
         const data = await res.json().catch(() => ({}))
+        if (res.status === 401) {
+          router.push(data.redirect || "/login")
+          return
+        }
         if (res.ok && data.success) {
           toast.success("API-ключ сохранён в data/gemini-key")
           setApiKey("")
@@ -110,8 +115,12 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
   function handleRemoveKey() {
     startTransition(async () => {
       try {
-        const res = await fetch("/api/settings/key", { method: "DELETE" })
+        const res = await fetch("/api/settings/key", { method: "DELETE", credentials: "include" })
         const data = await res.json().catch(() => ({}))
+        if (res.status === 401) {
+          router.push(data.redirect || "/login")
+          return
+        }
         if (res.ok && data.success) {
           toast.success("API-ключ удалён")
           router.refresh()

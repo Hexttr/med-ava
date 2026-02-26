@@ -31,7 +31,14 @@ export function proxy(request: NextRequest) {
 
   const loginUrl = new URL("/login", request.url)
   loginUrl.searchParams.set("redirect", pathname + request.nextUrl.search)
-  return NextResponse.redirect(loginUrl)
+
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.json(
+      { error: "Unauthorized", redirect: loginUrl.pathname + loginUrl.search },
+      { status: 401 }
+    )
+  }
+  return NextResponse.redirect(loginUrl, 303)
 }
 
 export const config = {
