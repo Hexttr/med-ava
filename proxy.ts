@@ -29,25 +29,21 @@ export function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
+  const redirectTarget = pathname + request.nextUrl.search
+  const redirectPath = redirectTarget ? `/login?redirect=${encodeURIComponent(redirectTarget)}` : "/login"
   const url = new URL(request.url)
   const isLocalhost = url.hostname === "localhost" || url.hostname === "127.0.0.1"
-  const forwardedHost = request.headers.get("x-forwarded-host")
-  const forwardedProto = request.headers.get("x-forwarded-proto")
-  const origin =
-    process.env.EAM_PUBLIC_URL?.trim() ||
-    (forwardedHost && forwardedProto ? `${forwardedProto}://${forwardedHost}` : null) ||
-    (!isLocalhost ? request.url : null) ||
-    request.url
-  const loginUrl = new URL("/login", origin)
-  loginUrl.searchParams.set("redirect", pathname + request.nextUrl.search)
+  const redirectUrl = isLocalhost && process.env.EAM_PUBLIC_URL?.trim()
+    ? new URL(redirectPath, process.env.EAM_PUBLIC_URL).toString()
+    : redirectPath
 
   if (pathname.startsWith("/api/")) {
     return NextResponse.json(
-      { error: "Unauthorized", redirect: loginUrl.pathname + loginUrl.search },
+      { error: "Unauthorized", redirect: redirectPath },
       { status: 401 }
     )
   }
-  return NextResponse.redirect(loginUrl, 303)
+  return NextResponse.redirect(redirectUrl, 303)
 }
 
 export const config = {
