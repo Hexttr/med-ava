@@ -25,17 +25,25 @@ APP_DIR = "/opt/med-ava"
 PORT = 3000
 
 
+def safe_print(text: str) -> None:
+    """Print with fallback for Windows console encoding."""
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        print(text.encode("ascii", errors="replace").decode())
+
+
 def run_ssh(ssh: paramiko.SSHClient, cmd: str, check=True) -> tuple[int, str, str]:
     """Выполнить команду по SSH, вернуть (code, stdout, stderr)."""
-    print(f"  $ {cmd[:80]}{'...' if len(cmd) > 80 else ''}")
+    safe_print(f"  $ {cmd[:80]}{'...' if len(cmd) > 80 else ''}")
     stdin, stdout, stderr = ssh.exec_command(cmd, get_pty=True)
     out = stdout.read().decode("utf-8", errors="replace")
     err = stderr.read().decode("utf-8", errors="replace")
     code = stdout.channel.recv_exit_status()
     if code != 0 and check:
-        print(f"  [ERROR] exit {code}")
-        print(f"  stdout: {out}")
-        print(f"  stderr: {err}")
+        safe_print(f"  [ERROR] exit {code}")
+        safe_print(f"  stdout: {out[-2000:]}")
+        safe_print(f"  stderr: {err[-2000:]}")
     return code, out, err
 
 
@@ -98,7 +106,14 @@ def main():
     # 6. Сборка
     if not args.skip_build:
         print("\n--- 6. npm run build ---")
-        run_ssh(ssh, f"cd {APP_DIR} && npm run build")
+        code, out, err = run_ssh(
+            ssh,
+            f"cd {APP_DIR} && npm run build > /tmp/build.log 2>&1; e=$?; tail -80 /tmp/build.log; exit $e",
+            check=False,
+        )
+        if code != 0:
+            safe_print(f"  Build failed (exit {code}). See output above.")
+            raise SystemExit(code)
         steps.append("build_ok")
     else:
         print("\n--- 6. Сборка пропущена (--skip-build) ---")
