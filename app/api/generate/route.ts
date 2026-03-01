@@ -13,6 +13,7 @@ import {
   getCorporateInstruction,
   getNegativePrompt,
 } from "@/lib/prompts"
+import { preprocessForGemini } from "@/lib/image-preprocess"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -120,11 +121,11 @@ export async function POST(request: NextRequest) {
 
     let geminiImagePrompt: string
     if (useBackgroundImage && hasReferencePhoto) {
-      geminiImagePrompt = `The FIRST attached image is the REFERENCE PHOTO of the person. The SECOND attached image is the BACKGROUND to use. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON placed onto this exact background. CRITICAL IDENTITY: The face must be identical — same person, same identity, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, any distinctive features. Place the person naturally and seamlessly onto the provided background — match lighting direction and color temperature, cast appropriate soft shadows, ensure correct scale and perspective, blend edges naturally (no cutout/pasted look). ${settingInstruction}. Use identical portrait framing: head and upper torso only, bust-length, shoulders visible — same crop for both medical and corporate styles. Clothing must look premium and high-quality.${negativeSuffix} Output the generated portrait image.`
+      geminiImagePrompt = `The FIRST attached image is the REFERENCE PHOTO of the person. The SECOND attached image is the BACKGROUND to use. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON placed onto this exact background. CRITICAL IDENTITY: The face must be identical — same person, same identity, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, any distinctive features. Mouth closed, lips together. Place the person naturally and seamlessly onto the provided background — match lighting direction and color temperature, cast appropriate soft shadows, ensure correct scale and perspective, blend edges naturally (no cutout/pasted look). ${settingInstruction}. Use identical portrait framing: head and upper torso only, bust-length, shoulders visible — same crop for both medical and corporate styles. Clothing must look premium and high-quality.${negativeSuffix} Output the generated portrait image.`
     } else if (useBackgroundImage && !hasReferencePhoto) {
       geminiImagePrompt = `The attached image is the BACKGROUND to use. Generate ONE professional studio portrait photo. ${universalFraming} ${prompt}. Place the person described in the prompt onto this exact background — match lighting, cast natural shadows, correct scale. Clothing must look premium and high-quality. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture.${negativeSuffix} Output the generated portrait image.`
     } else if (hasReferencePhoto) {
-      geminiImagePrompt = `The attached image is the REFERENCE PHOTO of the person. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: The face must be identical — same person, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, any distinctive features. Only change the setting and clothing as follows: ${settingInstruction}. Clothing must look premium and high-quality. Keep the person's face identical to the reference.${negativeSuffix} Output the generated portrait image.`
+      geminiImagePrompt = `The attached image is the REFERENCE PHOTO of the person. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: The face must be identical — same person, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, any distinctive features. Mouth closed, lips together. Only change the setting and clothing as follows: ${settingInstruction}. Clothing must look premium and high-quality. Keep the person's face identical to the reference.${negativeSuffix} Output the generated portrait image.`
     } else {
       geminiImagePrompt = `Professional studio portrait photo. ${universalFraming} ${prompt}. CRITICAL IDENTITY: The face MUST match the person described above exactly — maximum likeness, same person. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture. Clothing must look premium and high-quality. ${
         style === "medical"
@@ -137,11 +138,11 @@ export async function POST(request: NextRequest) {
 
     const parts: { text?: string; inlineData?: { mimeType: string; data: string } }[] = []
     if (hasReferencePhoto) {
+      const rawBase64 = referencePhotoBase64!.replace(/^data:image\/\w+;base64,/, "")
+      const buffer = Buffer.from(rawBase64, "base64")
+      const { base64, mimeType } = await preprocessForGemini(buffer)
       parts.push({
-        inlineData: {
-          mimeType: referencePhotoMimeType || "image/jpeg",
-          data: referencePhotoBase64!.replace(/^data:image\/\w+;base64,/, ""),
-        },
+        inlineData: { mimeType, data: base64 },
       })
     }
     if (useBackgroundImage) {

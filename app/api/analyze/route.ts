@@ -6,6 +6,7 @@ import { logger } from "@/lib/logger"
 import { getAnalysisPrompt } from "@/lib/prompts"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { validateImageFile } from "@/lib/upload-validation"
+import { preprocessForGemini } from "@/lib/image-preprocess"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -14,16 +15,6 @@ function getClientIp(request: NextRequest): string {
   return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     request.headers.get("x-real-ip") ||
     "unknown"
-}
-
-function toBase64(bytes: ArrayBuffer): string {
-  if (typeof Buffer !== "undefined") {
-    return Buffer.from(bytes).toString("base64")
-  }
-  const arr = new Uint8Array(bytes)
-  let binary = ""
-  for (let i = 0; i < arr.length; i++) binary += String.fromCharCode(arr[i])
-  return typeof btoa !== "undefined" ? btoa(binary) : ""
 }
 
 export async function POST(request: NextRequest) {
@@ -62,8 +53,8 @@ export async function POST(request: NextRequest) {
     }
 
     const bytes = await (photo as Blob).arrayBuffer()
-    const base64 = toBase64(bytes)
-    const mimeType = (photo as File).type || "image/jpeg"
+    const buffer = Buffer.from(bytes)
+    const { base64, mimeType } = await preprocessForGemini(buffer)
 
     const analysisPrompt = getAnalysisPrompt(employeeName)
     const appSettings = getAppSettings()
