@@ -5,7 +5,7 @@
 import { useState, useEffect, useTransition, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Key, Save, Trash2, CheckCircle2, ExternalLink, Stethoscope, Building2, FileText, ImageIcon, FileTextIcon, Upload } from "lucide-react"
+import { Key, Save, Trash2, CheckCircle2, ExternalLink, Stethoscope, Building2, FileText, ImageIcon, FileTextIcon, Upload, Stamp } from "lucide-react"
 import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,8 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
+import { Slider } from "@/components/ui/slider"
 import {
   Select,
   SelectContent,
@@ -29,6 +31,11 @@ interface AppSettingsData {
   backgroundCorporate: string
   backgroundMedicalImage?: string
   backgroundCorporateImage?: string
+  overlayLogoEnabled?: boolean
+  overlayLogoPath?: string
+  overlayLogoPosition?: "top-left" | "top-right" | "bottom-left" | "bottom-right"
+  overlayLogoSizePercent?: number
+  overlayLogoPadding?: number
   backgroundMode?: "description" | "image"
   modelAnalysis?: string
   modelGeneration?: string
@@ -57,11 +64,21 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
   const [clearCorporateRequested, setClearCorporateRequested] = useState(false)
   const medicalFileRef = useRef<HTMLInputElement>(null)
   const corporateFileRef = useRef<HTMLInputElement>(null)
+  const overlayLogoFileRef = useRef<HTMLInputElement>(null)
   const [promptAnalysis, setPromptAnalysis] = useState(initialAppSettings?.promptAnalysis ?? "")
   const [promptUniversalFraming, setPromptUniversalFraming] = useState(initialAppSettings?.promptUniversalFraming ?? "")
   const [promptMedicalInstruction, setPromptMedicalInstruction] = useState(initialAppSettings?.promptMedicalInstruction ?? "")
   const [promptCorporateInstruction, setPromptCorporateInstruction] = useState(initialAppSettings?.promptCorporateInstruction ?? "")
   const [promptNegative, setPromptNegative] = useState(initialAppSettings?.promptNegative ?? "")
+  const [overlayLogoEnabled, setOverlayLogoEnabled] = useState(initialAppSettings?.overlayLogoEnabled ?? false)
+  const [overlayLogoPosition, setOverlayLogoPosition] = useState<"top-left" | "top-right" | "bottom-left" | "bottom-right">(
+    initialAppSettings?.overlayLogoPosition ?? "top-right"
+  )
+  const [overlayLogoSizePercent, setOverlayLogoSizePercent] = useState(initialAppSettings?.overlayLogoSizePercent ?? 16)
+  const [overlayLogoPadding, setOverlayLogoPadding] = useState(initialAppSettings?.overlayLogoPadding ?? 24)
+  const [overlayLogoFile, setOverlayLogoFile] = useState<File | null>(null)
+  const [clearOverlayLogoRequested, setClearOverlayLogoRequested] = useState(false)
+  const [overlayLogoPreviewUrl, setOverlayLogoPreviewUrl] = useState<string | null>(null)
   const [modelAnalysis, setModelAnalysis] = useState(initialAppSettings?.modelAnalysis ?? "gemini-2.5-flash")
   const [modelGeneration, setModelGeneration] = useState(initialAppSettings?.modelGeneration ?? "gemini-3-pro-image-preview")
   const [appPending, setAppPending] = useState(false)
@@ -76,10 +93,29 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
       setPromptMedicalInstruction(initialAppSettings.promptMedicalInstruction ?? "")
       setPromptCorporateInstruction(initialAppSettings.promptCorporateInstruction ?? "")
       setPromptNegative(initialAppSettings.promptNegative ?? "")
+      setOverlayLogoEnabled(initialAppSettings.overlayLogoEnabled ?? false)
+      setOverlayLogoPosition(initialAppSettings.overlayLogoPosition ?? "top-right")
+      setOverlayLogoSizePercent(initialAppSettings.overlayLogoSizePercent ?? 16)
+      setOverlayLogoPadding(initialAppSettings.overlayLogoPadding ?? 24)
       setModelAnalysis(initialAppSettings.modelAnalysis ?? "gemini-2.5-flash")
       setModelGeneration(initialAppSettings.modelGeneration ?? "gemini-3-pro-image-preview")
     }
   }, [initialAppSettings])
+
+  useEffect(() => {
+    if (overlayLogoFile) {
+      const objectUrl = URL.createObjectURL(overlayLogoFile)
+      setOverlayLogoPreviewUrl(objectUrl)
+      return () => URL.revokeObjectURL(objectUrl)
+    }
+
+    if (initialAppSettings?.overlayLogoPath && !clearOverlayLogoRequested) {
+      setOverlayLogoPreviewUrl(`/api/files/${initialAppSettings.overlayLogoPath}`)
+      return
+    }
+
+    setOverlayLogoPreviewUrl(null)
+  }, [overlayLogoFile, initialAppSettings?.overlayLogoPath, clearOverlayLogoRequested])
 
   function handleSaveKey() {
     if (!apiKey.trim()) {
@@ -159,12 +195,34 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
         if (medicalFileRef.current) medicalFileRef.current.value = ""
         if (corporateFileRef.current) corporateFileRef.current.value = ""
       }
+      if (overlayLogoFile || clearOverlayLogoRequested) {
+        const fd = new FormData()
+        if (overlayLogoFile) fd.append("overlayLogo", overlayLogoFile)
+        if (clearOverlayLogoRequested) fd.append("clearLogo", "true")
+        const overlayRes = await fetch("/api/settings/branding", {
+          method: "POST",
+          body: fd,
+        })
+        const overlayData = await overlayRes.json().catch(() => ({}))
+        if (!overlayRes.ok) {
+          toast.error(overlayData.error || "Не удалось сохранить логотип")
+          setAppPending(false)
+          return
+        }
+        setOverlayLogoFile(null)
+        setClearOverlayLogoRequested(false)
+        if (overlayLogoFileRef.current) overlayLogoFileRef.current.value = ""
+      }
       const res = await fetch("/api/settings/app", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           backgroundMedical: bgMedical.trim(),
           backgroundCorporate: bgCorporate.trim(),
+          overlayLogoEnabled,
+          overlayLogoPosition,
+          overlayLogoSizePercent,
+          overlayLogoPadding,
           backgroundMode: bgMode,
           modelAnalysis: modelAnalysis,
           modelGeneration: modelGeneration,
@@ -347,6 +405,167 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
             <Save className="mr-2 size-4" />
             Сохранить настройки приложения
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-none bg-primary/10">
+              <Stamp className="size-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Логотип поверх портрета</CardTitle>
+              <CardDescription>
+                PNG-логотип накладывается сервером поверх финального изображения и попадает в скачанный файл.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-5">
+          <div className="flex items-center justify-between rounded-none border border-border bg-muted/30 px-4 py-3">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">Включить логотип на итоговых портретах</p>
+              <p className="text-xs text-muted-foreground">Накладывается после генерации на сервере через Sharp.</p>
+            </div>
+            <Switch checked={overlayLogoEnabled} onCheckedChange={setOverlayLogoEnabled} />
+          </div>
+
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_220px]">
+            <div className="space-y-5">
+              <div className="flex flex-col gap-2">
+                <Label>PNG-логотип</Label>
+                {overlayLogoPreviewUrl && (
+                  <div className="flex items-center gap-3 rounded-md border border-border bg-muted/30 p-3">
+                    <img
+                      src={overlayLogoPreviewUrl}
+                      alt="Логотип"
+                      className="h-14 w-14 rounded bg-white object-contain p-2"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-foreground">
+                        {overlayLogoFile ? overlayLogoFile.name : "Текущий логотип"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Используется для наложения на все новые сгенерированные портреты.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setOverlayLogoFile(null)
+                        if (overlayLogoFileRef.current) overlayLogoFileRef.current.value = ""
+                        if (initialAppSettings?.overlayLogoPath || overlayLogoPreviewUrl) {
+                          setClearOverlayLogoRequested(true)
+                        }
+                      }}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <Input
+                    ref={overlayLogoFileRef}
+                    type="file"
+                    accept="image/png"
+                    onChange={(e) => {
+                      setOverlayLogoFile(e.target.files?.[0] ?? null)
+                      setClearOverlayLogoRequested(false)
+                    }}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => overlayLogoFileRef.current?.click()}
+                  >
+                    <Upload className="mr-2 size-4" />
+                    {overlayLogoPreviewUrl ? "Заменить PNG" : "Загрузить PNG"}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">Рекомендуется PNG с прозрачным фоном.</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label>Позиция</Label>
+                  <Select value={overlayLogoPosition} onValueChange={(value) => setOverlayLogoPosition(value as typeof overlayLogoPosition)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="top-left">Слева сверху</SelectItem>
+                      <SelectItem value="top-right">Справа сверху</SelectItem>
+                      <SelectItem value="bottom-left">Слева снизу</SelectItem>
+                      <SelectItem value="bottom-right">Справа снизу</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="overlay-padding">Отступ, px</Label>
+                  <Input
+                    id="overlay-padding"
+                    type="number"
+                    min={0}
+                    max={96}
+                    value={overlayLogoPadding}
+                    onChange={(e) => setOverlayLogoPadding(Math.min(96, Math.max(0, Number(e.target.value) || 0)))}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-4">
+                  <Label>Размер логотипа</Label>
+                  <span className="text-sm text-muted-foreground">{overlayLogoSizePercent}% ширины изображения</span>
+                </div>
+                <Slider
+                  min={5}
+                  max={35}
+                  step={1}
+                  value={[overlayLogoSizePercent]}
+                  onValueChange={(values) => setOverlayLogoSizePercent(values[0] ?? 16)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Превью</Label>
+              <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-border bg-slate-100">
+                <img
+                  src="/placeholder-user.jpg"
+                  alt="Превью портрета"
+                  className="h-full w-full object-cover"
+                />
+                <div className="absolute inset-0 bg-linear-to-t from-slate-950/10 to-transparent" />
+                {overlayLogoEnabled && overlayLogoPreviewUrl ? (
+                  <img
+                    src={overlayLogoPreviewUrl}
+                    alt="Превью логотипа"
+                    className={[
+                      "absolute z-10 w-auto object-contain rounded",
+                      overlayLogoPosition === "top-left" ? "left-0 top-0" : "",
+                      overlayLogoPosition === "top-right" ? "right-0 top-0" : "",
+                      overlayLogoPosition === "bottom-left" ? "bottom-0 left-0" : "",
+                      overlayLogoPosition === "bottom-right" ? "bottom-0 right-0" : "",
+                    ].join(" ")}
+                    style={{
+                      width: `${overlayLogoSizePercent}%`,
+                      margin: `${overlayLogoPadding}px`,
+                    }}
+                  />
+                ) : (
+                  <div className="absolute inset-x-4 bottom-4 rounded-xl bg-black/55 px-3 py-2 text-center text-xs text-white">
+                    Включите логотип и загрузите PNG, чтобы увидеть результат.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

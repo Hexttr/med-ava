@@ -3,7 +3,7 @@ import fs from "fs/promises"
 import path from "path"
 import { getGeminiKey } from "@/lib/settings"
 import { getAppSettings } from "@/lib/app-settings"
-import { getAbsolutePath } from "@/lib/storage"
+import { applyOverlayLogo, getAbsolutePath } from "@/lib/storage"
 import { fetchWithProxy } from "@/lib/fetch-proxy"
 import { logger } from "@/lib/logger"
 import { checkRateLimit } from "@/lib/rate-limit"
@@ -18,6 +18,13 @@ import { preprocessForGemini } from "@/lib/image-preprocess"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
+
+const PRIMARY_MODEL_ATTEMPTS = 3
+const RETRY_DELAY_MS = 500
+
+type GenerateModelResult =
+  | { ok: true; imageUrl: string }
+  | { ok: false; status?: number; errorText: string }
 
 export async function POST(request: NextRequest) {
   try {
@@ -133,8 +140,6 @@ export async function POST(request: NextRequest) {
       }${negativeSuffix}`
     }
 
-    let gemini3ErrorText = ""
-
     const parts: { text?: string; inlineData?: { mimeType: string; data: string } }[] = []
     if (hasReferencePhoto) {
       const rawBase64 = referencePhotoBase64!.replace(/^data:image\/\w+;base64,/, "")
@@ -160,61 +165,96 @@ export async function POST(request: NextRequest) {
         imageConfig: { aspectRatio: "3:4" },
       },
     }
-    const geminiResponse = await fetchWithProxy(
-      `https://generativelanguage.googleapis.com/v1beta/models/${modelGeneration}:generateContent?key=${geminiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(geminiBody),
-      }
-    )
 
-    if (geminiResponse.ok) {
-      const geminiData = await geminiResponse.json()
-      const parts = geminiData.candidates?.[0]?.content?.parts
-      if (parts) {
-        for (const part of parts) {
-          if (part.inlineData?.data) {
-            const imageUrl = `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}`
-            logger.info("GENERATE", "Изображение сгенерировано", { style, model: modelGeneration })
-            return NextResponse.json({ imageUrl })
+    async function generateWithModel(model: string, attempts: number): Promise<GenerateModelResult> {
+      let lastStatus: number | undefined
+      let lastErrorText = ""
+
+      for (let attempt = 1; attempt <= attempts; attempt++) {
+        const response = await fetchWithProxy(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(geminiBody),
           }
+        )
+
+        if (response.ok) {
+          const geminiData = await response.json()
+          const responseParts = geminiData.candidates?.[0]?.content?.parts
+          if (responseParts) {
+            for (const part of responseParts) {
+              if (part.inlineData?.data) {
+                let imageUrl = `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}`
+                try {
+                  imageUrl = await applyOverlayLogo(imageUrl, appSettings)
+                } catch (error) {
+                  logger.warn("GENERATE", "Не удалось наложить логотип поверх изображения", {
+                    model,
+                    attempt,
+                    error: error instanceof Error ? error.message : String(error),
+                  })
+                }
+                logger.info("GENERATE", "Изображение сгенерировано", { style, model, attempt })
+                return { ok: true, imageUrl }
+              }
+            }
+          }
+
+          lastStatus = response.status
+          lastErrorText = "Модель не вернула изображение"
+          logger.warn("GENERATE", "Модель не вернула изображение, повторяем запрос", {
+            model,
+            attempt,
+          })
+        } else {
+          lastStatus = response.status
+          lastErrorText = await response.text()
+          logger.warn("GENERATE", "Модель генерации вернула ошибку", {
+            model,
+            attempt,
+            status: response.status,
+            body: lastErrorText.slice(0, 400),
+          })
+        }
+
+        if (attempt < attempts) {
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt))
         }
       }
-    } else {
-      gemini3ErrorText = await geminiResponse.text()
-      logger.warn("GENERATE", "Модель генерации не вернула изображение", { model: modelGeneration, status: geminiResponse.status, body: gemini3ErrorText.slice(0, 400) })
+
+      return { ok: false, status: lastStatus, errorText: lastErrorText }
+    }
+
+    const primaryResult = await generateWithModel(modelGeneration, PRIMARY_MODEL_ATTEMPTS)
+    if (primaryResult.ok) {
+      return NextResponse.json({ imageUrl: primaryResult.imageUrl })
     }
 
     // 2) Fallback: gemini-2.5-flash-image (тот же API generateContent)
     const fallbackModel = "gemini-2.5-flash-image"
-    if (modelGeneration !== fallbackModel) {
-      const fallbackResponse = await fetchWithProxy(
-        `https://generativelanguage.googleapis.com/v1beta/models/${fallbackModel}:generateContent?key=${geminiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(geminiBody),
-        }
-      )
+    let finalErrorText = primaryResult.errorText
+    let finalStatus = primaryResult.status
 
-      if (fallbackResponse.ok) {
-        const fallbackData = await fallbackResponse.json()
-        const fallbackParts = fallbackData.candidates?.[0]?.content?.parts
-        if (fallbackParts) {
-          for (const part of fallbackParts) {
-            if (part.inlineData?.data) {
-              const imageUrl = `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}`
-              logger.info("GENERATE", "Изображение сгенерировано (fallback)", { style, model: fallbackModel })
-              return NextResponse.json({ imageUrl })
-            }
-          }
-        }
+    if (modelGeneration !== fallbackModel) {
+      logger.warn("GENERATE", "Переходим на fallback после неудачных попыток основной модели", {
+        model: modelGeneration,
+        attempts: PRIMARY_MODEL_ATTEMPTS,
+      })
+
+      const fallbackResult = await generateWithModel(fallbackModel, 1)
+      if (fallbackResult.ok) {
+        logger.info("GENERATE", "Изображение сгенерировано через fallback", { style, model: fallbackModel })
+        return NextResponse.json({ imageUrl: fallbackResult.imageUrl })
       }
+
+      finalErrorText = fallbackResult.errorText || finalErrorText
+      finalStatus = fallbackResult.status ?? finalStatus
     }
 
     // Оба варианта не дали картинку — возвращаем ошибку
-    const lastError = gemini3ErrorText
+    const lastError = finalErrorText
     let userMessage = "Изображение не сгенерировано. Попробуйте другое фото или промпт."
     try {
       if (lastError) {
@@ -228,7 +268,11 @@ export async function POST(request: NextRequest) {
     } catch {
       if (lastError.length < 300) userMessage = lastError
     }
-    logger.error("GENERATE", "Ни выбранная модель, ни fallback не вернули изображение", { model: modelGeneration, geminiStatus: geminiResponse.status })
+    logger.error("GENERATE", "Ни выбранная модель, ни fallback не вернули изображение", {
+      model: modelGeneration,
+      geminiStatus: finalStatus,
+      primaryAttempts: PRIMARY_MODEL_ATTEMPTS,
+    })
     return NextResponse.json(
       { error: userMessage },
       { status: 500 }

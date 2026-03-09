@@ -3,7 +3,7 @@ import { Toaster } from 'sonner'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'PhotoHUB - удобная пакетная обработка фотографий для вашей организации',
+  title: 'Национальный медицинский исследовательский центр здоровья детей - генератор портретов',
   description: 'Система генерации профессиональных портретов для медучреждений',
   icons: { icon: '/favicon.png' },
 }

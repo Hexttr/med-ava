@@ -1,12 +1,19 @@
 import { getDb } from "./db"
 import { MODEL_ANALYSIS_OPTIONS, MODEL_GENERATION_OPTIONS } from "./model-options"
 
+export type OverlayLogoPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right"
+
 const KEYS = {
   organizationName: "organization_name",
   backgroundMedical: "background_medical",
   backgroundCorporate: "background_corporate",
   backgroundMedicalImage: "background_medical_image",
   backgroundCorporateImage: "background_corporate_image",
+  overlayLogoEnabled: "overlay_logo_enabled",
+  overlayLogoPath: "overlay_logo_path",
+  overlayLogoPosition: "overlay_logo_position",
+  overlayLogoSizePercent: "overlay_logo_size_percent",
+  overlayLogoPadding: "overlay_logo_padding",
   backgroundMode: "background_mode",
   modelAnalysis: "model_analysis",
   modelGeneration: "model_generation",
@@ -23,6 +30,11 @@ export interface AppSettings {
   backgroundCorporate: string
   backgroundMedicalImage: string
   backgroundCorporateImage: string
+  overlayLogoEnabled: boolean
+  overlayLogoPath: string
+  overlayLogoPosition: OverlayLogoPosition
+  overlayLogoSizePercent: number
+  overlayLogoPadding: number
   backgroundMode: "description" | "image"
   modelAnalysis: string
   modelGeneration: string
@@ -39,6 +51,11 @@ const ALL_KEYS = [
   KEYS.backgroundCorporate,
   KEYS.backgroundMedicalImage,
   KEYS.backgroundCorporateImage,
+  KEYS.overlayLogoEnabled,
+  KEYS.overlayLogoPath,
+  KEYS.overlayLogoPosition,
+  KEYS.overlayLogoSizePercent,
+  KEYS.overlayLogoPadding,
   KEYS.backgroundMode,
   KEYS.modelAnalysis,
   KEYS.modelGeneration,
@@ -54,12 +71,25 @@ export function getAppSettings(): AppSettings {
   const placeholders = ALL_KEYS.map(() => "?").join(", ")
   const rows = db.prepare(`SELECT key, value FROM app_settings WHERE key IN (${placeholders})`).all(...ALL_KEYS) as Array<{ key: string; value: string | null }>
   const map = new Map(rows.map((r) => [r.key, r.value ?? ""]))
+  const overlayLogoPosition = map.get(KEYS.overlayLogoPosition)
+  const overlayLogoSizePercent = Number(map.get(KEYS.overlayLogoSizePercent) || 16)
+  const overlayLogoPadding = Number(map.get(KEYS.overlayLogoPadding) || 24)
   return {
     organizationName: map.get(KEYS.organizationName) ?? "",
     backgroundMedical: map.get(KEYS.backgroundMedical) ?? "",
     backgroundCorporate: map.get(KEYS.backgroundCorporate) ?? "",
     backgroundMedicalImage: map.get(KEYS.backgroundMedicalImage) ?? "",
     backgroundCorporateImage: map.get(KEYS.backgroundCorporateImage) ?? "",
+    overlayLogoEnabled: map.get(KEYS.overlayLogoEnabled) === "true",
+    overlayLogoPath: map.get(KEYS.overlayLogoPath) ?? "",
+    overlayLogoPosition:
+      overlayLogoPosition === "top-left" ||
+      overlayLogoPosition === "bottom-left" ||
+      overlayLogoPosition === "bottom-right"
+        ? overlayLogoPosition
+        : "top-right",
+    overlayLogoSizePercent: Number.isFinite(overlayLogoSizePercent) ? overlayLogoSizePercent : 16,
+    overlayLogoPadding: Number.isFinite(overlayLogoPadding) ? overlayLogoPadding : 24,
     backgroundMode: (map.get(KEYS.backgroundMode) === "image" ? "image" : "description") as "description" | "image",
     modelAnalysis: map.get(KEYS.modelAnalysis) || MODEL_ANALYSIS_OPTIONS[0].value,
     modelGeneration: map.get(KEYS.modelGeneration) || MODEL_GENERATION_OPTIONS[0].value,
@@ -80,6 +110,11 @@ export function setAppSettings(updates: Partial<AppSettings>): void {
     [KEYS.backgroundCorporate, "backgroundCorporate"],
     [KEYS.backgroundMedicalImage, "backgroundMedicalImage"],
     [KEYS.backgroundCorporateImage, "backgroundCorporateImage"],
+    [KEYS.overlayLogoEnabled, "overlayLogoEnabled"],
+    [KEYS.overlayLogoPath, "overlayLogoPath"],
+    [KEYS.overlayLogoPosition, "overlayLogoPosition"],
+    [KEYS.overlayLogoSizePercent, "overlayLogoSizePercent"],
+    [KEYS.overlayLogoPadding, "overlayLogoPadding"],
     [KEYS.backgroundMode, "backgroundMode"],
     [KEYS.modelAnalysis, "modelAnalysis"],
     [KEYS.modelGeneration, "modelGeneration"],

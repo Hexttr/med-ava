@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getAppSettings, setAppSettings } from "@/lib/app-settings"
+import { getAppSettings, setAppSettings, type OverlayLogoPosition } from "@/lib/app-settings"
 import { logger } from "@/lib/logger"
 import { enforceTrustedOrigin } from "@/lib/request-security"
 
@@ -26,6 +26,11 @@ export async function PATCH(request: NextRequest) {
       organizationName?: string
       backgroundMedical?: string
       backgroundCorporate?: string
+      overlayLogoEnabled?: boolean
+      overlayLogoPath?: string
+      overlayLogoPosition?: OverlayLogoPosition
+      overlayLogoSizePercent?: number
+      overlayLogoPadding?: number
       backgroundMode?: "description" | "image"
       modelAnalysis?: string
       modelGeneration?: string
@@ -38,6 +43,22 @@ export async function PATCH(request: NextRequest) {
     if (typeof body?.organizationName === "string") updates.organizationName = body.organizationName
     if (typeof body?.backgroundMedical === "string") updates.backgroundMedical = body.backgroundMedical
     if (typeof body?.backgroundCorporate === "string") updates.backgroundCorporate = body.backgroundCorporate
+    if (typeof body?.overlayLogoEnabled === "boolean") updates.overlayLogoEnabled = body.overlayLogoEnabled
+    if (typeof body?.overlayLogoPath === "string") updates.overlayLogoPath = body.overlayLogoPath
+    if (
+      body?.overlayLogoPosition === "top-left" ||
+      body?.overlayLogoPosition === "top-right" ||
+      body?.overlayLogoPosition === "bottom-left" ||
+      body?.overlayLogoPosition === "bottom-right"
+    ) {
+      updates.overlayLogoPosition = body.overlayLogoPosition
+    }
+    if (typeof body?.overlayLogoSizePercent === "number" && Number.isFinite(body.overlayLogoSizePercent)) {
+      updates.overlayLogoSizePercent = Math.min(35, Math.max(5, Math.round(body.overlayLogoSizePercent)))
+    }
+    if (typeof body?.overlayLogoPadding === "number" && Number.isFinite(body.overlayLogoPadding)) {
+      updates.overlayLogoPadding = Math.min(96, Math.max(0, Math.round(body.overlayLogoPadding)))
+    }
     if (body?.backgroundMode === "description" || body?.backgroundMode === "image") updates.backgroundMode = body.backgroundMode
     if (typeof body?.modelAnalysis === "string") updates.modelAnalysis = body.modelAnalysis
     if (typeof body?.modelGeneration === "string") updates.modelGeneration = body.modelGeneration
