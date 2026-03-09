@@ -459,260 +459,222 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
 
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-none bg-primary/10">
-              <Stamp className="size-5 text-primary" />
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-none bg-primary/10">
+                <Stamp className="size-5 text-primary" />
+              </div>
+              <CardTitle className="text-base">Вставка логотипа</CardTitle>
             </div>
-            <div>
-              <CardTitle className="text-base">Логотип поверх портрета</CardTitle>
-              <CardDescription>
-                PNG-логотип накладывается сервером поверх финального изображения и попадает в скачанный файл.
-              </CardDescription>
+            <div className="flex items-center gap-3 rounded-full border border-border bg-muted/30 px-4 py-2 shadow-sm">
+              <div className="space-y-0.5 text-right">
+                <p className="text-sm font-medium text-foreground">Режим вставки</p>
+                <p className="text-xs text-muted-foreground">{overlayLogoEnabled ? "Включен" : "Выключен"}</p>
+              </div>
+              <Switch checked={overlayLogoEnabled} onCheckedChange={setOverlayLogoEnabled} />
             </div>
           </div>
         </CardHeader>
-        <CardContent className="flex flex-col gap-6">
-          <div className="rounded-3xl border border-border/70 bg-linear-to-br from-primary/[0.04] via-background to-slate-50 p-4 shadow-sm">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-foreground">Логотип встраивается прямо в итоговый файл</p>
-                <p className="max-w-xl text-sm text-muted-foreground">
-                  Наложение происходит после генерации на сервере через `Sharp`, поэтому логотип сохраняется и в галерее, и в скачанном изображении.
-                </p>
-              </div>
-              <div className="flex items-center gap-3 rounded-2xl border border-border/80 bg-background/90 px-4 py-3 shadow-sm">
-                <div className="space-y-0.5">
-                  <p className="text-sm font-medium text-foreground">Режим наложения</p>
-                  <p className="text-xs text-muted-foreground">{overlayLogoEnabled ? "Включен" : "Выключен"}</p>
-                </div>
-                <Switch checked={overlayLogoEnabled} onCheckedChange={setOverlayLogoEnabled} />
+        <CardContent className="flex flex-col gap-5">
+          <div className="space-y-3">
+            <Label className="text-sm font-semibold">Превью результата</Label>
+            <div className="rounded-[2rem] border border-border/80 bg-white p-3 shadow-sm">
+              <div className="relative aspect-[3/4] overflow-hidden rounded-[1.5rem] bg-slate-100">
+                <img
+                  src="/exz.jpg"
+                  alt="Превью портрета"
+                  className="h-full w-full object-cover"
+                />
+                <div className="absolute inset-0 bg-linear-to-t from-slate-950/12 via-transparent to-transparent" />
+                {overlayLogoEnabled && overlayLogoPreviewUrl ? (
+                  <img
+                    src={overlayLogoPreviewUrl}
+                    alt="Превью логотипа"
+                    className={[
+                      "absolute z-10 w-auto object-contain drop-shadow-[0_8px_24px_rgba(15,23,42,0.18)]",
+                      overlayLogoPosition === "top-left" ? "left-0 top-0" : "",
+                      overlayLogoPosition === "top-right" ? "right-0 top-0" : "",
+                      overlayLogoPosition === "bottom-left" ? "bottom-0 left-0" : "",
+                      overlayLogoPosition === "bottom-right" ? "bottom-0 right-0" : "",
+                    ].join(" ")}
+                    style={{
+                      width: `${overlayLogoSizePercent}%`,
+                      margin: `${overlayLogoPadding}px`,
+                    }}
+                  />
+                ) : (
+                  <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-slate-950/72 px-4 py-3 text-center text-xs leading-5 text-white backdrop-blur-sm">
+                    Загрузите PNG и сохраните настройки, чтобы увидеть результат прямо на фото.
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_320px]">
-            <div className="space-y-5">
-              <div className="rounded-3xl border border-border bg-background p-5 shadow-sm">
-                <div className="flex flex-col gap-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1">
-                      <Label className="text-sm font-semibold">PNG-логотип</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Лучше всего работает прозрачный PNG без лишних полей по краям.
+          <div className="rounded-3xl border border-border bg-background p-5 shadow-sm">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <Label className="text-sm font-semibold">PNG-логотип</Label>
+                  <p className="text-xs text-muted-foreground">Загрузите прозрачный PNG и при необходимости замените его здесь.</p>
+                </div>
+                <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px]">
+                  Только PNG
+                </Badge>
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-border/80 bg-muted/25 p-4">
+                {overlayLogoPreviewUrl ? (
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-border bg-white p-3 shadow-sm">
+                      <img
+                        src={overlayLogoPreviewUrl}
+                        alt="Логотип"
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {overlayLogoFile ? overlayLogoFile.name : "Текущий логотип"}
+                      </p>
+                      <p className="text-xs leading-5 text-muted-foreground">
+                        Используется для наложения на новые сгенерированные портреты.
                       </p>
                     </div>
-                    <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px]">
-                      Только PNG
-                    </Badge>
                   </div>
-
-                  <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-border/80 bg-muted/25 p-4 md:flex-row md:items-center">
-                    {overlayLogoPreviewUrl ? (
-                      <>
-                        <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-border bg-white p-3 shadow-sm">
-                          <img
-                            src={overlayLogoPreviewUrl}
-                            alt="Логотип"
-                            className="max-h-full max-w-full object-contain"
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <p className="truncate text-sm font-medium text-foreground">
-                            {overlayLogoFile ? overlayLogoFile.name : "Текущий логотип"}
-                          </p>
-                          <p className="text-xs leading-5 text-muted-foreground">
-                            Этот логотип будет накладываться поверх всех новых сгенерированных портретов.
-                          </p>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <p className="text-sm font-medium text-foreground">Логотип еще не загружен</p>
-                        <p className="text-xs leading-5 text-muted-foreground">
-                          Загрузите PNG, чтобы сразу увидеть результат в превью справа.
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap gap-2">
-                      <Input
-                        ref={overlayLogoFileRef}
-                        type="file"
-                        accept="image/png"
-                        onChange={(e) => {
-                          setOverlayLogoFile(e.target.files?.[0] ?? null)
-                          setClearOverlayLogoRequested(false)
-                        }}
-                        className="hidden"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="rounded-xl"
-                        onClick={() => overlayLogoFileRef.current?.click()}
-                      >
-                        <Upload className="mr-2 size-4" />
-                        {overlayLogoPreviewUrl ? "Заменить PNG" : "Загрузить PNG"}
-                      </Button>
-                      {overlayLogoPreviewUrl && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="rounded-xl text-muted-foreground"
-                          onClick={() => {
-                            setOverlayLogoFile(null)
-                            if (overlayLogoFileRef.current) overlayLogoFileRef.current.value = ""
-                            if (initialAppSettings?.overlayLogoPath || overlayLogoPreviewUrl) {
-                              setClearOverlayLogoRequested(true)
-                            }
-                          }}
-                        >
-                          <Trash2 className="mr-2 size-4" />
-                          Удалить
-                        </Button>
-                      )}
-                    </div>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">Логотип еще не загружен</p>
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      После загрузки вы сразу увидите его в превью выше.
+                    </p>
                   </div>
-                </div>
-              </div>
+                )}
 
-              <div className="grid gap-5 lg:grid-cols-2">
-                <div className="rounded-3xl border border-border bg-background p-5 shadow-sm">
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                      <Label className="text-sm font-semibold">Положение логотипа</Label>
-                      <p className="text-xs text-muted-foreground">Выберите угол, в котором логотип будет встроен в портрет.</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { value: "top-left", label: "Слева сверху" },
-                        { value: "top-right", label: "Справа сверху" },
-                        { value: "bottom-left", label: "Слева снизу" },
-                        { value: "bottom-right", label: "Справа снизу" },
-                      ].map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => setOverlayLogoPosition(option.value as typeof overlayLogoPosition)}
-                          className={cn(
-                            "rounded-2xl border px-3 py-3 text-left text-sm transition-colors",
-                            overlayLogoPosition === option.value
-                              ? "border-primary bg-primary/8 text-foreground shadow-sm"
-                              : "border-border bg-muted/20 text-muted-foreground hover:bg-muted/40"
-                          )}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border border-border bg-background p-5 shadow-sm">
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                      <Label htmlFor="overlay-padding" className="text-sm font-semibold">Отступ от края</Label>
-                      <p className="text-xs text-muted-foreground">Чем больше значение, тем дальше логотип от края изображения.</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Input
-                        id="overlay-padding"
-                        type="number"
-                        min={0}
-                        max={96}
-                        value={overlayLogoPadding}
-                        onChange={(e) => setOverlayLogoPadding(Math.min(96, Math.max(0, Number(e.target.value) || 0)))}
-                        className="rounded-xl"
-                      />
-                      <span className="text-sm text-muted-foreground">px</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-border bg-background p-5 shadow-sm">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <Label className="text-sm font-semibold">Размер логотипа</Label>
-                      <p className="text-xs text-muted-foreground">Размер считается в процентах от ширины итогового изображения.</p>
-                    </div>
-                    <div className="rounded-full bg-primary/8 px-3 py-1 text-sm font-medium text-primary">
-                      {overlayLogoSizePercent}% ширины
-                    </div>
-                  </div>
-                  <Slider
-                    min={5}
-                    max={35}
-                    step={1}
-                    value={[overlayLogoSizePercent]}
-                    onValueChange={(values) => setOverlayLogoSizePercent(values[0] ?? 16)}
+                <div className="flex flex-wrap gap-2">
+                  <Input
+                    ref={overlayLogoFileRef}
+                    type="file"
+                    accept="image/png"
+                    onChange={(e) => {
+                      setOverlayLogoFile(e.target.files?.[0] ?? null)
+                      setClearOverlayLogoRequested(false)
+                    }}
+                    className="hidden"
                   />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3 rounded-3xl border border-border bg-background p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-foreground">Сохранение блока</p>
-                  <p className="text-xs text-muted-foreground">
-                    Переключатель, PNG, позиция, размер и отступ сохраняются этой кнопкой.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px]">
-                    {isOverlayDirty ? "Есть несохраненные изменения" : "Все сохранено"}
-                  </Badge>
                   <Button
                     type="button"
-                    onClick={handleSaveOverlaySection}
-                    disabled={appPending}
-                    className="rounded-xl px-5"
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl"
+                    onClick={() => overlayLogoFileRef.current?.click()}
                   >
-                    <Save className="mr-2 size-4" />
-                    Сохранить
+                    <Upload className="mr-2 size-4" />
+                    {overlayLogoPreviewUrl ? "Заменить PNG" : "Загрузить PNG"}
                   </Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <Label className="text-sm font-semibold">Превью результата</Label>
-              <div className="rounded-[2rem] border border-border/80 bg-white p-3 shadow-sm">
-                <div className="relative aspect-[3/4] overflow-hidden rounded-[1.5rem] bg-slate-100">
-                  <img
-                    src="/exz.jpg"
-                    alt="Превью портрета"
-                    className="h-full w-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-linear-to-t from-slate-950/12 via-transparent to-transparent" />
-                  {overlayLogoEnabled && overlayLogoPreviewUrl ? (
-                    <img
-                      src={overlayLogoPreviewUrl}
-                      alt="Превью логотипа"
-                      className={[
-                        "absolute z-10 w-auto object-contain drop-shadow-[0_8px_24px_rgba(15,23,42,0.18)]",
-                        overlayLogoPosition === "top-left" ? "left-0 top-0" : "",
-                        overlayLogoPosition === "top-right" ? "right-0 top-0" : "",
-                        overlayLogoPosition === "bottom-left" ? "bottom-0 left-0" : "",
-                        overlayLogoPosition === "bottom-right" ? "bottom-0 right-0" : "",
-                      ].join(" ")}
-                      style={{
-                        width: `${overlayLogoSizePercent}%`,
-                        margin: `${overlayLogoPadding}px`,
+                  {overlayLogoPreviewUrl && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-xl text-muted-foreground"
+                      onClick={() => {
+                        setOverlayLogoFile(null)
+                        if (overlayLogoFileRef.current) overlayLogoFileRef.current.value = ""
+                        if (initialAppSettings?.overlayLogoPath || overlayLogoPreviewUrl) {
+                          setClearOverlayLogoRequested(true)
+                        }
                       }}
-                    />
-                  ) : (
-                    <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-slate-950/72 px-4 py-3 text-center text-xs leading-5 text-white backdrop-blur-sm">
-                      Загрузите PNG и сохраните настройки, чтобы увидеть итоговый вариант прямо на фото.
-                    </div>
+                    >
+                      <Trash2 className="mr-2 size-4" />
+                      Удалить
+                    </Button>
                   )}
                 </div>
               </div>
-              <div className="rounded-2xl border border-border/70 bg-muted/25 px-4 py-3 text-xs leading-5 text-muted-foreground">
-                Превью в этом блоке показано для ориентира. Финальное наложение выполняется на сервере и встраивается прямо в скачиваемый файл.
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-border bg-background p-5 shadow-sm">
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold">Положение логотипа</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: "top-left", label: "Слева сверху" },
+                    { value: "top-right", label: "Справа сверху" },
+                    { value: "bottom-left", label: "Слева снизу" },
+                    { value: "bottom-right", label: "Справа снизу" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setOverlayLogoPosition(option.value as typeof overlayLogoPosition)}
+                      className={cn(
+                        "rounded-2xl border px-3 py-3 text-left text-sm transition-colors",
+                        overlayLogoPosition === option.value
+                          ? "border-primary bg-primary/8 text-foreground shadow-sm"
+                          : "border-border bg-muted/20 text-muted-foreground hover:bg-muted/40"
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-4">
+                  <Label className="text-sm font-semibold">Размер логотипа</Label>
+                  <div className="rounded-full bg-primary/8 px-3 py-1 text-sm font-medium text-primary">
+                    {overlayLogoSizePercent}% ширины
+                  </div>
+                </div>
+                <Slider
+                  min={5}
+                  max={35}
+                  step={1}
+                  value={[overlayLogoSizePercent]}
+                  onValueChange={(values) => setOverlayLogoSizePercent(values[0] ?? 16)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="overlay-padding" className="text-sm font-semibold">Отступ от края</Label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    id="overlay-padding"
+                    type="number"
+                    min={0}
+                    max={96}
+                    value={overlayLogoPadding}
+                    onChange={(e) => setOverlayLogoPadding(Math.min(96, Math.max(0, Number(e.target.value) || 0)))}
+                    className="rounded-xl"
+                  />
+                  <span className="text-sm text-muted-foreground">px</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 rounded-3xl border border-border bg-background p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-foreground">Сохранение</p>
+              <p className="text-xs text-muted-foreground">Сначала измените параметры, затем сохраните этот блок.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px]">
+                {isOverlayDirty ? "Есть несохраненные изменения" : "Все сохранено"}
+              </Badge>
+              <Button
+                type="button"
+                onClick={handleSaveOverlaySection}
+                disabled={appPending}
+                className="rounded-xl px-5"
+              >
+                <Save className="mr-2 size-4" />
+                Сохранить
+              </Button>
             </div>
           </div>
         </CardContent>
