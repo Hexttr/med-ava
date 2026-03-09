@@ -21,6 +21,9 @@ export function proxy(request: NextRequest) {
   if (!isAuthEnabled()) return NextResponse.next()
 
   const pathname = request.nextUrl.pathname
+  if (/\.[^/]+$/.test(pathname)) {
+    return NextResponse.next()
+  }
   if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
     return NextResponse.next()
   }

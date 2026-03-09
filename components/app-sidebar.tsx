@@ -25,6 +25,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -58,7 +59,11 @@ const navItems = [
   },
 ]
 
-const INSTITUTION_NAME = "Национальный медицинский исследовательский центр здоровья детей"
+const INSTITUTION_NAME_LINES = [
+  "Национальный медицинский",
+  "исследовательский центр",
+  "здоровья детей",
+]
 const SIDEBAR_SUBTITLE = "Корпоративный генератор портретов"
 
 export function AppSidebar() {
@@ -88,7 +93,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="relative px-4 py-5">
+      <SidebarHeader className="relative px-4 pt-5 pb-3">
         {isMobile && (
           <Button
             type="button"
@@ -101,32 +106,38 @@ export function AppSidebar() {
             <X className="size-5" />
           </Button>
         )}
-        <Link href="/" className="flex items-center gap-3 pr-8">
-          <div className="hidden size-9 shrink-0 items-center justify-center rounded-none border border-sidebar-border/60 bg-white group-data-[collapsible=icon]:flex">
+        <Link href="/" className="block pr-8">
+          <div className="hidden h-11 w-11 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-black/5 group-data-[collapsible=icon]:flex">
             <Image
               src="/nczd-logo-blue.png"
               alt="Логотип НМИЦ здоровья детей"
-              width={24}
-              height={24}
-              className="size-6 object-contain"
+              width={28}
+              height={28}
+              className="size-7 object-contain"
             />
           </div>
-          <div className="flex min-w-0 flex-col gap-2 group-data-[collapsible=icon]:hidden w-full">
-            <div className="flex items-start gap-3 rounded-none border border-sidebar-border/60 bg-sidebar-accent/20 px-3 py-3">
-              <div className="flex size-14 shrink-0 items-center justify-center rounded-none border border-sidebar-border/60 bg-white">
-                <Image
-                  src="/nczd-logo-blue.png"
-                  alt="Логотип НМИЦ здоровья детей"
-                  width={40}
-                  height={40}
-                  className="h-10 w-auto object-contain"
-                />
+          <div className="group-data-[collapsible=icon]:hidden">
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm">
+              <div className="flex justify-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+                  <Image
+                    src="/nczd-logo-blue.png"
+                    alt="Логотип НМИЦ здоровья детей"
+                    width={44}
+                    height={44}
+                    className="h-11 w-auto object-contain"
+                  />
+                </div>
               </div>
-              <div className="min-w-0 space-y-1">
-                <p className="text-sm font-semibold leading-tight text-sidebar-foreground">
-                  {INSTITUTION_NAME}
-                </p>
-                <p className="text-[11px] leading-tight text-sidebar-foreground/70">
+              <div className="mt-4 space-y-2 text-center">
+                <div className="space-y-0.5">
+                  {INSTITUTION_NAME_LINES.map((line) => (
+                    <p key={line} className="text-[15px] font-semibold leading-[1.2] tracking-[-0.01em] text-sidebar-foreground">
+                      {line}
+                    </p>
+                  ))}
+                </div>
+                <p className="mx-auto max-w-[15rem] text-xs leading-5 text-sidebar-foreground/72">
                   {SIDEBAR_SUBTITLE}
                 </p>
               </div>
@@ -136,7 +147,7 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupContent className="pt-4">
+          <SidebarGroupContent className="pt-2">
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
@@ -144,6 +155,8 @@ export function AppSidebar() {
                     asChild
                     isActive={pathname === item.href}
                     tooltip={item.title}
+                    size="lg"
+                    className="rounded-xl px-3"
                   >
                     <Link href={item.href}>
                       <item.icon className="size-4" />
@@ -156,13 +169,15 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarSeparator className="mx-4 bg-white/10" />
+      <SidebarFooter className="pt-3">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
               isActive={pathname === "/settings"}
               tooltip="Настройки"
+              className="rounded-xl px-3"
             >
               <Link href="/settings">
                 <Settings className="size-4" />
@@ -173,6 +188,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip="Выйти"
+              className="rounded-xl px-3"
             >
               <button
                 type="button"
