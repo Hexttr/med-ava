@@ -657,12 +657,12 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 rounded-3xl border border-border bg-background p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-3xl border border-border bg-background p-5 shadow-sm">
             <div className="space-y-1">
               <p className="text-sm font-semibold text-foreground">Сохранение</p>
               <p className="text-xs text-muted-foreground">Сначала измените параметры, затем сохраните этот блок.</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px]">
                 {isOverlayDirty ? "Есть несохраненные изменения" : "Все сохранено"}
               </Badge>
@@ -670,7 +670,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
                 type="button"
                 onClick={handleSaveOverlaySection}
                 disabled={appPending}
-                className="rounded-xl px-5"
+                className="w-full rounded-xl px-5 sm:w-auto"
               >
                 <Save className="mr-2 size-4" />
                 Сохранить
