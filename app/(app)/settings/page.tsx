@@ -4,6 +4,9 @@ import { getPromptDefaults } from "@/lib/prompts"
 import { PageHeader } from "@/components/page-header"
 import { SettingsForm } from "./settings-form"
 
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+
 export default async function SettingsPage() {
   const [geminiKey, appSettings] = await Promise.all([getGeminiKey(), getAppSettings()])
   const defaults = getPromptDefaults()

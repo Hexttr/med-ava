@@ -56,6 +56,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
   const router = useRouter()
   const [apiKey, setApiKey] = useState("")
   const [isPending, startTransition] = useTransition()
+  const [savedSettings, setSavedSettings] = useState<AppSettingsData | undefined>(initialAppSettings)
   const [bgMedical, setBgMedical] = useState(initialAppSettings?.backgroundMedical ?? "")
   const [bgCorporate, setBgCorporate] = useState(initialAppSettings?.backgroundCorporate ?? "")
   const [bgMode, setBgMode] = useState<"description" | "image">(initialAppSettings?.backgroundMode ?? "description")
@@ -84,22 +85,27 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
   const [modelGeneration, setModelGeneration] = useState(initialAppSettings?.modelGeneration ?? "gemini-3-pro-image-preview")
   const [appPending, setAppPending] = useState(false)
 
+  function syncFormWithSettings(settings: AppSettingsData) {
+    setSavedSettings(settings)
+    setBgMedical(settings.backgroundMedical ?? "")
+    setBgCorporate(settings.backgroundCorporate ?? "")
+    setBgMode(settings.backgroundMode ?? "description")
+    setPromptAnalysis(settings.promptAnalysis ?? "")
+    setPromptUniversalFraming(settings.promptUniversalFraming ?? "")
+    setPromptMedicalInstruction(settings.promptMedicalInstruction ?? "")
+    setPromptCorporateInstruction(settings.promptCorporateInstruction ?? "")
+    setPromptNegative(settings.promptNegative ?? "")
+    setOverlayLogoEnabled(settings.overlayLogoEnabled ?? false)
+    setOverlayLogoPosition(settings.overlayLogoPosition ?? "top-right")
+    setOverlayLogoSizePercent(settings.overlayLogoSizePercent ?? 16)
+    setOverlayLogoPadding(settings.overlayLogoPadding ?? 24)
+    setModelAnalysis(settings.modelAnalysis ?? "gemini-2.5-flash")
+    setModelGeneration(settings.modelGeneration ?? "gemini-3-pro-image-preview")
+  }
+
   useEffect(() => {
     if (initialAppSettings) {
-      setBgMedical(initialAppSettings.backgroundMedical)
-      setBgCorporate(initialAppSettings.backgroundCorporate)
-      setBgMode(initialAppSettings.backgroundMode ?? "description")
-      setPromptAnalysis(initialAppSettings.promptAnalysis ?? "")
-      setPromptUniversalFraming(initialAppSettings.promptUniversalFraming ?? "")
-      setPromptMedicalInstruction(initialAppSettings.promptMedicalInstruction ?? "")
-      setPromptCorporateInstruction(initialAppSettings.promptCorporateInstruction ?? "")
-      setPromptNegative(initialAppSettings.promptNegative ?? "")
-      setOverlayLogoEnabled(initialAppSettings.overlayLogoEnabled ?? false)
-      setOverlayLogoPosition(initialAppSettings.overlayLogoPosition ?? "top-right")
-      setOverlayLogoSizePercent(initialAppSettings.overlayLogoSizePercent ?? 16)
-      setOverlayLogoPadding(initialAppSettings.overlayLogoPadding ?? 24)
-      setModelAnalysis(initialAppSettings.modelAnalysis ?? "gemini-2.5-flash")
-      setModelGeneration(initialAppSettings.modelGeneration ?? "gemini-3-pro-image-preview")
+      syncFormWithSettings(initialAppSettings)
     }
   }, [initialAppSettings])
 
@@ -110,19 +116,19 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
       return () => URL.revokeObjectURL(objectUrl)
     }
 
-    if (initialAppSettings?.overlayLogoPath && !clearOverlayLogoRequested) {
-      setOverlayLogoPreviewUrl(`/api/files/${initialAppSettings.overlayLogoPath}`)
+    if (savedSettings?.overlayLogoPath && !clearOverlayLogoRequested) {
+      setOverlayLogoPreviewUrl(`/api/files/${savedSettings.overlayLogoPath}`)
       return
     }
 
     setOverlayLogoPreviewUrl(null)
-  }, [overlayLogoFile, initialAppSettings?.overlayLogoPath, clearOverlayLogoRequested])
+  }, [overlayLogoFile, savedSettings?.overlayLogoPath, clearOverlayLogoRequested])
 
   const isOverlayDirty =
-    overlayLogoEnabled !== (initialAppSettings?.overlayLogoEnabled ?? false) ||
-    overlayLogoPosition !== (initialAppSettings?.overlayLogoPosition ?? "top-right") ||
-    overlayLogoSizePercent !== (initialAppSettings?.overlayLogoSizePercent ?? 16) ||
-    overlayLogoPadding !== (initialAppSettings?.overlayLogoPadding ?? 24) ||
+    overlayLogoEnabled !== (savedSettings?.overlayLogoEnabled ?? false) ||
+    overlayLogoPosition !== (savedSettings?.overlayLogoPosition ?? "top-right") ||
+    overlayLogoSizePercent !== (savedSettings?.overlayLogoSizePercent ?? 16) ||
+    overlayLogoPadding !== (savedSettings?.overlayLogoPadding ?? 24) ||
     overlayLogoFile !== null ||
     clearOverlayLogoRequested
 
@@ -141,6 +147,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
       toast.error(overlayData.error || "Не удалось сохранить логотип")
       return false
     }
+    setSavedSettings(overlayData)
     setOverlayLogoFile(null)
     setClearOverlayLogoRequested(false)
     if (overlayLogoFileRef.current) overlayLogoFileRef.current.value = ""
@@ -163,6 +170,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
       toast.error(data.error || "Не удалось сохранить настройки логотипа")
       return false
     }
+    setSavedSettings(data)
     return true
   }
 
@@ -237,6 +245,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
           setAppPending(false)
           return
         }
+        setSavedSettings(bgData)
         setBgMedicalFile(null)
         setBgCorporateFile(null)
         setClearMedicalRequested(false)
@@ -270,6 +279,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
+        syncFormWithSettings(data)
         toast.success("Настройки приложения сохранены")
         router.refresh()
       } else {
@@ -287,6 +297,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
     try {
       if (!(await saveOverlayLogoAsset())) return
       if (!(await saveOverlaySettingsOnly())) return
+      setClearOverlayLogoRequested(false)
       toast.success("Настройки логотипа сохранены")
       router.refresh()
     } catch {
@@ -306,7 +317,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
               <Building2 className="size-5 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-base">Настройки организации</CardTitle>
+              <CardTitle className="text-base">Настройка фона</CardTitle>
               <CardDescription>
                 Фоны для портретов: описание или изображения
               </CardDescription>
@@ -357,13 +368,13 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
                 </p>
                 <div className="flex flex-col gap-2">
                   <Label>Фон 1 — медицинский</Label>
-                  {(bgMedicalFile || (initialAppSettings?.backgroundMedicalImage && !clearMedicalRequested)) && (
+                  {(bgMedicalFile || (savedSettings?.backgroundMedicalImage && !clearMedicalRequested)) && (
                     <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-2">
                       {bgMedicalFile ? (
                         <span className="text-sm">{bgMedicalFile.name}</span>
-                      ) : initialAppSettings?.backgroundMedicalImage ? (
+                      ) : savedSettings?.backgroundMedicalImage ? (
                         <img
-                          src={`/api/files/${initialAppSettings.backgroundMedicalImage}`}
+                          src={`/api/files/${savedSettings.backgroundMedicalImage}`}
                           alt="Мед. фон"
                           className="h-12 w-12 rounded object-cover"
                         />
@@ -375,7 +386,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
                         onClick={() => {
                           setBgMedicalFile(null)
                           if (medicalFileRef.current) medicalFileRef.current.value = ""
-                          if (initialAppSettings?.backgroundMedicalImage) setClearMedicalRequested(true)
+                          if (savedSettings?.backgroundMedicalImage) setClearMedicalRequested(true)
                         }}
                       >
                         <Trash2 className="size-4" />
@@ -403,13 +414,13 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
                 </div>
                 <div className="flex flex-col gap-2">
                   <Label>Фон 2 — корпоративный</Label>
-                  {(bgCorporateFile || (initialAppSettings?.backgroundCorporateImage && !clearCorporateRequested)) && (
+                  {(bgCorporateFile || (savedSettings?.backgroundCorporateImage && !clearCorporateRequested)) && (
                     <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-2">
                       {bgCorporateFile ? (
                         <span className="text-sm">{bgCorporateFile.name}</span>
-                      ) : initialAppSettings?.backgroundCorporateImage ? (
+                      ) : savedSettings?.backgroundCorporateImage ? (
                         <img
-                          src={`/api/files/${initialAppSettings.backgroundCorporateImage}`}
+                          src={`/api/files/${savedSettings.backgroundCorporateImage}`}
                           alt="Корп. фон"
                           className="h-12 w-12 rounded object-cover"
                         />
@@ -421,7 +432,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
                         onClick={() => {
                           setBgCorporateFile(null)
                           if (corporateFileRef.current) corporateFileRef.current.value = ""
-                          if (initialAppSettings?.backgroundCorporateImage) setClearCorporateRequested(true)
+                          if (savedSettings?.backgroundCorporateImage) setClearCorporateRequested(true)
                         }}
                       >
                         <Trash2 className="size-4" />
@@ -581,7 +592,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
                       onClick={() => {
                         setOverlayLogoFile(null)
                         if (overlayLogoFileRef.current) overlayLogoFileRef.current.value = ""
-                        if (initialAppSettings?.overlayLogoPath || overlayLogoPreviewUrl) {
+                        if (savedSettings?.overlayLogoPath || overlayLogoPreviewUrl) {
                           setClearOverlayLogoRequested(true)
                         }
                       }}
