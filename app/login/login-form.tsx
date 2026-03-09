@@ -1,16 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { Lock, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { sanitizeAppRedirectPath } from "@/lib/url-safety"
 
 export function LoginForm() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [password, setPassword] = useState("")
   const [csrfToken, setCsrfToken] = useState("")
@@ -40,7 +40,7 @@ export function LoginForm() {
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.success) {
         toast.success("Вход выполнен")
-        const redirect = searchParams.get("redirect") || "/"
+        const redirect = sanitizeAppRedirectPath(searchParams.get("redirect"))
         window.location.assign(redirect)
       } else {
         toast.error(data.error || "Неверный пароль")

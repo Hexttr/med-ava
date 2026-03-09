@@ -7,6 +7,7 @@ import { getAbsolutePath } from "@/lib/storage"
 import { fetchWithProxy } from "@/lib/fetch-proxy"
 import { logger } from "@/lib/logger"
 import { checkRateLimit } from "@/lib/rate-limit"
+import { enforceTrustedOrigin, getClientIp } from "@/lib/request-security"
 import {
   getUniversalFraming,
   getMedicalInstruction,
@@ -18,16 +19,13 @@ import { preprocessForGemini } from "@/lib/image-preprocess"
 export const runtime = "nodejs"
 export const maxDuration = 60
 
-function getClientIp(request: NextRequest): string {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown"
-}
-
 export async function POST(request: NextRequest) {
   try {
+    const originError = enforceTrustedOrigin(request)
+    if (originError) return originError
+
     const ip = getClientIp(request)
-    const { allowed, remaining, resetIn } = checkRateLimit(`generate:${ip}`)
+    const { allowed, resetIn } = checkRateLimit(`generate:${ip}`)
     if (!allowed) {
       return NextResponse.json(
         { error: `Превышен лимит запросов. Повторите через ${resetIn} сек.` },
@@ -50,6 +48,7 @@ export async function POST(request: NextRequest) {
       referencePhotoBase64?: string
       referencePhotoMimeType?: string
     }
+    void referencePhotoMimeType
 
     if (!prompt) {
       return NextResponse.json(

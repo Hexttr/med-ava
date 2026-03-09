@@ -1,13 +1,14 @@
 import { cookies } from "next/headers"
 import crypto from "crypto"
 
+import { getSessionSecret } from "@/lib/runtime-config"
+
 export const SESSION_COOKIE = "eam_session"
 const CSRF_COOKIE = "eam_csrf"
-const SESSION_SECRET = process.env.EAM_PASSWORD || "eam-default-secret"
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 7 // 7 дней
 
 function getSecret(): string {
-  return process.env.EAM_PASSWORD || "eam-default-secret"
+  return getSessionSecret()
 }
 
 function sign(value: string): string {

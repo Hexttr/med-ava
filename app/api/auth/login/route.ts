@@ -1,25 +1,26 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createSessionToken, SESSION_COOKIE, SESSION_MAX_AGE, verifyCsrf, checkLoginRateLimit, clearLoginRateLimit } from "@/lib/auth"
 import { logger } from "@/lib/logger"
+import { enforceTrustedOrigin, getClientIp, withNoStore } from "@/lib/request-security"
 
 export const dynamic = "force-dynamic"
 
-function getClientIp(request: NextRequest): string {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown"
-}
-
 export async function POST(request: NextRequest) {
   try {
+    const originError = enforceTrustedOrigin(request)
+    if (originError) {
+      logger.warn("AUTH", "Rejected login request from untrusted origin")
+      return withNoStore(originError)
+    }
+
     const ip = getClientIp(request)
-    const { allowed, remainingAttempts } = checkLoginRateLimit(ip)
+    const { allowed } = checkLoginRateLimit(ip)
     if (!allowed) {
       logger.warn("AUTH", "Login rate limit exceeded", { ip })
-      return NextResponse.json(
+      return withNoStore(NextResponse.json(
         { success: false, error: "Слишком много попыток. Повторите через 15 минут." },
         { status: 429 }
-      )
+      ))
     }
 
     const body = await request.json()
@@ -27,31 +28,31 @@ export async function POST(request: NextRequest) {
     const csrfToken = typeof body?.csrfToken === "string" ? body.csrfToken : ""
 
     if (!password) {
-      return NextResponse.json({ success: false, error: "Введите пароль" }, { status: 400 })
+      return withNoStore(NextResponse.json({ success: false, error: "Введите пароль" }, { status: 400 }))
     }
 
     const validCsrf = await verifyCsrf(csrfToken)
     if (!validCsrf) {
       logger.warn("AUTH", "Invalid CSRF token")
-      return NextResponse.json(
+      return withNoStore(NextResponse.json(
         { success: false, error: "Сессия истекла. Обновите страницу." },
         { status: 400 }
-      )
+      ))
     }
 
     const expected = process.env.EAM_PASSWORD?.trim()
     if (!expected) {
-      return NextResponse.json(
+      return withNoStore(NextResponse.json(
         { success: false, error: "Авторизация не настроена" },
         { status: 500 }
-      )
+      ))
     }
 
     if (password !== expected) {
-      return NextResponse.json(
+      return withNoStore(NextResponse.json(
         { success: false, error: "Неверный пароль" },
         { status: 401 }
-      )
+      ))
     }
 
     clearLoginRateLimit(ip)
@@ -64,12 +65,12 @@ export async function POST(request: NextRequest) {
       maxAge: SESSION_MAX_AGE,
       path: "/",
     })
-    return response
+    return withNoStore(response)
   } catch (e) {
     logger.error("AUTH", "Login error", { error: e instanceof Error ? e.message : String(e) })
-    return NextResponse.json(
+    return withNoStore(NextResponse.json(
       { success: false, error: "Ошибка при входе" },
       { status: 500 }
-    )
+    ))
   }
 }

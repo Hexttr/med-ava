@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db"
 import { saveEmployeePhotoFromBuffer } from "@/lib/storage"
 import { validateImageFile } from "@/lib/upload-validation"
 import { logger } from "@/lib/logger"
+import { enforceTrustedOrigin } from "@/lib/request-security"
 
 const MAX_FILES = 100
 const MAX_TOTAL_SIZE = 50 * 1024 * 1024 // 50 MB суммарно
@@ -30,6 +31,9 @@ function toResponse(row: {
 
 export async function POST(request: NextRequest) {
   try {
+    const originError = enforceTrustedOrigin(request)
+    if (originError) return originError
+
     const formData = await request.formData()
     const departmentId = formData.get("departmentId") as string | null
     const files = formData.getAll("photo") as File[]

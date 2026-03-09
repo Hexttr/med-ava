@@ -39,6 +39,12 @@ import {
   deleteDepartment,
 } from "@/lib/structure-api"
 import { fetchGallery, addGalleryItem, fetchGalleryByEmployeeId, updateGalleryItem } from "@/lib/gallery-api"
+import {
+  analyzePortrait,
+  generatePortrait,
+  generatePortraitSet,
+  referencePhotoFromUrl,
+} from "@/lib/portrait-generation-client"
 import { cn } from "@/lib/utils"
 
 const UPLOAD_BATCH_LIMIT = 50
@@ -48,22 +54,6 @@ type GenStatus = "pending" | "analyzing" | "generating" | "complete" | "error"
 
 interface BatchClientProps {
   hasApiKey: boolean
-}
-
-async function urlToBase64(url: string): Promise<{ base64: string; mimeType: string }> {
-  const res = await fetch(url)
-  const blob = await res.blob()
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const dataUrl = reader.result as string
-      const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
-      if (!match) return reject(new Error("Invalid data URL"))
-      resolve({ base64: match[2], mimeType: match[1] })
-    }
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(blob)
-  })
 }
 
 function sanitizeFileName(name: string): string {
@@ -156,11 +146,6 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
     setCardsPage(1)
   }, [filterDepartmentId])
 
-  const rootEmployees = employees.filter((e) => !e.departmentId)
-  const employeesByDept = departments.map((d) => ({
-    department: d,
-    employees: employees.filter((e) => e.departmentId === d.id),
-  }))
   const allEmployees = employees
   /** Сотрудники, видимые при текущем фильтре */
   const visibleEmployees =
@@ -301,79 +286,16 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
       setGenerationState((prev) => ({ ...prev, [id]: { ...prev[id], status: "analyzing" } }))
       try {
         const photoUrl = emp.photoUrl.startsWith("http") || emp.photoUrl.startsWith("data:") ? emp.photoUrl : `${window.location.origin}${emp.photoUrl}`
-        const reference = await urlToBase64(photoUrl)
-        const formData = new FormData()
-        formData.append("employeeName", emp.name)
-        const blobRes = await fetch(photoUrl)
-        const blob = await blobRes.blob()
-        const file = new File([blob], `${emp.name}.jpg`, { type: blob.type || "image/jpeg" })
-        formData.append("photo", file)
-
-        const analyzeRes = await fetch("/api/analyze", { method: "POST", body: formData })
-        if (!analyzeRes.ok) {
-          const err = await analyzeRes.json().catch(() => ({}))
-          throw new Error(err?.error || `Ошибка анализа: ${analyzeRes.status}`)
-        }
-        const analysis = await analyzeRes.json()
+        const { file, reference } = await referencePhotoFromUrl(photoUrl, `${emp.name}.jpg`)
+        const analysis = await analyzePortrait(file, emp.name)
 
         setGenerationState((prev) => ({ ...prev, [id]: { ...prev[id], status: "generating" } }))
 
         const genMedical = mode === "all" || mode === "medical"
         const genCorporate = mode === "all" || mode === "corporate"
-        const promises: Promise<Response>[] = []
-        if (genMedical) {
-          promises.push(
-            fetch("/api/generate", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                prompt: analysis.medicalPrompt,
-                style: "medical",
-                referencePhotoBase64: reference.base64,
-                referencePhotoMimeType: reference.mimeType,
-              }),
-            })
-          )
-        }
-        if (genCorporate) {
-          promises.push(
-            fetch("/api/generate", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                prompt: analysis.corporatePrompt,
-                style: "corporate",
-                referencePhotoBase64: reference.base64,
-                referencePhotoMimeType: reference.mimeType,
-              }),
-            })
-          )
-        }
-        const results = await Promise.all(promises)
-        let medicalUrl: string | null = null
-        let corporateUrl: string | null = null
-        let idx = 0
-        if (genMedical && results[idx]) {
-          const res = results[idx]
-          if (res.ok) {
-            const data = await res.json()
-            medicalUrl = data.imageUrl
-          } else {
-            const err = await res.json().catch(() => ({}))
-            throw new Error(err?.error || `Ошибка генерации медицинского: ${res.status}`)
-          }
-          idx++
-        }
-        if (genCorporate && results[idx]) {
-          const res = results[idx]
-          if (res.ok) {
-            const data = await res.json()
-            corporateUrl = data.imageUrl
-          } else {
-            const err = await res.json().catch(() => ({}))
-            throw new Error(err?.error || `Ошибка генерации корпоративного: ${res.status}`)
-          }
-        }
+        const generated = await generatePortraitSet(analysis, reference, mode)
+        const medicalUrl = generated.medicalUrl
+        const corporateUrl = generated.corporateUrl
         setGenerationState((prev) => ({
           ...prev,
           [id]: {
@@ -417,36 +339,10 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
       setRegeneratingCard({ employeeId, style })
       try {
         const photoUrl = emp.photoUrl.startsWith("http") || emp.photoUrl.startsWith("data:") ? emp.photoUrl : `${window.location.origin}${emp.photoUrl}`
-        const reference = await urlToBase64(photoUrl)
-        const formData = new FormData()
-        formData.append("employeeName", emp.name)
-        const blobRes = await fetch(photoUrl)
-        const blob = await blobRes.blob()
-        const file = new File([blob], `${emp.name}.jpg`, { type: blob.type || "image/jpeg" })
-        formData.append("photo", file)
-        const analyzeRes = await fetch("/api/analyze", { method: "POST", body: formData })
-        if (!analyzeRes.ok) {
-          const err = await analyzeRes.json().catch(() => ({}))
-          throw new Error(err?.error || `Ошибка анализа: ${analyzeRes.status}`)
-        }
-        const analysis = await analyzeRes.json()
+        const { file, reference } = await referencePhotoFromUrl(photoUrl, `${emp.name}.jpg`)
+        const analysis = await analyzePortrait(file, emp.name)
         const prompt = style === "medical" ? analysis.medicalPrompt : analysis.corporatePrompt
-        const genRes = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt,
-            style,
-            referencePhotoBase64: reference.base64,
-            referencePhotoMimeType: reference.mimeType,
-          }),
-        })
-        if (!genRes.ok) {
-          const err = await genRes.json().catch(() => ({}))
-          throw new Error(err.error || "Ошибка генерации")
-        }
-        const data = await genRes.json()
-        const newUrl = data.imageUrl
+        const newUrl = await generatePortrait(prompt, style, reference)
         setGenerationState((prev) => ({
           ...prev,
           [employeeId]: {
@@ -519,7 +415,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         setIsProcessing(false)
       }
     },
-    [employees, generationState, processOne, generateMode, needsGeneration]
+    [employees, processOne, generateMode, needsGeneration]
   )
 
   /** Генерация только для видимых на странице сотрудников (без уже готовых) */
@@ -589,6 +485,17 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
     }
   }, [visibleEmployees, generationState])
 
+  const handleAddEmployeesInModal = useCallback(
+    async (files: FileList | File[]) => {
+      await handleDropOrSelect(
+        files,
+        filterDepartmentId === "_all" ? null : filterDepartmentId
+      )
+      setAddEmployeesOpen(false)
+    },
+    [handleDropOrSelect, filterDepartmentId]
+  )
+
   if (!hasApiKey) {
     return (
       <Card className="border-destructive/30 bg-destructive/5">
@@ -610,17 +517,6 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
       </Card>
     )
   }
-
-  const handleAddEmployeesInModal = useCallback(
-    async (files: FileList | File[]) => {
-      await handleDropOrSelect(
-        files,
-        filterDepartmentId === "_all" ? null : filterDepartmentId
-      )
-      setAddEmployeesOpen(false)
-    },
-    [handleDropOrSelect, filterDepartmentId]
-  )
 
   return (
     <div className="flex flex-col gap-6">

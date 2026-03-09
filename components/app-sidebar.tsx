@@ -70,6 +70,7 @@ export function AppSidebar({ initialOrganizationName }: AppSidebarProps) {
   const [subtitle, setSubtitle] = useState(
     initialOrganizationName?.trim() || DEFAULT_SUBTITLE
   )
+  const [loggingOut, setLoggingOut] = useState(false)
 
   useEffect(() => {
     fetch("/api/settings/app")
@@ -84,6 +85,20 @@ export function AppSidebar({ initialOrganizationName }: AppSidebarProps) {
   useEffect(() => {
     if (isMobile) setOpenMobile(false)
   }, [pathname, isMobile, setOpenMobile])
+
+  async function handleLogout() {
+    if (loggingOut) return
+
+    setLoggingOut(true)
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      })
+    } finally {
+      window.location.assign("/login")
+    }
+  }
 
   return (
     <Sidebar collapsible="icon">
@@ -157,13 +172,17 @@ export function AppSidebar({ initialOrganizationName }: AppSidebarProps) {
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
-              asChild
               tooltip="Выйти"
             >
-              <Link href="/api/auth/logout" prefetch={false} className="text-muted-foreground hover:text-foreground">
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={loggingOut}
+                className="flex w-full items-center gap-2 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+              >
                 <LogOut className="size-4" />
-                <span>Выйти</span>
-              </Link>
+                <span>{loggingOut ? "Выход..." : "Выйти"}</span>
+              </button>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

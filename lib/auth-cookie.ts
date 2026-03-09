@@ -3,10 +3,10 @@
  */
 import crypto from "crypto"
 
-const SESSION_COOKIE = "eam_session"
+import { getSessionSecret } from "@/lib/runtime-config"
 
 function getSecret(): string {
-  return process.env.EAM_PASSWORD || "eam-default-secret"
+  return getSessionSecret()
 }
 
 function sign(value: string): string {

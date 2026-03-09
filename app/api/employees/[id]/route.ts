@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db"
 import { saveEmployeePhoto, removeFile } from "@/lib/storage"
 import { validateBase64Image } from "@/lib/upload-validation"
 import { logger } from "@/lib/logger"
+import { enforceTrustedOrigin } from "@/lib/request-security"
 
 function toResponse(row: {
   id: string
@@ -63,6 +64,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const originError = enforceTrustedOrigin(request)
+    if (originError) return originError
+
     const { id } = await params
     const body = await request.json()
     const database = getDb()
@@ -131,10 +135,13 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const originError = enforceTrustedOrigin(request)
+    if (originError) return originError
+
     const { id } = await params
     const database = getDb()
     const row = database.prepare("SELECT photo_path, thumbnail_path FROM employees WHERE id = ?").get(id) as

@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db"
 import { saveEmployeePhoto } from "@/lib/storage"
 import { validateBase64Image } from "@/lib/upload-validation"
 import { logger } from "@/lib/logger"
+import { enforceTrustedOrigin } from "@/lib/request-security"
 
 function toResponse(row: {
   id: string
@@ -68,6 +69,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const originError = enforceTrustedOrigin(request)
+    if (originError) return originError
+
     const body = await request.json()
     const name = String(body?.name ?? "Сотрудник").trim()
     const photoUrl = body?.photoUrl

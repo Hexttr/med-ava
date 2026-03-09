@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAppSettings, setAppSettings } from "@/lib/app-settings"
 import { logger } from "@/lib/logger"
+import { enforceTrustedOrigin } from "@/lib/request-security"
 
 export async function GET() {
   try {
@@ -17,6 +18,9 @@ export async function GET() {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const originError = enforceTrustedOrigin(request)
+    if (originError) return originError
+
     const body = await request.json()
     const updates: {
       organizationName?: string

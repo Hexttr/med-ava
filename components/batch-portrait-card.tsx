@@ -1,5 +1,7 @@
 "use client"
 
+/* eslint-disable @next/next/no-img-element */
+
 import { X, Download, Loader2, AlertCircle, CheckCircle2, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -324,7 +326,9 @@ export function BatchPortraitCard({
             {(item.status === "pending" || item.status === "error") && onGenerate && (
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 {item.status === "error" && (
-                  <AlertCircle className="size-3.5 shrink-0 text-destructive" title={item.error} />
+                  <span title={item.error} className="flex shrink-0">
+                    <AlertCircle className="size-3.5 text-destructive" />
+                  </span>
                 )}
                 <Button
                   type="button"

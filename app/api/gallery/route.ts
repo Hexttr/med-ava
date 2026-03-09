@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db"
 import { saveBase64Image } from "@/lib/storage"
 import { validateBase64Image } from "@/lib/upload-validation"
 import { logger } from "@/lib/logger"
+import { enforceTrustedOrigin } from "@/lib/request-security"
 
 function toItemResponse(row: {
   id: string
@@ -86,6 +87,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const originError = enforceTrustedOrigin(request)
+    if (originError) return originError
+
     const body = await request.json()
     const name = String(body?.name ?? "Сотрудник").trim()
     const medicalUrl = body?.medicalUrl
@@ -105,8 +109,6 @@ export async function POST(request: NextRequest) {
     }
     const employeeId = body?.employeeId ?? null
     const database = getDb()
-    let departmentId: string | null = null
-    let departmentName: string | null = null
     if (employeeId) {
       const emp = database
         .prepare(
@@ -114,8 +116,9 @@ export async function POST(request: NextRequest) {
         )
         .get(employeeId) as { department_id: string | null; name: string | null } | undefined
       if (emp) {
-        departmentId = emp.department_id
-        departmentName = emp.name
+        // Touch the employee relationship early to validate that the referenced employee exists.
+        void emp.department_id
+        void emp.name
       }
     }
     const id = crypto.randomUUID()
@@ -140,6 +143,7 @@ export async function POST(request: NextRequest) {
       .get(id) as {
       id: string
       name: string
+      employee_name: string | null
       medical_path: string
       corporate_path: string
       employee_id: string | null

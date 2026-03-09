@@ -36,6 +36,7 @@ export async function GET() {
     env: {
       EAM_HTTPS_PROXY_set: boolean
       GEMINI_API_KEY_set: boolean
+      EAM_PASSWORD_set: boolean
       NODE_ENV: string
       proxy_type?: string
       proxy_host_port?: string

@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAppSettings, setAppSettings } from "@/lib/app-settings"
 import { saveBackgroundImage, removeFile } from "@/lib/storage"
 import { logger } from "@/lib/logger"
+import { enforceTrustedOrigin } from "@/lib/request-security"
 
 const MAX_SIZE = 10 * 1024 * 1024 // 10 MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"]
 
 export async function POST(request: NextRequest) {
   try {
+    const originError = enforceTrustedOrigin(request)
+    if (originError) return originError
+
     const formData = await request.formData()
     const current = getAppSettings()
     const updates: { backgroundMedicalImage?: string; backgroundCorporateImage?: string } = {}

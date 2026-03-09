@@ -3,7 +3,6 @@ import path from "path"
 import sharp from "sharp"
 import { getUploadsDir } from "./db"
 
-const UPLOADS = "uploads"
 const THUMB_MAX_SIZE = 400
 const THUMB_QUALITY = 0.75
 

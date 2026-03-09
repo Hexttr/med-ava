@@ -1,5 +1,7 @@
 "use client"
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useEffect, useState, useCallback } from "react"
 import { Building2, Plus, Pencil, Trash2, Users } from "lucide-react"
 import { toast } from "sonner"

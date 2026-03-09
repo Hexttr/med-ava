@@ -14,6 +14,7 @@ const minLevel = isDev ? LOG_LEVELS.debug : LOG_LEVELS.warn
 
 const MAX_BUFFER_SIZE = 200
 const MAX_LOG_FILE_LINES = 5000
+const MAX_LOG_FILE_SIZE_BYTES = 2 * 1024 * 1024
 
 export interface LogEntry {
   id: string
@@ -48,10 +49,12 @@ function appendToFile(entry: LogEntry): void {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
     const line = JSON.stringify(entry) + "\n"
     fs.appendFileSync(filePath, line)
-    // Ротация: если файл слишком большой, оставляем последние строки
-    const content = fs.readFileSync(filePath, "utf-8")
-    const lines = content.split("\n").filter(Boolean)
-    if (lines.length > MAX_LOG_FILE_LINES) {
+
+    // Проверяем ротацию только по размеру файла, чтобы не перечитывать лог на каждую запись.
+    const stats = fs.statSync(filePath)
+    if (stats.size > MAX_LOG_FILE_SIZE_BYTES) {
+      const content = fs.readFileSync(filePath, "utf-8")
+      const lines = content.split("\n").filter(Boolean)
       const keep = lines.slice(-MAX_LOG_FILE_LINES)
       fs.writeFileSync(filePath, keep.join("\n") + "\n")
     }

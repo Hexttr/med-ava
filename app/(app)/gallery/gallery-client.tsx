@@ -1,5 +1,7 @@
 "use client"
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useEffect, useState, useCallback } from "react"
 import { ImageIcon, ArrowRight, X, Download, FolderTree } from "lucide-react"
 import Link from "next/link"
@@ -45,29 +47,6 @@ function getExtension(mime: string): string {
   if (mime.includes("png")) return "png"
   if (mime.includes("webp")) return "webp"
   return "jpg"
-}
-
-export function useGallery() {
-  const [items, setItems] = useState<GalleryItem[]>([])
-
-  const load = useCallback(async (departmentId?: string) => {
-    try {
-      const list = await fetchGallery(departmentId ? { departmentId } : undefined)
-      setItems(list)
-    } catch {
-      setItems([])
-    }
-  }, [])
-
-  useEffect(() => {
-    load()
-  }, [load])
-
-  function clearGallery() {
-    setItems([])
-  }
-
-  return { items, clearGallery, load }
 }
 
 export function GalleryClient() {

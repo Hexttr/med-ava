@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
 """
-Скрипт развёртывания med-ava на Ubuntu VPS через SSH (paramiko).
-Использование: python deploy.py [--host HOST] [--user USER] [--password PASSWORD]
-Или через переменные: DEPLOY_HOST, DEPLOY_USER, DEPLOY_PASSWORD
+Безопасный deploy med-ava по SSH через paramiko.
+
+Ожидаемый workflow:
+1. Один раз выполнить bootstrap_production.py
+2. Добавить deploy key в DEPLOY_KEY_FILE
+3. Выполнять python deploy/deploy.py для каждого релиза
 """
+
+from __future__ import annotations
 
 import argparse
 import os
 import sys
+import tarfile
+import tempfile
 import time
+from pathlib import Path
 
 try:
     import paramiko
@@ -18,153 +26,212 @@ except ImportError:
 
 
 DEFAULT_HOST = "81.31.245.65"
-DEFAULT_USER = "root"
+DEFAULT_USER = "medava"
 REPO_URL = "https://github.com/Hexttr/med-ava.git"
 BRANCH = "ubuntu"
 APP_DIR = "/opt/med-ava"
 PORT = 3000
+KNOWN_HOSTS = Path(__file__).with_name("known_hosts")
+WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 
 
 def safe_print(text: str) -> None:
-    """Print with fallback for Windows console encoding."""
     try:
         print(text)
     except UnicodeEncodeError:
         print(text.encode("ascii", errors="replace").decode())
 
 
-def run_ssh(ssh: paramiko.SSHClient, cmd: str, check=True) -> tuple[int, str, str]:
-    """Выполнить команду по SSH, вернуть (code, stdout, stderr)."""
-    safe_print(f"  $ {cmd[:80]}{'...' if len(cmd) > 80 else ''}")
-    stdin, stdout, stderr = ssh.exec_command(cmd, get_pty=True)
+def run_ssh(ssh: paramiko.SSHClient, command: str, check: bool = True) -> tuple[int, str, str]:
+    safe_print(f"  $ {command[:120]}{'...' if len(command) > 120 else ''}")
+    _, stdout, stderr = ssh.exec_command(command, get_pty=True)
     out = stdout.read().decode("utf-8", errors="replace")
     err = stderr.read().decode("utf-8", errors="replace")
     code = stdout.channel.recv_exit_status()
     if code != 0 and check:
-        safe_print(f"  [ERROR] exit {code}")
-        safe_print(f"  stdout: {out[-2000:]}")
-        safe_print(f"  stderr: {err[-2000:]}")
+        raise RuntimeError(f"Command failed ({code}): {command}\nstdout:\n{out[-4000:]}\nstderr:\n{err[-4000:]}")
     return code, out, err
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Deploy med-ava to Ubuntu VPS")
-    parser.add_argument("--host", default=os.environ.get("DEPLOY_HOST", DEFAULT_HOST))
-    parser.add_argument("--user", default=os.environ.get("DEPLOY_USER", DEFAULT_USER))
-    parser.add_argument("--password", default=os.environ.get("DEPLOY_PASSWORD", ""))
-    parser.add_argument("--skip-build", action="store_true", help="Skip npm build (faster re-deploy)")
-    args = parser.parse_args()
+def load_client(known_hosts_path: Path) -> paramiko.SSHClient:
+    client = paramiko.SSHClient()
+    client.load_host_keys(str(known_hosts_path))
+    client.set_missing_host_key_policy(paramiko.RejectPolicy())
+    return client
 
-    if not args.password:
-        print("Укажите пароль: --password или DEPLOY_PASSWORD")
-        sys.exit(1)
 
-    print(f"\n=== Подключение к {args.user}@{args.host} ===\n")
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+def write_remote_file(ssh: paramiko.SSHClient, remote_path: str, content: str, mode: int | None = None) -> None:
+    sftp = ssh.open_sftp()
+    with sftp.file(remote_path, "w") as handle:
+        handle.write(content)
+    if mode is not None:
+        sftp.chmod(remote_path, mode)
+    sftp.close()
 
-    try:
-        ssh.connect(args.host, username=args.user, password=args.password, timeout=30)
-        print("  SSH подключение установлено.\n")
-    except Exception as e:
-        print(f"  Ошибка подключения: {e}")
-        sys.exit(1)
 
-    steps = []
+def upload_file(ssh: paramiko.SSHClient, local_path: Path, remote_path: str) -> None:
+    sftp = ssh.open_sftp()
+    sftp.put(str(local_path), remote_path)
+    sftp.close()
 
-    # 1. Проверка Node.js
-    print("--- 1. Проверка Node.js ---")
-    code, out, _ = run_ssh(ssh, "node -v 2>/dev/null || echo 'NOT_FOUND'", check=False)
-    if "NOT_FOUND" in out or code != 0:
-        print("  Установка Node.js 20...")
-        run_ssh(ssh, "curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs")
-    else:
-        print(f"  Node.js: {out.strip()}")
-    steps.append("node_ok")
 
-    # 2. Создание директории и клонирование
-    print("\n--- 2. Репозиторий ---")
-    run_ssh(ssh, f"mkdir -p {APP_DIR} && cd {APP_DIR} && (test -d .git && git fetch origin && git checkout {BRANCH} && git pull origin {BRANCH}) || (git clone -b {BRANCH} {REPO_URL} .)")
-    steps.append("repo_ok")
+def sudo(command: str) -> str:
+    return f"sudo -n bash -lc {command!r}"
 
-    # 3. Установка зависимостей
-    print("\n--- 3. npm install ---")
-    run_ssh(ssh, f"cd {APP_DIR} && npm install")
-    run_ssh(ssh, f"cd {APP_DIR} && npm rebuild better-sqlite3")
-    steps.append("npm_ok")
 
-    # 4. .env
-    print("\n--- 4. Конфигурация .env ---")
-    run_ssh(ssh, f"cd {APP_DIR} && test -f .env || cp .env.example .env")
-    run_ssh(ssh, f"cd {APP_DIR} && grep -q GEMINI_API_KEY .env && echo '.env существует' || true", check=False)
-    public_url = f"http://{args.host}:{PORT}"
-    run_ssh(ssh, f"cd {APP_DIR} && grep -q '^EAM_PUBLIC_URL=' .env || echo 'EAM_PUBLIC_URL={public_url}' >> .env", check=False)
-    steps.append("env_ok")
-
-    # 5. Создание data/
-    print("\n--- 5. Директория data/ ---")
-    run_ssh(ssh, f"cd {APP_DIR} && mkdir -p data/uploads/employees data/uploads/gallery data/uploads/backgrounds && chmod -R 755 data")
-    steps.append("data_ok")
-
-    # 6. Сборка
-    if not args.skip_build:
-        print("\n--- 6. npm run build ---")
-        code, out, err = run_ssh(
-            ssh,
-            f"cd {APP_DIR} && npm run build > /tmp/build.log 2>&1; e=$?; tail -80 /tmp/build.log; exit $e",
-            check=False,
-        )
-        if code != 0:
-            safe_print(f"  Build failed (exit {code}). See output above.")
-            raise SystemExit(code)
-        steps.append("build_ok")
-    else:
-        print("\n--- 6. Сборка пропущена (--skip-build) ---")
-
-    # 7. systemd
-    print("\n--- 7. systemd сервис ---")
-    service_content = f"""[Unit]
+def systemd_service(app_dir: str, runtime_user: str) -> str:
+    return f"""[Unit]
 Description=PhotoHUB Enterprise (med-ava)
 After=network.target
 
 [Service]
 Type=simple
-User=root
-WorkingDirectory={APP_DIR}
+User={runtime_user}
+Group={runtime_user}
+WorkingDirectory={app_dir}
 Environment=NODE_ENV=production
-Environment=PATH=/usr/bin:/usr/local/bin
-Environment=EAM_PUBLIC_URL=http://{args.host}:{PORT}
-EnvironmentFile={APP_DIR}/.env
-ExecStart=/usr/local/bin/node {APP_DIR}/node_modules/.bin/next start -p {PORT}
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+EnvironmentFile={app_dir}/.env
+ExecStart=/usr/local/bin/node {app_dir}/node_modules/.bin/next start -H 127.0.0.1 -p {PORT}
 Restart=on-failure
 RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths={app_dir}
 
 [Install]
 WantedBy=multi-user.target
 """
-    # Записываем через SFTP
-    sftp = ssh.open_sftp()
-    with sftp.file("/etc/systemd/system/med-ava.service", "w") as f:
-        f.write(service_content)
-    sftp.close()
-    run_ssh(ssh, "systemctl daemon-reload && systemctl enable med-ava && systemctl restart med-ava")
-    steps.append("systemd_ok")
 
-    # 8. Проверка
-    print("\n--- 8. Проверка ---")
-    time.sleep(3)
-    run_ssh(ssh, "systemctl status med-ava --no-pager")
-    code, out, _ = run_ssh(ssh, f"curl -s -o /dev/null -w '%{{http_code}}' http://127.0.0.1:{PORT}/api/health 2>/dev/null || echo '000'", check=False)
-    if "200" in out or "000" not in out:
-        print(f"  Health check: HTTP {out.strip() or 'OK'}")
+
+def create_release_archive(source_dir: Path) -> Path:
+    ignored_dirs = {".git", ".next", "node_modules", "data"}
+    ignored_files = {
+        Path("deploy/check_server.py"),
+    }
+
+    temp_dir = Path(tempfile.mkdtemp(prefix="medava-release-"))
+    archive_path = temp_dir / "release.tar.gz"
+
+    with tarfile.open(archive_path, "w:gz") as tar:
+        for path in source_dir.rglob("*"):
+            relative = path.relative_to(source_dir)
+            if relative in ignored_files:
+                continue
+            if any(part in ignored_dirs for part in relative.parts):
+                continue
+            tar.add(path, arcname=str(relative))
+
+    return archive_path
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Deploy med-ava safely to Ubuntu VPS")
+    parser.add_argument("--host", default=os.environ.get("DEPLOY_HOST", DEFAULT_HOST))
+    parser.add_argument("--user", default=os.environ.get("DEPLOY_USER", DEFAULT_USER))
+    parser.add_argument("--key-file", default=os.environ.get("DEPLOY_KEY_FILE", ""))
+    parser.add_argument("--password", default=os.environ.get("DEPLOY_PASSWORD", ""))
+    parser.add_argument("--branch", default=os.environ.get("DEPLOY_BRANCH", BRANCH))
+    parser.add_argument("--public-url", default=os.environ.get("DEPLOY_PUBLIC_URL", ""))
+    parser.add_argument("--app-dir", default=os.environ.get("DEPLOY_APP_DIR", APP_DIR))
+    parser.add_argument("--runtime-user", default=os.environ.get("DEPLOY_RUNTIME_USER", DEFAULT_USER))
+    parser.add_argument("--upload-local", action="store_true", help="Upload the current local workspace instead of pulling from Git")
+    parser.add_argument("--local-source", default=os.environ.get("DEPLOY_LOCAL_SOURCE", str(WORKSPACE_ROOT)))
+    parser.add_argument("--skip-build", action="store_true", help="Skip npm run build")
+    args = parser.parse_args()
+
+    if not KNOWN_HOSTS.exists():
+        raise SystemExit(f"known_hosts file not found: {KNOWN_HOSTS}")
+
+    if not args.key_file and not args.password:
+        raise SystemExit("Specify DEPLOY_KEY_FILE/--key-file or DEPLOY_PASSWORD/--password")
+
+    ssh = load_client(KNOWN_HOSTS)
+    connect_kwargs = {
+        "hostname": args.host,
+        "username": args.user,
+        "timeout": 30,
+        "look_for_keys": False,
+        "allow_agent": False,
+    }
+    if args.key_file:
+        connect_kwargs["key_filename"] = args.key_file
     else:
-        print(f"  Health check: ожидание... (curl: {out})")
+        connect_kwargs["password"] = args.password
 
-    ssh.close()
-    print("\n=== Развёртывание завершено ===")
-    print(f"  Приложение: http://{args.host}:{PORT}")
-    print("  Не забудьте настроить .env (GEMINI_API_KEY, EAM_PASSWORD) на сервере.")
-    print(f"  Редактирование: ssh root@{args.host} -> nano /opt/med-ava/.env")
+    safe_print(f"\n=== Подключение к {args.user}@{args.host} ===\n")
+    ssh.connect(**connect_kwargs)
+
+    try:
+        safe_print("--- 1. Подготовка репозитория ---")
+        if args.upload_local:
+            archive_path = create_release_archive(Path(args.local_source))
+            remote_archive = "/tmp/med-ava-release.tar.gz"
+            upload_file(ssh, archive_path, remote_archive)
+            run_ssh(ssh, f"mkdir -p {args.app_dir}")
+            run_ssh(
+                ssh,
+                f"find {args.app_dir} -mindepth 1 -maxdepth 1 ! -name data ! -name .env -exec rm -rf {{}} +"
+            )
+            run_ssh(ssh, f"tar -xzf {remote_archive} -C {args.app_dir}")
+        else:
+            run_ssh(
+                ssh,
+                f"mkdir -p {args.app_dir} && "
+                f"(test -d {args.app_dir}/.git && cd {args.app_dir} && git fetch origin && git checkout {args.branch} && git pull --ff-only origin {args.branch}) || "
+                f"(git clone -b {args.branch} {REPO_URL} {args.app_dir})"
+            )
+
+        safe_print("\n--- 2. Настройка окружения и прав ---")
+        run_ssh(ssh, f"cd {args.app_dir} && test -f .env || cp .env.example .env")
+        if args.public_url:
+            run_ssh(
+                ssh,
+                f"cd {args.app_dir} && "
+                f"grep -q '^EAM_PUBLIC_URL=' .env && sed -i 's|^EAM_PUBLIC_URL=.*|EAM_PUBLIC_URL={args.public_url}|' .env || echo 'EAM_PUBLIC_URL={args.public_url}' >> .env"
+            )
+        run_ssh(
+            ssh,
+            f"cd {args.app_dir} && "
+            f"grep -q '^EAM_HTTPS=' .env && sed -i 's|^EAM_HTTPS=.*|EAM_HTTPS=true|' .env || echo 'EAM_HTTPS=true' >> .env"
+        )
+        run_ssh(
+            ssh,
+            f"cd {args.app_dir} && "
+            "grep -q '^EAM_SESSION_SECRET=' .env || echo \"EAM_SESSION_SECRET=$(openssl rand -hex 32)\" >> .env"
+        )
+        run_ssh(ssh, sudo(f"mkdir -p {args.app_dir}/data/uploads/employees {args.app_dir}/data/uploads/gallery {args.app_dir}/data/uploads/backgrounds"))
+        run_ssh(ssh, sudo(f"chown -R {args.runtime_user}:{args.runtime_user} {args.app_dir}"))
+        run_ssh(ssh, sudo(f"chmod 750 {args.app_dir} {args.app_dir}/data {args.app_dir}/data/uploads {args.app_dir}/data/uploads/employees {args.app_dir}/data/uploads/gallery {args.app_dir}/data/uploads/backgrounds"))
+        run_ssh(ssh, sudo(f"chmod 600 {args.app_dir}/.env"))
+        run_ssh(ssh, sudo(f"test -f {args.app_dir}/data/gemini-key && chmod 600 {args.app_dir}/data/gemini-key || true"))
+        run_ssh(ssh, sudo(f"test -f {args.app_dir}/data/eam.db && chmod 640 {args.app_dir}/data/eam.db || true"))
+        run_ssh(ssh, sudo(f"test -f {args.app_dir}/data/eam-logs.jsonl && chmod 640 {args.app_dir}/data/eam-logs.jsonl || true"))
+
+        safe_print("\n--- 3. Установка зависимостей и smoke checks ---")
+        run_ssh(ssh, f"cd {args.app_dir} && npm ci")
+        run_ssh(ssh, f"cd {args.app_dir} && npm run typecheck")
+        run_ssh(ssh, f"cd {args.app_dir} && npm run lint")
+        if not args.skip_build:
+            run_ssh(ssh, f"cd {args.app_dir} && npm run build")
+
+        safe_print("\n--- 4. Обновление systemd ---")
+        service_content = systemd_service(args.app_dir, args.runtime_user)
+        write_remote_file(ssh, "/tmp/med-ava.service", service_content)
+        run_ssh(ssh, sudo("install -m 644 /tmp/med-ava.service /etc/systemd/system/med-ava.service"))
+        run_ssh(ssh, sudo("systemctl daemon-reload && systemctl enable med-ava && systemctl restart med-ava"))
+
+        safe_print("\n--- 5. Проверка readiness ---")
+        time.sleep(3)
+        run_ssh(ssh, sudo("systemctl status med-ava --no-pager -l"))
+        _, out, _ = run_ssh(ssh, "curl -fsS http://127.0.0.1:3000/api/ready", check=False)
+        safe_print(out.strip() or "Readiness endpoint returned no body")
+
+        safe_print("\n=== Развёртывание завершено ===")
+        safe_print(f"  Публичный URL: {args.public_url}")
+    finally:
+        ssh.close()
 
 
 if __name__ == "__main__":

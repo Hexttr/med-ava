@@ -5,22 +5,20 @@ import { fetchWithProxy } from "@/lib/fetch-proxy"
 import { logger } from "@/lib/logger"
 import { getAnalysisPrompt } from "@/lib/prompts"
 import { checkRateLimit } from "@/lib/rate-limit"
+import { enforceTrustedOrigin, getClientIp } from "@/lib/request-security"
 import { validateImageFile } from "@/lib/upload-validation"
 import { preprocessForGemini } from "@/lib/image-preprocess"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
 
-function getClientIp(request: NextRequest): string {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown"
-}
-
 export async function POST(request: NextRequest) {
   try {
+    const originError = enforceTrustedOrigin(request)
+    if (originError) return originError
+
     const ip = getClientIp(request)
-    const { allowed, remaining, resetIn } = checkRateLimit(`analyze:${ip}`)
+    const { allowed, resetIn } = checkRateLimit(`analyze:${ip}`)
     if (!allowed) {
       return NextResponse.json(
         { error: `Превышен лимит запросов. Повторите через ${resetIn} сек.` },
@@ -176,7 +174,7 @@ export async function POST(request: NextRequest) {
       try {
         const fixed = jsonStr.replace(/,(\s*[}\]])/g, "$1")
         parsed = JSON.parse(fixed)
-      } catch (e2) {
+      } catch {
         const msg = e1 instanceof Error ? e1.message : String(e1)
         logger.error("ANALYZE", "Не удалось разобрать ответ Gemini", { error: msg, excerpt: textContent.slice(0, 600) })
         return NextResponse.json(

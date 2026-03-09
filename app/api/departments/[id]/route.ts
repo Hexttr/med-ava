@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
 import { logger } from "@/lib/logger"
+import { enforceTrustedOrigin } from "@/lib/request-security"
 
 function toResponse(row: { id: string; name: string; created_at: number }) {
   return {
@@ -35,6 +36,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const originError = enforceTrustedOrigin(request)
+    if (originError) return originError
+
     const { id } = await params
     const body = await request.json()
     const name = body.name !== undefined ? String(body.name).trim() : undefined
@@ -60,10 +64,13 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const originError = enforceTrustedOrigin(request)
+    if (originError) return originError
+
     const { id } = await params
     const database = getDb()
     const existing = database.prepare("SELECT id FROM departments WHERE id = ?").get(id)

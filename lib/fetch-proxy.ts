@@ -5,7 +5,6 @@
 
 import { logger, sanitizeUrl } from "@/lib/logger"
 
-const isDev = process.env.NODE_ENV === "development"
 type FetchInput = RequestInfo | URL
 type FetchInit = RequestInit
 
@@ -24,11 +23,12 @@ function isHttps(url: string): boolean {
 function parseProxyUrl(proxyUrl: string): { protocol: "http" | "socks5"; host: string; port: number } | null {
   try {
     const u = new URL(proxyUrl)
-    const protocol = u.protocol.replace(":", "") as "http" | "socks5"
-    if (protocol === "socks5" || protocol === "http" || protocol === "https") {
+    const rawProtocol = u.protocol.replace(":", "")
+    if (rawProtocol === "socks5" || rawProtocol === "http" || rawProtocol === "https") {
       const host = u.hostname || "127.0.0.1"
+      const protocol: "http" | "socks5" = rawProtocol === "socks5" ? "socks5" : "http"
       const port = u.port ? parseInt(u.port, 10) : protocol === "socks5" ? 10808 : 10809
-      return { protocol: protocol === "https" ? "http" : protocol, host, port }
+      return { protocol, host, port }
     }
   } catch {
     if (proxyUrl.toLowerCase().startsWith("socks5://")) {
@@ -81,17 +81,19 @@ export async function fetchWithProxy(input: FetchInput, init?: FetchInit): Promi
         port: parsed.port,
       })
       const { fetch: undiciFetch } = await import("undici")
-      res = await undiciFetch(input, {
+      const undiciResponse = await undiciFetch(input as never, {
         ...init,
         dispatcher,
-      } as RequestInit & { dispatcher: unknown })
+      } as never)
+      res = undiciResponse as unknown as Response
     } else {
       const { fetch: undiciFetch, ProxyAgent } = await import("undici")
       const dispatcher = new ProxyAgent(`http://${parsed.host}:${parsed.port}`)
-      res = await undiciFetch(input, {
+      const undiciResponse = await undiciFetch(input as never, {
         ...init,
         dispatcher,
-      } as RequestInit & { dispatcher: unknown })
+      } as never)
+      res = undiciResponse as unknown as Response
     }
     return logResponse(res, safeUrl, proxyDesc, start)
   } catch (e) {

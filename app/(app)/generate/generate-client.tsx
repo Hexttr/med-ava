@@ -1,5 +1,7 @@
 "use client"
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useState, useCallback, useEffect, useRef } from "react"
 import { Sparkles, AlertCircle, Settings, Loader2, Upload, Download } from "lucide-react"
 import Link from "next/link"
@@ -23,6 +25,12 @@ import type { Department } from "@/lib/types"
 import { fetchDepartments, createEmployee } from "@/lib/structure-api"
 import { addGalleryItem, updateGalleryItem } from "@/lib/gallery-api"
 import { fileToDataUrl } from "@/lib/file-utils"
+import {
+  analyzePortrait,
+  fileToReferencePhoto,
+  generatePortrait,
+  generatePortraitSet,
+} from "@/lib/portrait-generation-client"
 
 interface GenerateClientProps {
   hasApiKey: boolean
@@ -60,57 +68,16 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
     if (nameFromFile) setEmployeeName(nameFromFile)
   }, [])
 
-  const handleClear = useCallback(() => {
-    if (preview) URL.revokeObjectURL(preview)
-    setFile(null)
-    setPreview(null)
-    setMedicalUrl(null)
-    setCorporateUrl(null)
-    setGalleryItemId(null)
-    setStatus("idle")
-    setProgress(0)
-  }, [preview])
-
-  function fileToBase64(f: File): Promise<{ base64: string; mimeType: string }> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => {
-        const dataUrl = reader.result as string
-        const base64 = dataUrl.includes(",") ? dataUrl.split(",")[1]! : dataUrl
-        resolve({ base64, mimeType: f.type || "image/jpeg" })
-      }
-      reader.onerror = () => reject(reader.error)
-      reader.readAsDataURL(f)
-    })
-  }
-
   async function handleGenerate() {
     if (!file) return
 
     try {
       setStatus("analyzing")
       setProgress(10)
-
-      const formData = new FormData()
-      formData.append("photo", file)
-      formData.append("employeeName", employeeName || "Сотрудник")
-
-      // Step 1: Analyze photo
-      const analyzeRes = await fetch("/api/analyze", {
-        method: "POST",
-        body: formData,
-      })
-
-      if (!analyzeRes.ok) {
-        const err = await analyzeRes.json().catch(() => ({}))
-        const msg = typeof err?.error === "string" ? err.error : "Ошибка анализа"
-        throw new Error(msg)
-      }
-
-      const analysis = await analyzeRes.json()
+      const analysis = await analyzePortrait(file, employeeName || "Сотрудник")
       setProgress(30)
 
-      const reference = await fileToBase64(file)
+      const reference = await fileToReferencePhoto(file)
 
       const genMedical = generateMode === "all" || generateMode === "medical"
       const genCorporate = generateMode === "all" || generateMode === "corporate"
@@ -118,47 +85,13 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
       setStatus("generating")
       setProgress(40)
 
-      let medicalData: { imageUrl: string } | null = null
-      let corporateData: { imageUrl: string } | null = null
+      const generated = await generatePortraitSet(analysis, reference, generateMode)
+      const medicalData = generated.medicalUrl ? { imageUrl: generated.medicalUrl } : null
+      const corporateData = generated.corporateUrl ? { imageUrl: generated.corporateUrl } : null
 
-      if (genMedical) {
-        const medicalRes = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: analysis.medicalPrompt,
-            style: "medical",
-            referencePhotoBase64: reference.base64,
-            referencePhotoMimeType: reference.mimeType,
-          }),
-        })
-        if (!medicalRes.ok) {
-          const err = await medicalRes.json()
-          throw new Error(err.error || "Ошибка генерации медицинского портрета")
-        }
-        medicalData = await medicalRes.json()
-        setMedicalUrl(medicalData.imageUrl)
-      }
+      if (medicalData?.imageUrl) setMedicalUrl(medicalData.imageUrl)
       setProgress(genMedical && genCorporate ? 70 : 100)
-
-      if (genCorporate) {
-        const corporateRes = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: analysis.corporatePrompt,
-            style: "corporate",
-            referencePhotoBase64: reference.base64,
-            referencePhotoMimeType: reference.mimeType,
-          }),
-        })
-        if (!corporateRes.ok) {
-          const err = await corporateRes.json()
-          throw new Error(err.error || "Ошибка генерации корпоративного портрета")
-        }
-        corporateData = await corporateRes.json()
-        setCorporateUrl(corporateData.imageUrl)
-      }
+      if (corporateData?.imageUrl) setCorporateUrl(corporateData.imageUrl)
       setProgress(100)
       setStatus("complete")
 
@@ -200,6 +133,36 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
     }
   }
 
+  const handleRegenerateOne = useCallback(
+    async (style: "medical" | "corporate") => {
+      if (!file) return
+      setRegeneratingStyle(style)
+      try {
+        const analysis = await analyzePortrait(file, employeeName || "Сотрудник")
+        const reference = await fileToReferencePhoto(file)
+        const prompt = style === "medical" ? analysis.medicalPrompt : analysis.corporatePrompt
+        const newUrl = await generatePortrait(prompt, style, reference)
+        if (style === "medical") setMedicalUrl(newUrl)
+        else setCorporateUrl(newUrl)
+        if (galleryItemId) {
+          await updateGalleryItem(galleryItemId, { [style === "medical" ? "medicalUrl" : "corporateUrl"]: newUrl })
+        }
+        toast.success("Портрет перегенерирован")
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Ошибка")
+      } finally {
+        setRegeneratingStyle(null)
+      }
+    },
+    [file, employeeName, galleryItemId]
+  )
+
+  const isProcessing = status === "analyzing" || status === "generating"
+  const genMedical = generateMode === "all" || generateMode === "medical"
+  const genCorporate = generateMode === "all" || generateMode === "corporate"
+  const medicalStatus = medicalUrl ? "complete" : genMedical && status === "generating" ? "generating" : status === "analyzing" ? "analyzing" : "idle"
+  const corporateStatus = corporateUrl ? "complete" : genCorporate && status === "generating" ? "generating" : status
+
   if (!hasApiKey) {
     return (
       <Card className="border-destructive/30 bg-destructive/5">
@@ -221,56 +184,6 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
       </Card>
     )
   }
-
-  const handleRegenerateOne = useCallback(
-    async (style: "medical" | "corporate") => {
-      if (!file) return
-      setRegeneratingStyle(style)
-      try {
-        const formData = new FormData()
-        formData.append("photo", file)
-        formData.append("employeeName", employeeName || "Сотрудник")
-        const analyzeRes = await fetch("/api/analyze", { method: "POST", body: formData })
-        if (!analyzeRes.ok) throw new Error("Ошибка анализа")
-        const analysis = await analyzeRes.json()
-        const reference = await fileToBase64(file)
-        const prompt = style === "medical" ? analysis.medicalPrompt : analysis.corporatePrompt
-        const genRes = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt,
-            style,
-            referencePhotoBase64: reference.base64,
-            referencePhotoMimeType: reference.mimeType,
-          }),
-        })
-        if (!genRes.ok) {
-          const err = await genRes.json().catch(() => ({}))
-          throw new Error(err.error || "Ошибка генерации")
-        }
-        const data = await genRes.json()
-        const newUrl = data.imageUrl
-        if (style === "medical") setMedicalUrl(newUrl)
-        else setCorporateUrl(newUrl)
-        if (galleryItemId) {
-          await updateGalleryItem(galleryItemId, { [style === "medical" ? "medicalUrl" : "corporateUrl"]: newUrl })
-        }
-        toast.success("Портрет перегенерирован")
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Ошибка")
-      } finally {
-        setRegeneratingStyle(null)
-      }
-    },
-    [file, employeeName, galleryItemId]
-  )
-
-  const isProcessing = status === "analyzing" || status === "generating"
-  const genMedical = generateMode === "all" || generateMode === "medical"
-  const genCorporate = generateMode === "all" || generateMode === "corporate"
-  const medicalStatus = medicalUrl ? "complete" : genMedical && status === "generating" ? "generating" : status === "analyzing" ? "analyzing" : "idle"
-  const corporateStatus = corporateUrl ? "complete" : genCorporate && status === "generating" ? "generating" : status
 
   return (
     <div className="flex min-w-0 flex-col overflow-x-hidden">

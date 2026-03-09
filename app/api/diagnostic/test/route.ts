@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { getGeminiKey } from "@/lib/settings"
 import { fetchWithProxy } from "@/lib/fetch-proxy"
 import { logger } from "@/lib/logger"
+import { enforceTrustedOrigin } from "@/lib/request-security"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -11,7 +12,10 @@ export const maxDuration = 30
  * Тестовый запрос к Google API через текущий прокси.
  * Показывает точный ответ Google (в т.ч. ошибку «position» / геоблок).
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const originError = enforceTrustedOrigin(request)
+  if (originError) return originError
+
   const key = await getGeminiKey()
   if (!key) {
     return NextResponse.json({

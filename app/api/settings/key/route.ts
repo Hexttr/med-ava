@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { saveGeminiKey, removeGeminiKey } from "@/lib/settings"
 import { logger } from "@/lib/logger"
+import { enforceTrustedOrigin } from "@/lib/request-security"
 
 function isValidKey(key: string): boolean {
   const trimmed = key.trim()
@@ -10,6 +11,9 @@ function isValidKey(key: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
+    const originError = enforceTrustedOrigin(request)
+    if (originError) return originError
+
     const body = await request.json()
     const key = typeof body?.key === "string" ? body.key : ""
 
@@ -36,8 +40,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   try {
+    const originError = enforceTrustedOrigin(request)
+    if (originError) return originError
+
     await removeGeminiKey()
     logger.info("SETTINGS", "API-ключ удалён из data/gemini-key")
     return NextResponse.json({ success: true })

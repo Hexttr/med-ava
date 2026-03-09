@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
 import { logger } from "@/lib/logger"
+import { enforceTrustedOrigin } from "@/lib/request-security"
 
 function toResponse(row: { id: string; name: string; created_at: number }) {
   return {
@@ -25,6 +26,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const originError = enforceTrustedOrigin(request)
+    if (originError) return originError
+
     const body = await request.json()
     const name = String(body?.name ?? "").trim()
     if (!name) {
