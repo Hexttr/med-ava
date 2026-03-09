@@ -12,7 +12,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-8">
       <div className="w-full max-w-xl space-y-6">
         <div className="rounded-3xl border border-border/70 bg-card/80 px-6 py-8 text-center shadow-sm backdrop-blur-sm md:px-10">
-          <div className="mx-auto flex h-28 w-28 items-center justify-center rounded-[1.75rem] bg-white shadow-sm ring-1 ring-black/5">
+          <div className="mx-auto flex h-28 w-28 items-center justify-center rounded-[1.75rem] border border-primary/18 bg-white shadow-md ring-2 ring-primary/14">
             <Image
               src="/nczd-logo-blue.png"
               alt="Логотип НМИЦ здоровья детей"

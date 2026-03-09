@@ -93,7 +93,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="relative px-4 pt-5 pb-3">
+      <SidebarHeader className="relative px-4 pt-5 pb-3 group-data-[collapsible=icon]:px-3">
         {isMobile && (
           <Button
             type="button"
@@ -106,18 +106,21 @@ export function AppSidebar() {
             <X className="size-5" />
           </Button>
         )}
-        <Link href="/" className="block pr-8">
-          <div className="hidden h-11 w-11 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-black/5 group-data-[collapsible=icon]:flex">
+        <Link
+          href="/"
+          className="block pr-8 md:pr-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center"
+        >
+          <div className="hidden h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-black/8 group-data-[collapsible=icon]:flex">
             <Image
               src="/nczd-logo-blue.png"
               alt="Логотип НМИЦ здоровья детей"
-              width={28}
-              height={28}
-              className="size-7 object-contain"
+              width={26}
+              height={26}
+              className="size-[26px] object-contain"
             />
           </div>
           <div className="group-data-[collapsible=icon]:hidden">
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm">
+            <div className="mx-auto max-w-[15.25rem] rounded-2xl border border-white/10 bg-white/5 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm">
               <div className="flex justify-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
                   <Image
@@ -147,7 +150,7 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupContent className="pt-2">
+          <SidebarGroupContent className="pt-2 group-data-[collapsible=icon]:px-0">
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
@@ -156,11 +159,11 @@ export function AppSidebar() {
                     isActive={pathname === item.href}
                     tooltip={item.title}
                     size="lg"
-                    className="rounded-xl px-3"
+                    className="rounded-xl px-3 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-12 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
                   >
                     <Link href={item.href}>
-                      <item.icon className="size-4" />
-                      <span>{item.title}</span>
+                      <item.icon className="size-5 shrink-0" />
+                      <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -169,35 +172,35 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarSeparator className="mx-4 bg-white/10" />
-      <SidebarFooter className="pt-3">
+      <SidebarSeparator className="mx-4 bg-white/10 group-data-[collapsible=icon]:mx-3" />
+      <SidebarFooter className="pt-3 group-data-[collapsible=icon]:px-3">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
               isActive={pathname === "/settings"}
               tooltip="Настройки"
-              className="rounded-xl px-3"
+              className="rounded-xl px-3 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-12 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
             >
               <Link href="/settings">
-                <Settings className="size-4" />
-                <span>Настройки</span>
+                <Settings className="size-5 shrink-0" />
+                <span className="group-data-[collapsible=icon]:hidden">Настройки</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip="Выйти"
-              className="rounded-xl px-3"
+              className="rounded-xl px-3 text-red-200 hover:bg-red-500/12 hover:text-red-100 data-[active=true]:bg-red-500/12 data-[active=true]:text-red-100 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-12 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-full group-data-[collapsible=icon]:bg-red-500/14 group-data-[collapsible=icon]:px-0"
             >
               <button
                 type="button"
                 onClick={handleLogout}
                 disabled={loggingOut}
-                className="flex w-full items-center gap-2 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                className="flex w-full items-center gap-2 text-inherit transition-colors disabled:opacity-50 group-data-[collapsible=icon]:justify-center"
               >
-                <LogOut className="size-4" />
-                <span>{loggingOut ? "Выход..." : "Выйти"}</span>
+                <LogOut className="size-5 shrink-0" />
+                <span className="group-data-[collapsible=icon]:hidden">{loggingOut ? "Выход..." : "Выйти"}</span>
               </button>
             </SidebarMenuButton>
           </SidebarMenuItem>
