@@ -42,9 +42,10 @@ export function proxy(request: NextRequest) {
   const redirectPath = redirectTarget ? `/login?redirect=${encodeURIComponent(redirectTarget)}` : "/login"
   const url = new URL(request.url)
   const isLocalhost = url.hostname === "localhost" || url.hostname === "127.0.0.1"
-  const redirectUrl = isLocalhost && process.env.EAM_PUBLIC_URL?.trim()
-    ? new URL(redirectPath, process.env.EAM_PUBLIC_URL).toString()
-    : redirectPath
+  const redirectBase = isLocalhost && process.env.EAM_PUBLIC_URL?.trim()
+    ? process.env.EAM_PUBLIC_URL
+    : request.url
+  const redirectUrl = new URL(redirectPath, redirectBase).toString()
 
   if (pathname.startsWith("/api/")) {
     return NextResponse.json(
