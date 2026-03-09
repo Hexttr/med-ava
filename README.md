@@ -26,7 +26,9 @@
 | База данных | SQLite (better-sqlite3) |
 | UI | Radix UI, Tailwind CSS 4, shadcn/ui |
 | AI | Google Gemini API (анализ + генерация изображений) |
-| Аналитика | Vercel Analytics |
+| Изображения | Sharp (предобработка, превью) |
+
+> **Для AI-агентов:** см. [AGENTS.md](./AGENTS.md) — краткое руководство по проекту и особенностям.
 
 ---
 
@@ -60,6 +62,7 @@ med-ava/
 │   ├── app-settings.ts            # Настройки из БД
 │   ├── storage.ts                 # Сохранение изображений
 │   ├── fetch-proxy.ts             # Fetch через SOCKS5/HTTP прокси
+│   ├── image-preprocess.ts        # Sharp: предобработка фото перед Gemini
 │   ├── prompts.ts                 # Промпты для анализа и генерации
 │   ├── model-options.ts           # Опции моделей Gemini
 │   ├── structure-api.ts           # CRUD отделов и сотрудников
@@ -67,7 +70,7 @@ med-ava/
 │   ├── logger.ts                  # Логирование (файл + консоль)
 │   ├── rate-limit.ts              # Ограничение запросов
 │   └── types.ts                   # Общие типы
-├── proxy.ts                       # Middleware авторизации (см. ниже)
+├── proxy.ts                       # Авторизация (Next.js 16 proxy, см. ниже)
 ├── data/                          # SQLite + загрузки (gitignore)
 │   ├── eam.db
 │   ├── eam-logs.jsonl
@@ -76,6 +79,8 @@ med-ava/
 │       ├── employees/
 │       ├── gallery/
 │       └── backgrounds/
+├── deploy/                        # Развёртывание
+│   └── deploy.py                  # Деплой через SSH (paramiko)
 └── .env.example
 ```
 
@@ -133,12 +138,7 @@ med-ava/
 - **CSRF** — защита формы входа
 - **Rate limit** — 5 попыток входа за 15 мин на IP
 
-**Важно:** `proxy.ts` содержит логику middleware, но Next.js не подхватывает его автоматически. Для включения авторизации создайте `middleware.ts` в корне:
-
-```ts
-// middleware.ts
-export { proxy as default, config } from "./proxy"
-```
+**Важно:** Next.js 16 использует `proxy.ts` напрямую (не middleware). Не создавать `middleware.ts` — это приведёт к конфликту.
 
 ---
 
@@ -218,6 +218,8 @@ export { proxy as default, config } from "./proxy"
 |------------|-------------|----------|
 | `GEMINI_API_KEY` | Да* | API-ключ Gemini. *Можно задать в настройках (файл `data/gemini-key`) |
 | `EAM_PASSWORD` | Нет | Пароль входа. Если задан — все страницы требуют авторизации |
+| `EAM_PUBLIC_URL` | Да при self-hosted | Публичный URL (напр. `http://IP:3000`). Без него редиректы на localhost |
+| `EAM_HTTPS` | Нет | `true` только при HTTPS (иначе cookies не работают по HTTP) |
 | `EAM_HTTPS_PROXY` | Нет | Прокси для запросов к Google (SOCKS5 / HTTP). Пример: `socks5://127.0.0.1:10808` |
 | `HTTPS_PROXY` / `HTTP_PROXY` | Нет | Альтернативные переменные прокси |
 
@@ -234,9 +236,21 @@ export { proxy as default, config } from "./proxy"
 
 ## Развёртывание на VPS
 
+### Автоматический деплой (рекомендуется)
+
+- **Ветка:** `ubuntu`
+- **Скрипт:** `deploy/deploy.py` (paramiko), путь на сервере: `/opt/med-ava`
+- **Порядок:** `git push` → `python deploy/deploy.py`
+- **Node на сервере:** `/usr/local/bin/node` (v24) — для better-sqlite3
+
+```bash
+$env:DEPLOY_PASSWORD = 'ваш_пароль'
+python deploy/deploy.py
+```
+
 ### Требования
 
-- Node.js 18+
+- Node.js 24+ (для better-sqlite3)
 - Постоянный диск (SQLite и `data/` должны сохраняться между перезапусками)
 
 ### Шаги
@@ -301,7 +315,7 @@ server {
 
 3. **Логи** — пишутся в `data/eam-logs.jsonl` (до 5000 строк, ротация). На read-only FS (например, Vercel) запись не выполняется, но приложение не падает.
 
-4. **Middleware** — `proxy.ts` нужно подключить через `middleware.ts` для включения авторизации.
+4. **Авторизация** — Next.js 16 использует `proxy.ts` напрямую. Не создавать `middleware.ts`.
 
 ---
 
