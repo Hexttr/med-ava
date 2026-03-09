@@ -59,13 +59,21 @@ export async function fetchWithProxy(input: FetchInput, init?: FetchInit): Promi
       env_EAM_HTTPS_PROXY: !!process.env.EAM_HTTPS_PROXY,
       env_HTTPS_PROXY: !!process.env.HTTPS_PROXY,
     })
-    return logResponse(await fetch(input, init), safeUrl, "direct", start)
+    try {
+      return logResponse(await fetch(input, init), safeUrl, "direct", start)
+    } catch (e) {
+      return toNetworkErrorResponse(e, safeUrl, "direct")
+    }
   }
 
   const parsed = parseProxyUrl(proxyUrl)
   if (!parsed) {
     logger.warn("FETCH", "Неверный формат прокси — запрос напрямую", { proxyUrl, target: safeUrl })
-    return logResponse(await fetch(input, init), safeUrl, "direct", start)
+    try {
+      return logResponse(await fetch(input, init), safeUrl, "direct", start)
+    } catch (e) {
+      return toNetworkErrorResponse(e, safeUrl, "direct")
+    }
   }
 
   const proxyDesc = `${parsed.protocol}://${parsed.host}:${parsed.port}`
@@ -97,22 +105,44 @@ export async function fetchWithProxy(input: FetchInput, init?: FetchInit): Promi
     }
     return logResponse(res, safeUrl, proxyDesc, start)
   } catch (e) {
-    const err = e as Error
-    logger.error("FETCH", "Прокси недоступен — запрос НЕ отправлен с вашего IP", {
-      proxy: proxyDesc,
+    return toNetworkErrorResponse(e, safeUrl, proxyDesc)
+  }
+}
+
+function toNetworkErrorResponse(error: unknown, safeUrl: string, via: string): Response {
+  const err = error as Error
+  if (via === "direct") {
+    logger.error("FETCH", "Сетевой сбой при прямом запросе к Google", {
       target: safeUrl,
       error: err.message,
     })
-    // Не делаем fallback на прямое подключение: иначе Google увидит ваш IP и вернёт "location not supported"
     return new Response(
       JSON.stringify({
         error: {
-          message: `Прокси недоступен (${err.message}). Запустите VPN (HAPP), выберите PROXY, проверьте порты 10808/10809. Не используем прямое подключение, чтобы не раскрывать ваш IP.`,
+          message:
+            `Не удалось подключиться к Gemini API (${err.message}). ` +
+            "Сервер не имеет стабильного исходящего маршрута к Google API. " +
+            "Нужен рабочий VPN/proxy с выходом в поддерживаемый регион.",
         },
       }),
       { status: 503, headers: { "Content-Type": "application/json" } }
     )
   }
+
+  logger.error("FETCH", "Прокси недоступен — запрос НЕ отправлен с вашего IP", {
+    proxy: via,
+    target: safeUrl,
+    error: err.message,
+  })
+  // Не делаем fallback на прямое подключение: иначе Google увидит ваш IP и вернёт "location not supported"
+  return new Response(
+    JSON.stringify({
+      error: {
+        message: `Прокси недоступен (${err.message}). Запустите VPN (HAPP), выберите PROXY, проверьте порты 10808/10809. Не используем прямое подключение, чтобы не раскрывать ваш IP.`,
+      },
+    }),
+    { status: 503, headers: { "Content-Type": "application/json" } }
+  )
 }
 
 async function logResponse(
