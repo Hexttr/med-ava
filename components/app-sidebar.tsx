@@ -93,7 +93,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="relative px-4 pt-5 pb-3 group-data-[collapsible=icon]:px-3">
+      <SidebarHeader className="relative px-4 pt-5 pb-4 group-data-[collapsible=icon]:px-3">
         {isMobile && (
           <Button
             type="button"
@@ -110,47 +110,46 @@ export function AppSidebar() {
           href="/"
           className="block pr-8 md:pr-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center"
         >
-          <div className="hidden h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-black/8 group-data-[collapsible=icon]:flex">
+          <div className="hidden items-center justify-center group-data-[collapsible=icon]:flex">
             <Image
               src="/nczd-logo-blue.png"
               alt="Логотип НМИЦ здоровья детей"
-              width={26}
-              height={26}
-              className="size-[26px] object-contain"
+              width={34}
+              height={34}
+              className="h-[34px] w-auto object-contain"
             />
           </div>
           <div className="group-data-[collapsible=icon]:hidden">
-            <div className="mx-auto max-w-[15.25rem] rounded-2xl border border-white/10 bg-white/5 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm">
-              <div className="flex justify-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
-                  <Image
-                    src="/nczd-logo-blue.png"
-                    alt="Логотип НМИЦ здоровья детей"
-                    width={44}
-                    height={44}
-                    className="h-11 w-auto object-contain"
-                  />
+            <div className="px-1">
+              <div className="flex items-start gap-3">
+                <Image
+                  src="/nczd-logo-blue.png"
+                  alt="Логотип НМИЦ здоровья детей"
+                  width={48}
+                  height={48}
+                  className="mt-0.5 h-12 w-auto object-contain"
+                />
+                <div className="min-w-0 space-y-1.5">
+                  <div className="space-y-0.5">
+                    {INSTITUTION_NAME_LINES.map((line) => (
+                      <p key={line} className="text-[15px] font-semibold leading-[1.2] tracking-[-0.01em] text-sidebar-foreground">
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                  <p className="max-w-[14.5rem] text-xs leading-5 text-sidebar-foreground/68">
+                    {SIDEBAR_SUBTITLE}
+                  </p>
                 </div>
-              </div>
-              <div className="mt-4 space-y-2 text-center">
-                <div className="space-y-0.5">
-                  {INSTITUTION_NAME_LINES.map((line) => (
-                    <p key={line} className="text-[15px] font-semibold leading-[1.2] tracking-[-0.01em] text-sidebar-foreground">
-                      {line}
-                    </p>
-                  ))}
-                </div>
-                <p className="mx-auto max-w-[15rem] text-xs leading-5 text-sidebar-foreground/72">
-                  {SIDEBAR_SUBTITLE}
-                </p>
               </div>
             </div>
           </div>
         </Link>
+        <div className="mt-4 h-px bg-white/10 group-data-[collapsible=icon]:mt-3" />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupContent className="pt-2 group-data-[collapsible=icon]:px-0">
+          <SidebarGroupContent className="pt-1 group-data-[collapsible=icon]:px-0">
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
@@ -159,7 +158,7 @@ export function AppSidebar() {
                     isActive={pathname === item.href}
                     tooltip={item.title}
                     size="lg"
-                    className="rounded-xl px-3 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-12 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+                    className="relative h-11 rounded-xl px-3.5 text-[15px] text-sidebar-foreground/84 hover:bg-white/6 hover:text-sidebar-foreground data-[active=true]:bg-white/8 data-[active=true]:text-sidebar-foreground before:absolute before:left-0 before:top-2.5 before:h-6 before:w-0.5 before:rounded-full before:bg-transparent data-[active=true]:before:bg-sidebar-primary group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-11 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-2xl group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:before:hidden"
                   >
                     <Link href={item.href}>
                       <item.icon className="size-5 shrink-0" />
@@ -173,14 +172,14 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarSeparator className="mx-4 bg-white/10 group-data-[collapsible=icon]:mx-3" />
-      <SidebarFooter className="pt-3 group-data-[collapsible=icon]:px-3">
+      <SidebarFooter className="pt-4 group-data-[collapsible=icon]:px-3">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
               isActive={pathname === "/settings"}
               tooltip="Настройки"
-              className="rounded-xl px-3 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-12 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+              className="relative h-11 rounded-xl px-3.5 text-[15px] text-sidebar-foreground/84 hover:bg-white/6 hover:text-sidebar-foreground data-[active=true]:bg-white/8 data-[active=true]:text-sidebar-foreground before:absolute before:left-0 before:top-2.5 before:h-6 before:w-0.5 before:rounded-full before:bg-transparent data-[active=true]:before:bg-sidebar-primary group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-11 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-2xl group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:before:hidden"
             >
               <Link href="/settings">
                 <Settings className="size-5 shrink-0" />
@@ -191,7 +190,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip="Выйти"
-              className="rounded-xl px-3 text-red-200 hover:bg-red-500/12 hover:text-red-100 data-[active=true]:bg-red-500/12 data-[active=true]:text-red-100 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-12 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-full group-data-[collapsible=icon]:bg-red-500/14 group-data-[collapsible=icon]:px-0"
+              className="h-11 rounded-xl px-3.5 text-[15px] text-red-200/90 hover:bg-red-500/10 hover:text-red-100 data-[active=true]:bg-red-500/10 data-[active=true]:text-red-100 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-11 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-2xl group-data-[collapsible=icon]:px-0"
             >
               <button
                 type="button"
