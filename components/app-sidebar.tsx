@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -57,29 +58,14 @@ const navItems = [
   },
 ]
 
-const DEFAULT_SUBTITLE = "Корпоративный генератор портретов"
+const INSTITUTION_NAME = "Национальный медицинский исследовательский центр здоровья детей"
+const SIDEBAR_SUBTITLE = "Корпоративный генератор портретов"
 
-interface AppSidebarProps {
-  initialOrganizationName?: string
-}
-
-export function AppSidebar({ initialOrganizationName }: AppSidebarProps) {
+export function AppSidebar() {
   const pathname = usePathname()
   const isMobile = useIsMobile()
   const { setOpenMobile } = useSidebar()
-  const [subtitle, setSubtitle] = useState(
-    initialOrganizationName?.trim() || DEFAULT_SUBTITLE
-  )
   const [loggingOut, setLoggingOut] = useState(false)
-
-  useEffect(() => {
-    fetch("/api/settings/app")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        if (data?.organizationName?.trim()) setSubtitle(data.organizationName.trim())
-      })
-      .catch(() => {})
-  }, [])
 
   // Закрывать выдвижное меню на мобильных при переходе по ссылке
   useEffect(() => {
@@ -116,20 +102,34 @@ export function AppSidebar({ initialOrganizationName }: AppSidebarProps) {
           </Button>
         )}
         <Link href="/" className="flex items-center gap-3 pr-8">
-          {/* Свёрнутое состояние: аббревиатура */}
-          <div className="hidden size-8 shrink-0 items-center justify-center rounded-none bg-sidebar-primary group-data-[collapsible=icon]:flex">
-            <span className="text-xs font-bold tracking-tight text-sidebar-primary-foreground">PH</span>
+          <div className="hidden size-9 shrink-0 items-center justify-center rounded-none border border-sidebar-border/60 bg-white group-data-[collapsible=icon]:flex">
+            <Image
+              src="/nczd-logo-blue.png"
+              alt="Логотип НМИЦ здоровья детей"
+              width={24}
+              height={24}
+              className="size-6 object-contain"
+            />
           </div>
-          {/* Развёрнутое состояние: название и название организации */}
           <div className="flex min-w-0 flex-col gap-2 group-data-[collapsible=icon]:hidden w-full">
-            <div className="flex flex-col items-center gap-0 text-center">
-              <span className="text-lg font-semibold tracking-tight text-sidebar-foreground leading-tight">PhotoHUB</span>
-              <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-sidebar-foreground/60 leading-tight">ENTERPRISE</span>
-            </div>
-            <div className="mt-3 rounded-none border border-sidebar-border/60 bg-sidebar-accent/30 px-2.5 py-1.5">
-              <p className="text-[11px] font-medium leading-tight text-sidebar-foreground/90 truncate" title={subtitle}>
-                {subtitle}
-              </p>
+            <div className="flex items-start gap-3 rounded-none border border-sidebar-border/60 bg-sidebar-accent/20 px-3 py-3">
+              <div className="flex size-14 shrink-0 items-center justify-center rounded-none border border-sidebar-border/60 bg-white">
+                <Image
+                  src="/nczd-logo-blue.png"
+                  alt="Логотип НМИЦ здоровья детей"
+                  width={40}
+                  height={40}
+                  className="h-10 w-auto object-contain"
+                />
+              </div>
+              <div className="min-w-0 space-y-1">
+                <p className="text-sm font-semibold leading-tight text-sidebar-foreground">
+                  {INSTITUTION_NAME}
+                </p>
+                <p className="text-[11px] leading-tight text-sidebar-foreground/70">
+                  {SIDEBAR_SUBTITLE}
+                </p>
+              </div>
             </div>
           </div>
         </Link>

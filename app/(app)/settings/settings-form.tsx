@@ -48,7 +48,6 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
   const router = useRouter()
   const [apiKey, setApiKey] = useState("")
   const [isPending, startTransition] = useTransition()
-  const [orgName, setOrgName] = useState(initialAppSettings?.organizationName ?? "")
   const [bgMedical, setBgMedical] = useState(initialAppSettings?.backgroundMedical ?? "")
   const [bgCorporate, setBgCorporate] = useState(initialAppSettings?.backgroundCorporate ?? "")
   const [bgMode, setBgMode] = useState<"description" | "image">(initialAppSettings?.backgroundMode ?? "description")
@@ -69,7 +68,6 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
 
   useEffect(() => {
     if (initialAppSettings) {
-      setOrgName(initialAppSettings.organizationName)
       setBgMedical(initialAppSettings.backgroundMedical)
       setBgCorporate(initialAppSettings.backgroundCorporate)
       setBgMode(initialAppSettings.backgroundMode ?? "description")
@@ -165,7 +163,6 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          organizationName: orgName.trim(),
           backgroundMedical: bgMedical.trim(),
           backgroundCorporate: bgCorporate.trim(),
           backgroundMode: bgMode,
@@ -204,21 +201,12 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
             <div>
               <CardTitle className="text-base">Настройки организации</CardTitle>
               <CardDescription>
-                Название и фоны для портретов (описание или изображения)
+                Фоны для портретов: описание или изображения
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="org-name">Название</Label>
-            <Input
-              id="org-name"
-              placeholder="Корпоративный генератор портретов"
-              value={orgName}
-              onChange={(e) => setOrgName(e.target.value)}
-            />
-          </div>
           <div className="flex flex-col gap-2">
             <Label>Фоны для портретов</Label>
             <Tabs value={bgMode} onValueChange={(v) => setBgMode(v as "description" | "image")}>
