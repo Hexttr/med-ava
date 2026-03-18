@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 import fs from "fs/promises"
-import path from "path"
 import { getGeminiKey } from "@/lib/settings"
 import { getAppSettings } from "@/lib/app-settings"
 import { applyOverlayLogo, getAbsolutePath } from "@/lib/storage"
@@ -21,6 +20,10 @@ export const maxDuration = 60
 
 const PRIMARY_MODEL_ATTEMPTS = 3
 const RETRY_DELAY_MS = 500
+const HARD_FRAMING_RULES =
+  "STRICT FRAMING RULES: vertical 3:4 studio portrait only. Head and upper torso only, bust-length, both shoulders visible. The head must occupy about 30-35% of the full image height. Eye line should sit around 38-42% from the top edge. Keep identical camera distance, identical crop, and identical head-to-body scale across all portraits. Do not crop tighter, do not zoom wider, do not show full body, hands, or waist."
+const BACKGROUND_REFERENCE_RULES =
+  "Treat the second image as a BACKGROUND REFERENCE PLATE, not as a literal pasted layer. Recreate the same scene naturally with matching palette, depth, perspective, softness, and lighting direction, but the final portrait must look like one coherent professional photograph. Avoid any cutout, pasted, or composited look."
 
 type GenerateModelResult =
   | { ok: true; imageUrl: string }
@@ -86,9 +89,9 @@ export async function POST(request: NextRequest) {
       try {
         const fullPath = getAbsolutePath(bgMedicalImagePath)
         const buf = await fs.readFile(fullPath)
-        backdropMedicalImageBase64 = buf.toString("base64")
-        const ext = path.extname(fullPath).toLowerCase()
-        backdropMedicalMime = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg"
+        const processed = await preprocessForGemini(buf, { mode: "background-reference" })
+        backdropMedicalImageBase64 = processed.base64
+        backdropMedicalMime = processed.mimeType
       } catch {
         logger.warn("GENERATE", "Не удалось прочитать фон медицинского портрета", { path: bgMedicalImagePath })
       }
@@ -97,9 +100,9 @@ export async function POST(request: NextRequest) {
       try {
         const fullPath = getAbsolutePath(bgCorporateImagePath)
         const buf = await fs.readFile(fullPath)
-        backdropCorporateImageBase64 = buf.toString("base64")
-        const ext = path.extname(fullPath).toLowerCase()
-        backdropCorporateMime = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg"
+        const processed = await preprocessForGemini(buf, { mode: "background-reference" })
+        backdropCorporateImageBase64 = processed.base64
+        backdropCorporateMime = processed.mimeType
       } catch {
         logger.warn("GENERATE", "Не удалось прочитать фон корпоративного портрета", { path: bgCorporateImagePath })
       }
@@ -127,13 +130,13 @@ export async function POST(request: NextRequest) {
 
     let geminiImagePrompt: string
     if (useBackgroundImage && hasReferencePhoto) {
-      geminiImagePrompt = `The FIRST attached image is the REFERENCE PHOTO of the person. The SECOND attached image is the BACKGROUND to use. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON placed onto this exact background. CRITICAL IDENTITY: The face must be identical — same person, same identity, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, any distinctive features. Mouth closed, lips together. Place the person naturally and seamlessly onto the provided background — match lighting direction and color temperature, cast appropriate soft shadows, ensure correct scale and perspective, blend edges naturally (no cutout/pasted look). ${settingInstruction}. Use identical portrait framing: head and upper torso only, bust-length, shoulders visible — same crop for both medical and corporate styles. Clothing must look premium and high-quality.${negativeSuffix} Output the generated portrait image.`
+      geminiImagePrompt = `The FIRST attached image is the REFERENCE PHOTO of the person. The SECOND attached image is the BACKGROUND REFERENCE PLATE for the final scene. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, same identity, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. Mouth closed, lips together. ${BACKGROUND_REFERENCE_RULES} ${HARD_FRAMING_RULES} ${settingInstruction}. Clothing must look premium and high-quality. Use soft, physically believable transitions between the person and the background. Output the generated portrait image.${negativeSuffix}`
     } else if (useBackgroundImage && !hasReferencePhoto) {
-      geminiImagePrompt = `The attached image is the BACKGROUND to use. Generate ONE professional studio portrait photo. ${universalFraming} ${prompt}. Place the person described in the prompt onto this exact background — match lighting, cast natural shadows, correct scale. Clothing must look premium and high-quality. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture.${negativeSuffix} Output the generated portrait image.`
+      geminiImagePrompt = `The attached image is the BACKGROUND REFERENCE PLATE for the final scene. Generate ONE professional studio portrait photo. ${BACKGROUND_REFERENCE_RULES} ${HARD_FRAMING_RULES} ${universalFraming} ${prompt}. Clothing must look premium and high-quality. Ultra high quality, professional photography, sharp focus, natural skin texture. Output the generated portrait image.${negativeSuffix}`
     } else if (hasReferencePhoto) {
-      geminiImagePrompt = `The attached image is the REFERENCE PHOTO of the person. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: The face must be identical — same person, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, any distinctive features. Mouth closed, lips together. Only change the setting and clothing as follows: ${settingInstruction}. Clothing must look premium and high-quality. Keep the person's face identical to the reference.${negativeSuffix} Output the generated portrait image.`
+      geminiImagePrompt = `The attached image is the REFERENCE PHOTO of the person. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. Mouth closed, lips together. ${HARD_FRAMING_RULES} Only change the setting and clothing as follows: ${settingInstruction}. Clothing must look premium and high-quality. Keep the person's face identical to the reference. Output the generated portrait image.${negativeSuffix}`
     } else {
-      geminiImagePrompt = `Professional studio portrait photo. ${universalFraming} ${prompt}. CRITICAL IDENTITY: The face MUST match the person described above exactly — maximum likeness, same person. Ultra high quality, 8k resolution, professional photography, sharp focus, natural skin texture. Clothing must look premium and high-quality. ${
+      geminiImagePrompt = `Professional studio portrait photo. ${HARD_FRAMING_RULES} ${universalFraming} ${prompt}. CRITICAL IDENTITY: The face MUST match the person described above exactly — maximum likeness, same person. Ultra high quality, professional photography, sharp focus, natural skin texture. Clothing must look premium and high-quality. ${
         style === "medical"
           ? (backgroundMedical ? `${backdropMedical} Medical professional aesthetic.` : "Clean white/light gray backdrop, medical professional aesthetic.")
           : (backgroundCorporate ? `${backdropCorporate} Business professional aesthetic.` : "Medium gray corporate backdrop, business professional aesthetic.")
@@ -144,7 +147,7 @@ export async function POST(request: NextRequest) {
     if (hasReferencePhoto) {
       const rawBase64 = referencePhotoBase64!.replace(/^data:image\/\w+;base64,/, "")
       const buffer = Buffer.from(rawBase64, "base64")
-      const { base64, mimeType } = await preprocessForGemini(buffer)
+      const { base64, mimeType } = await preprocessForGemini(buffer, { mode: "portrait-reference" })
       parts.push({
         inlineData: { mimeType, data: base64 },
       })

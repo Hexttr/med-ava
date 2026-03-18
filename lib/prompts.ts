@@ -6,7 +6,7 @@
 import { getAppSettings } from "./app-settings"
 
 const DEFAULT_UNIVERSAL_FRAMING =
-  "IDENTICAL portrait framing for ALL images: head and upper torso only, bust-length, shoulders visible. Same camera distance, same head size in frame, same crop — medical and corporate MUST have identical proportions. Do not crop tighter or wider. Consistent framing across all portraits."
+  "IDENTICAL portrait framing for ALL images: head and upper torso only, bust-length, both shoulders visible. Vertical 3:4 portrait. Head should occupy about 30-35% of total image height, with the eye line around 38-42% from the top edge. Same camera distance, same head size in frame, same crop — medical and corporate MUST have identical proportions. Do not crop tighter or wider. No full body, no hands in frame, no waist crop. Consistent framing across all portraits."
 
 const DEFAULT_ANALYSIS_PROMPT = `You are a professional portrait photography prompt engineer for an AI image generation system. Your goal is to produce text prompts that will generate portraits with MAXIMUM LIKENESS to the source photo — the person must be instantly recognizable.
 
@@ -22,7 +22,7 @@ Analyze this photo of a person named "{employeeName}". You MUST describe the fac
 
 Based on your analysis, create TWO detailed prompts. Each prompt MUST start with a full, precise description of this person's face and head so the generated image looks like the EXACT SAME person. Identity preservation is mandatory.
 
-UNIVERSAL FRAMING RULE: All portraits MUST use identical composition. Include this phrase in BOTH prompts: "Identical portrait framing: head and upper torso only, bust-length, shoulders visible, same head-to-body scale as all other portraits in the system." Medical and corporate must have the SAME crop and proportions.
+UNIVERSAL FRAMING RULE: All portraits MUST use identical composition. Include this phrase in BOTH prompts: "Identical portrait framing: head and upper torso only, bust-length, both shoulders visible, head occupies about 30-35% of image height, eye line around 38-42% from top, same head-to-body scale as all other portraits in the system." Medical and corporate must have the SAME crop and proportions.
 
 1. MEDICAL PORTRAIT: First describe the person's face in full detail (same person identity), then the framing phrase, then: wearing a premium-quality crisp white medical doctor's coat (expensive fabric, luxury tailoring). NO stethoscope, NO medical accessories — only the white coat. Professional medical setting. Clean, well-lit studio backdrop in light gray or white. Warm, approachable expression. Mouth closed, lips together. High-quality studio photography lighting.
 
@@ -44,7 +44,7 @@ const DEFAULT_CORPORATE_INSTRUCTION =
   "Show this person in premium professional business attire (expensive dark suit or blazer, designer quality, luxury tailoring). {backdrop} Confident, professional expression. Mouth closed, lips together. Preserve exact facial likeness."
 
 const DEFAULT_NEGATIVE_PROMPT =
-  "Avoid: blurry, distorted face, different identity, different person, over-smoothing, artificial skin, wrong proportions, cheap-looking clothing, plastic skin, unnatural lighting, stethoscope, medical accessories, open mouth, mouth open."
+  "Avoid: blurry, distorted face, different identity, different person, over-smoothing, artificial skin, wrong proportions, cheap-looking clothing, plastic skin, unnatural lighting, stethoscope, medical accessories, open mouth, mouth open, pasted cutout look, harsh compositing edges, floating subject, extreme close-up, tiny head in frame, oversized head, full-body framing, hands in frame."
 
 /** Значения по умолчанию для отображения в настройках (когда поле пустое в БД). */
 export function getPromptDefaults() {
