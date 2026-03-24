@@ -24,9 +24,9 @@ Based on your analysis, create TWO detailed prompts. Each prompt MUST start with
 
 UNIVERSAL FRAMING RULE: All portraits MUST use identical composition. Include this phrase in BOTH prompts: "Identical portrait framing: head and upper torso only, bust-length, both shoulders visible, head occupies about 30-35% of image height, eye line around 38-42% from top, same head-to-body scale as all other portraits in the system." Medical and corporate must have the SAME crop and proportions.
 
-1. MEDICAL PORTRAIT: First describe the person's face in full detail (same person identity), then the framing phrase, then: wearing a premium-quality crisp white medical doctor's coat (expensive fabric, luxury tailoring). NO stethoscope, NO medical accessories — only the white coat. Professional medical setting. Clean, well-lit studio backdrop in light gray or white. Warm, approachable expression. Mouth closed, lips together. High-quality studio photography lighting.
+1. MEDICAL PORTRAIT: First describe the person's face in full detail (same person identity), then the framing phrase, then: wearing a premium-quality crisp white medical doctor's coat (expensive fabric, luxury tailoring). NO stethoscope, NO medical accessories — only the white coat. Professional medical setting. Clean, well-lit studio backdrop in light gray or white. Warm, approachable expression. Mouth closed, lips together. High-quality studio photography lighting. Tack-sharp focus on eyes and facial features, crisp hair strands, clear eyelashes, natural skin texture, high micro-contrast, no softness or haze.
 
-2. CORPORATE PORTRAIT: First describe the person's face in full detail (identical person), then the same framing phrase (identical wording), then: in premium professional business attire (expensive dark suit or blazer, designer quality, luxury tailoring). Clean corporate background in medium gray or soft slate, well-lit. Confident, professional expression. Mouth closed, lips together. Studio photography with rim lighting.
+2. CORPORATE PORTRAIT: First describe the person's face in full detail (identical person), then the same framing phrase (identical wording), then: in premium professional business attire (expensive dark suit or blazer, designer quality, luxury tailoring). Clean corporate background in medium gray or soft slate, well-lit. Confident, professional expression. Mouth closed, lips together. Studio photography with rim lighting. Tack-sharp focus on eyes and facial features, crisp hair strands, clear eyelashes, natural skin texture, high micro-contrast, no softness or haze.
 
 CRITICAL: Both prompts must describe the EXACT SAME person. The face must be identical — recognizable at first glance. Lead with exhaustive facial description. Clothing must be described as premium/expensive/high-quality in both. Framing must be identical in both prompts.
 
@@ -38,13 +38,13 @@ Respond with ONLY one valid JSON object (no markdown, no \`\`\` code fences, no 
 }`
 
 const DEFAULT_MEDICAL_INSTRUCTION =
-  "Show this person in a premium-quality crisp white medical doctor's coat (expensive fabric, luxury tailoring). No stethoscope, no medical accessories — only the white coat. {backdrop} Warm, approachable expression. Mouth closed, lips together. Preserve exact facial likeness."
+  "Show this person in a premium-quality crisp white medical doctor's coat (expensive fabric, luxury tailoring). No stethoscope, no medical accessories — only the white coat. {backdrop} Warm, approachable expression. Mouth closed, lips together. Preserve exact facial likeness. Tack-sharp eyes and facial features, crisp hair detail, clear eyelashes, natural skin texture, high micro-contrast, no soft-focus look."
 
 const DEFAULT_CORPORATE_INSTRUCTION =
-  "Show this person in premium professional business attire (expensive dark suit or blazer, designer quality, luxury tailoring). {backdrop} Confident, professional expression. Mouth closed, lips together. Preserve exact facial likeness."
+  "Show this person in premium professional business attire (expensive dark suit or blazer, designer quality, luxury tailoring). {backdrop} Confident, professional expression. Mouth closed, lips together. Preserve exact facial likeness. Tack-sharp eyes and facial features, crisp hair detail, clear eyelashes, natural skin texture, high micro-contrast, no soft-focus look."
 
 const DEFAULT_NEGATIVE_PROMPT =
-  "Avoid: blurry, distorted face, different identity, different person, over-smoothing, artificial skin, wrong proportions, cheap-looking clothing, plastic skin, unnatural lighting, stethoscope, medical accessories, open mouth, mouth open, pasted cutout look, harsh compositing edges, floating subject, extreme close-up, tiny head in frame, oversized head, full-body framing, hands in frame."
+  "Avoid: blurry, soft focus, haze, low-resolution look, smeared details, washed-out details, distorted face, different identity, different person, over-smoothing, artificial skin, plastic skin, wrong proportions, cheap-looking clothing, unnatural lighting, stethoscope, medical accessories, open mouth, mouth open, pasted cutout look, harsh compositing edges, floating subject, extreme close-up, tiny head in frame, oversized head, full-body framing, hands in frame."
 
 /** Значения по умолчанию для отображения в настройках (когда поле пустое в БД). */
 export function getPromptDefaults() {

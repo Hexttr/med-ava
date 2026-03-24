@@ -6,12 +6,12 @@
 import sharp from "sharp"
 
 /** Максимальная сторона (px). Gemini хорошо работает с 1024–1536. */
-const GEMINI_MAX_SIDE = 1024
-const PORTRAIT_REFERENCE_WIDTH = 768
-const PORTRAIT_REFERENCE_HEIGHT = 1024
+const GEMINI_MAX_SIDE = 1536
+const PORTRAIT_REFERENCE_WIDTH = 1152
+const PORTRAIT_REFERENCE_HEIGHT = 1536
 
 /** Качество JPEG для баланса качества и размера. */
-const JPEG_QUALITY = 90
+const JPEG_QUALITY = 94
 
 export interface PreprocessResult {
   base64: string
@@ -24,7 +24,7 @@ export interface PreprocessOptions {
 
 /**
  * Предобрабатывает буфер изображения для Gemini:
- * - Ресайз до max 1024px по большей стороне (сохраняя пропорции)
+ * - Ресайз до max 1536px по большей стороне (сохраняя пропорции)
  * - Конвертация в JPEG
  */
 export async function preprocessForGemini(
@@ -37,11 +37,13 @@ export async function preprocessForGemini(
   if (mode === "portrait-reference") {
     // Normalize the source portrait closer to the target 3:4 framing so the
     // generation model receives a more consistent head-to-body scale.
-    pipeline = pipeline.resize(PORTRAIT_REFERENCE_WIDTH, PORTRAIT_REFERENCE_HEIGHT, {
-      fit: "cover",
-      position: "attention",
-      withoutEnlargement: false,
-    })
+    pipeline = pipeline
+      .resize(PORTRAIT_REFERENCE_WIDTH, PORTRAIT_REFERENCE_HEIGHT, {
+        fit: "cover",
+        position: "attention",
+        withoutEnlargement: false,
+      })
+      .sharpen(0.8)
   } else if (mode === "background-reference") {
     // Turn the uploaded background into a softer portrait plate reference
     // instead of a literal hard composite target.
