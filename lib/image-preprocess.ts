@@ -15,7 +15,7 @@ const JPEG_QUALITY = 94
 
 export interface PreprocessResult {
   base64: string
-  mimeType: "image/jpeg"
+  mimeType: "image/jpeg" | "image/png"
 }
 
 export interface PreprocessOptions {
@@ -25,7 +25,7 @@ export interface PreprocessOptions {
 /**
  * Предобрабатывает буфер изображения для Gemini:
  * - Ресайз до max 1536px по большей стороне (сохраняя пропорции)
- * - Конвертация в JPEG
+ * - Конвертация в JPEG или PNG в зависимости от режима
  */
 export async function preprocessForGemini(
   buffer: Buffer,
@@ -41,7 +41,7 @@ export async function preprocessForGemini(
       .resize(PORTRAIT_REFERENCE_WIDTH, PORTRAIT_REFERENCE_HEIGHT, {
         fit: "cover",
         position: "attention",
-        withoutEnlargement: false,
+        withoutEnlargement: true,
       })
       .sharpen(0.8)
   } else if (mode === "background-reference") {
@@ -66,10 +66,16 @@ export async function preprocessForGemini(
     }
   }
 
-  const jpegBuffer = await pipeline.jpeg({ quality: JPEG_QUALITY }).toBuffer()
+  if (mode === "portrait-reference") {
+    const pngBuffer = await pipeline.png({ compressionLevel: 9 }).toBuffer()
+    return {
+      base64: pngBuffer.toString("base64"),
+      mimeType: "image/png",
+    }
+  }
 
   return {
-    base64: jpegBuffer.toString("base64"),
+    base64: (await pipeline.jpeg({ quality: JPEG_QUALITY }).toBuffer()).toString("base64"),
     mimeType: "image/jpeg",
   }
 }
