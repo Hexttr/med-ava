@@ -49,7 +49,9 @@ function PanelImage({
   title: string
   onOpen: (url: string) => void
 }) {
-  if (!imageUrl) {
+  const [failed, setFailed] = useState(false)
+
+  if (!imageUrl || failed) {
     return (
       <div className="flex size-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
         Изображение пока недоступно
@@ -67,6 +69,7 @@ function PanelImage({
         src={imageUrl}
         alt={title}
         className="size-full object-cover object-top transition duration-300 group-hover:scale-[1.02]"
+        onError={() => setFailed(true)}
       />
       <div className="absolute inset-x-3 bottom-3 flex items-center justify-between rounded-xl bg-black/55 px-3 py-2 text-xs text-white opacity-0 transition group-hover:opacity-100">
         <span>Открыть крупнее</span>
@@ -86,9 +89,9 @@ function PhotoPanel({
   onOpen,
 }: PhotoPanelProps) {
   return (
-    <div className="overflow-hidden rounded-[1.25rem] border border-border/70 bg-card/90 shadow-sm backdrop-blur">
-      <div className="flex min-h-[4rem] items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
-        <p className="text-sm font-semibold leading-5 text-foreground">{title}</p>
+    <div className="overflow-hidden rounded-[1.25rem] border border-border/80 bg-white/95 shadow-sm backdrop-blur">
+      <div className="flex min-h-[4.5rem] items-start justify-between gap-3 border-b border-border/80 px-5 py-3.5">
+        <p className="text-[15px] font-semibold leading-6 text-foreground md:text-base">{title}</p>
         {onVote && currentVote ? (
           <div
             className={cn(
@@ -104,11 +107,11 @@ function PhotoPanel({
       </div>
 
       <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted/30">
-        <PanelImage imageUrl={imageUrl} title={title} onOpen={onOpen} />
+        <PanelImage key={imageUrl ?? "missing"} imageUrl={imageUrl} title={title} onOpen={onOpen} />
       </div>
 
       {onVote ? (
-        <div className="grid grid-cols-1 gap-2 border-t border-border/70 bg-muted/10 p-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 border-t border-border/80 bg-muted/10 p-3 sm:grid-cols-2">
           <Button
             type="button"
             variant={currentVote === "like" ? "default" : "outline"}
@@ -134,7 +137,7 @@ function PhotoPanel({
           </Button>
         </div>
       ) : footer ? (
-        <div className="border-t border-border/70 bg-muted/10 px-4 py-3 text-sm text-muted-foreground">
+        <div className="border-t border-border/80 bg-muted/10 px-4 py-3 text-center text-sm text-muted-foreground">
           {footer}
         </div>
       ) : null}
@@ -222,7 +225,21 @@ export function ReviewClient() {
       )
       toast.success("Оценка сохранена")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Не удалось сохранить голос")
+      const message = error instanceof Error ? error.message : "Не удалось сохранить голос"
+      if (message.includes("Набор портретов не найден")) {
+        try {
+          const refreshed = await fetchPublicReviewEmployee(selectedEmployee.employeeId)
+          setSelectedEmployee(refreshed)
+          toast.error("Этот набор уже был удалён. Страница обновлена.")
+        } catch {
+          setSelectedEmployee(null)
+          setSelectedEmployeeId(null)
+          setResults([])
+          toast.error("Набор уже удалён из системы.")
+        }
+      } else {
+        toast.error(message)
+      }
     } finally {
       setVotingStyle(null)
     }
@@ -233,7 +250,7 @@ export function ReviewClient() {
 
   return (
     <>
-      <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.10),_transparent_34%),linear-gradient(to_bottom,_#f8fbff,_#ffffff_32%,_#f8fafc_100%)]">
+      <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.16),_transparent_34%),linear-gradient(to_bottom,_#eef5ff,_#ffffff_30%,_#f1f5f9_100%)]">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute left-[-10rem] top-24 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl" />
           <div className="absolute right-[-6rem] top-16 h-80 w-80 rounded-full bg-cyan-400/10 blur-3xl" />
@@ -241,7 +258,7 @@ export function ReviewClient() {
 
         <div className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-8 md:px-6 md:py-12">
           <section className="mx-auto w-full max-w-5xl">
-            <div className="rounded-[2rem] border border-border/60 bg-white/85 px-6 py-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur md:px-10 md:py-10">
+            <div className="rounded-[2rem] border border-slate-200/90 bg-white/92 px-6 py-8 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur md:px-10 md:py-10">
               <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
                 <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1 text-sm text-muted-foreground shadow-sm">
                   <UserSearch className="size-4" />
@@ -255,7 +272,7 @@ export function ReviewClient() {
                 </p>
               </div>
 
-              <div className="mx-auto mt-8 max-w-4xl rounded-[1.5rem] border border-border/70 bg-background/90 p-4 shadow-sm md:p-5">
+              <div className="mx-auto mt-8 max-w-4xl rounded-[1.5rem] border border-slate-200/90 bg-background/95 p-4 shadow-sm md:p-5">
                 <form onSubmit={handleSearchSubmit} className="flex flex-col gap-3 md:flex-row">
                   <div className="relative flex-1">
                     <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -282,7 +299,7 @@ export function ReviewClient() {
 
           <section className="mt-8">
             {showEmptyState && (
-              <Card className="mx-auto max-w-3xl rounded-[1.5rem] border-border/60 bg-white/90 shadow-[0_16px_48px_rgba(15,23,42,0.06)] backdrop-blur">
+              <Card className="mx-auto max-w-3xl rounded-[1.5rem] border-slate-200/90 bg-white/95 shadow-[0_16px_48px_rgba(15,23,42,0.08)] backdrop-blur">
                 <CardContent className="flex min-h-[240px] flex-col items-center justify-center gap-4 p-8 text-center">
                   <div className="flex size-14 items-center justify-center rounded-full bg-muted/60 text-muted-foreground">
                     <Search className="size-6" />
@@ -298,7 +315,7 @@ export function ReviewClient() {
             )}
 
             {showResultsList && (
-              <Card className="mx-auto max-w-3xl rounded-[1.5rem] border-border/60 bg-white/90 shadow-[0_16px_48px_rgba(15,23,42,0.06)] backdrop-blur">
+              <Card className="mx-auto max-w-3xl rounded-[1.5rem] border-slate-200/90 bg-white/95 shadow-[0_16px_48px_rgba(15,23,42,0.08)] backdrop-blur">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-xl">Найдено несколько вариантов</CardTitle>
                   <p className="text-sm text-muted-foreground">
@@ -327,7 +344,7 @@ export function ReviewClient() {
             )}
 
             {selectedEmployeeId && loadingEmployee && (
-              <Card className="mx-auto max-w-6xl rounded-[1.5rem] border-border/60 bg-white/90 shadow-[0_16px_48px_rgba(15,23,42,0.06)] backdrop-blur">
+              <Card className="mx-auto max-w-6xl rounded-[1.5rem] border-slate-200/90 bg-white/95 shadow-[0_16px_48px_rgba(15,23,42,0.08)] backdrop-blur">
                 <CardContent className="flex min-h-[420px] items-center justify-center">
                   <div className="flex items-center gap-3 text-sm text-muted-foreground">
                     <Loader2 className="size-4 animate-spin text-primary" />
@@ -339,7 +356,7 @@ export function ReviewClient() {
 
             {selectedEmployee && !loadingEmployee && (
               <div className="mx-auto max-w-6xl">
-                <Card className="overflow-hidden rounded-[1.5rem] border-border/60 bg-white/90 shadow-[0_16px_48px_rgba(15,23,42,0.06)] backdrop-blur">
+                <Card className="overflow-hidden rounded-[1.5rem] border-slate-200/90 bg-white/95 shadow-[0_16px_48px_rgba(15,23,42,0.08)] backdrop-blur">
                   <CardHeader className="border-b border-border/70 bg-gradient-to-r from-primary/[0.05] via-transparent to-cyan-500/[0.04] pb-5">
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div>
@@ -415,7 +432,7 @@ export function ReviewClient() {
       <Dialog open={!!lightboxUrl} onOpenChange={(open) => !open && setLightboxUrl(null)}>
         <DialogContent
           showCloseButton={false}
-          className="max-h-[95vh] max-w-[95vw] overflow-hidden border-0 bg-black/95 p-0"
+          className="flex max-h-[95vh] max-w-[95vw] items-center justify-center overflow-hidden border-0 bg-black/95 p-0"
         >
           <DialogTitle className="sr-only">Просмотр фотографии</DialogTitle>
           {lightboxUrl && (
@@ -432,7 +449,7 @@ export function ReviewClient() {
             <img
               src={lightboxUrl}
               alt=""
-              className="max-h-[95vh] w-auto max-w-full object-contain"
+              className="mx-auto block max-h-[95vh] w-auto max-w-full object-contain"
               draggable={false}
             />
           )}
