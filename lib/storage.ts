@@ -137,6 +137,40 @@ export async function saveBrandingImage(
   return path.join(dir, finalName)
 }
 
+export async function enhanceGeneratedPortrait(dataUrl: string): Promise<string> {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
+  if (!match) return dataUrl
+
+  const mimeType = match[1]
+  const inputBuffer = Buffer.from(match[2], "base64")
+  const image = sharp(inputBuffer, { failOn: "none" })
+  const metadata = await image.metadata()
+  const width = metadata.width ?? 0
+  const height = metadata.height ?? 0
+
+  if (!width || !height) return dataUrl
+
+  const targetHeight = height < 1536 ? Math.min(1536, Math.round(height * 1.35)) : height
+  const targetWidth = width < 1152 ? Math.min(1152, Math.round(width * 1.35)) : width
+
+  const output = image
+    .resize(targetWidth, targetHeight, {
+      fit: "fill",
+      kernel: sharp.kernel.lanczos3,
+      withoutEnlargement: false,
+    })
+    .sharpen({ sigma: 1.1, m1: 1.2, m2: 2.2, x1: 2, y2: 10, y3: 20 })
+    .modulate({ brightness: 1.01, saturation: 1.02 })
+
+  if (mimeType.includes("png")) {
+    return `data:image/png;base64,${(await output.png({ compressionLevel: 9 }).toBuffer()).toString("base64")}`
+  }
+  if (mimeType.includes("webp")) {
+    return `data:image/webp;base64,${(await output.webp({ quality: 96 }).toBuffer()).toString("base64")}`
+  }
+  return `data:image/jpeg;base64,${(await output.jpeg({ quality: 96 }).toBuffer()).toString("base64")}`
+}
+
 export async function applyOverlayLogo(
   dataUrl: string,
   settings: Pick<

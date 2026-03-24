@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import fs from "fs/promises"
 import { getGeminiKey } from "@/lib/settings"
 import { getAppSettings } from "@/lib/app-settings"
-import { applyOverlayLogo, getAbsolutePath } from "@/lib/storage"
+import { applyOverlayLogo, enhanceGeneratedPortrait, getAbsolutePath } from "@/lib/storage"
 import { fetchWithProxy } from "@/lib/fetch-proxy"
 import { logger } from "@/lib/logger"
 import { checkRateLimit } from "@/lib/rate-limit"
@@ -26,6 +26,8 @@ const SHARPNESS_RULES =
   "IMAGE QUALITY RULES: tack-sharp focus on the eyes, eyelashes, eyebrows, lips, and overall facial features. Preserve crisp hair strands, clean edge detail, natural skin texture, and realistic micro-contrast. The final portrait must look sharply resolved and professionally photographed, without soft-focus haze or smeared details."
 const BACKGROUND_REFERENCE_RULES =
   "Treat the second image as a BACKGROUND REFERENCE PLATE, not as a literal pasted layer. Recreate the same scene naturally with matching palette, depth, perspective, softness, and lighting direction, but the final portrait must look like one coherent professional photograph. Avoid any cutout, pasted, or composited look."
+const BACKGROUND_PRIORITY_RULES =
+  "FACIAL PRIORITY RULES: facial fidelity, eye clarity, and facial sharpness are more important than exact background matching. If needed, simplify or approximate the background to preserve a crisp, clean, sharply resolved face. Never sacrifice facial detail for scene fidelity."
 
 type GenerateModelResult =
   | { ok: true; imageUrl: string }
@@ -132,9 +134,9 @@ export async function POST(request: NextRequest) {
 
     let geminiImagePrompt: string
     if (useBackgroundImage && hasReferencePhoto) {
-      geminiImagePrompt = `The FIRST attached image is the REFERENCE PHOTO of the person. The SECOND attached image is the BACKGROUND REFERENCE PLATE for the final scene. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, same identity, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. Mouth closed, lips together. ${BACKGROUND_REFERENCE_RULES} ${HARD_FRAMING_RULES} ${SHARPNESS_RULES} ${settingInstruction}. Clothing must look premium and high-quality. Use soft, physically believable transitions between the person and the background. Output the generated portrait image.${negativeSuffix}`
+      geminiImagePrompt = `The FIRST attached image is the REFERENCE PHOTO of the person. The SECOND attached image is the BACKGROUND REFERENCE PLATE for the final scene. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, same identity, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. Mouth closed, lips together. ${BACKGROUND_REFERENCE_RULES} ${BACKGROUND_PRIORITY_RULES} ${HARD_FRAMING_RULES} ${SHARPNESS_RULES} ${settingInstruction}. Clothing must look premium and high-quality. Use soft, physically believable transitions between the person and the background. Output the generated portrait image.${negativeSuffix}`
     } else if (useBackgroundImage && !hasReferencePhoto) {
-      geminiImagePrompt = `The attached image is the BACKGROUND REFERENCE PLATE for the final scene. Generate ONE professional studio portrait photo. ${BACKGROUND_REFERENCE_RULES} ${HARD_FRAMING_RULES} ${SHARPNESS_RULES} ${universalFraming} ${prompt}. Clothing must look premium and high-quality. Ultra high quality, professional photography, sharp focus, natural skin texture. Output the generated portrait image.${negativeSuffix}`
+      geminiImagePrompt = `The attached image is the BACKGROUND REFERENCE PLATE for the final scene. Generate ONE professional studio portrait photo. ${BACKGROUND_REFERENCE_RULES} ${BACKGROUND_PRIORITY_RULES} ${HARD_FRAMING_RULES} ${SHARPNESS_RULES} ${universalFraming} ${prompt}. Clothing must look premium and high-quality. Ultra high quality, professional photography, sharp focus, natural skin texture. Output the generated portrait image.${negativeSuffix}`
     } else if (hasReferencePhoto) {
       geminiImagePrompt = `The attached image is the REFERENCE PHOTO of the person. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. Mouth closed, lips together. ${HARD_FRAMING_RULES} ${SHARPNESS_RULES} Only change the setting and clothing as follows: ${settingInstruction}. Clothing must look premium and high-quality. Keep the person's face identical to the reference. Output the generated portrait image.${negativeSuffix}`
     } else {
@@ -192,6 +194,15 @@ export async function POST(request: NextRequest) {
             for (const part of responseParts) {
               if (part.inlineData?.data) {
                 let imageUrl = `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}`
+                try {
+                  imageUrl = await enhanceGeneratedPortrait(imageUrl)
+                } catch (error) {
+                  logger.warn("GENERATE", "Не удалось усилить финальное изображение после генерации", {
+                    model,
+                    attempt,
+                    error: error instanceof Error ? error.message : String(error),
+                  })
+                }
                 try {
                   imageUrl = await applyOverlayLogo(imageUrl, appSettings)
                 } catch (error) {
