@@ -4,6 +4,7 @@ import { saveBase64Image } from "@/lib/storage"
 import { validateBase64Image } from "@/lib/upload-validation"
 import { logger } from "@/lib/logger"
 import { enforceTrustedOrigin } from "@/lib/request-security"
+import { emptyGalleryFeedbackSummary, getGalleryFeedbackMap } from "@/lib/gallery-feedback"
 
 function toItemResponse(row: {
   id: string
@@ -15,7 +16,7 @@ function toItemResponse(row: {
   department_id: string | null
   department_name: string | null
   created_at: number
-}) {
+}, feedback = emptyGalleryFeedbackSummary()) {
   return {
     id: row.id,
     name: row.employee_name ?? row.name,
@@ -25,6 +26,7 @@ function toItemResponse(row: {
     departmentId: row.department_id ?? undefined,
     departmentName: row.department_name ?? undefined,
     createdAt: row.created_at,
+    feedback,
   }
 }
 
@@ -78,7 +80,8 @@ export async function GET(request: NextRequest) {
         )
         .all() as typeof rows
     }
-    return NextResponse.json(rows.map(toItemResponse))
+    const feedbackByItem = getGalleryFeedbackMap(database, rows.map((row) => row.id))
+    return NextResponse.json(rows.map((row) => toItemResponse(row, feedbackByItem[row.id])))
   } catch (e) {
     logger.error("GALLERY", "GET error", { error: e instanceof Error ? e.message : String(e) })
     return NextResponse.json({ error: "Не удалось загрузить галерею" }, { status: 500 })

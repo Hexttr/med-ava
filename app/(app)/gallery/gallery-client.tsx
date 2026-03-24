@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
+import { GalleryFeedbackBadges } from "@/components/gallery-feedback-badges"
 import type { GalleryItem } from "@/lib/types"
 import type { Department } from "@/lib/types"
 import { fetchGallery, deleteGalleryItem } from "@/lib/gallery-api"
@@ -201,7 +202,13 @@ export function GalleryClient() {
           <p className="pr-8 text-sm font-medium text-foreground">{item.name}</p>
           <div className="grid grid-cols-2 gap-2">
             {item.medicalUrl && (
-              <div>
+              <div className="space-y-2">
+                <div className="flex min-h-5 items-center justify-between gap-2">
+                  <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                    Медицинский
+                  </span>
+                  <GalleryFeedbackBadges summary={item.feedback?.medical} />
+                </div>
                 <button
                   type="button"
                   onClick={() => setLightboxUrl(item.medicalUrl)}
@@ -217,7 +224,13 @@ export function GalleryClient() {
               </div>
             )}
             {item.corporateUrl && (
-              <div>
+              <div className="space-y-2">
+                <div className="flex min-h-5 items-center justify-between gap-2">
+                  <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                    Корпоративный
+                  </span>
+                  <GalleryFeedbackBadges summary={item.feedback?.corporate} />
+                </div>
                 <button
                   type="button"
                   onClick={() => setLightboxUrl(item.corporateUrl)}

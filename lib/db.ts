@@ -183,6 +183,34 @@ function runMigrations(database: Database.Database) {
     `)
     database.prepare("UPDATE _schema_version SET version = 4").run()
   }
+
+  if (version < 5) {
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS gallery_feedback_votes (
+        id TEXT PRIMARY KEY,
+        gallery_item_id TEXT NOT NULL,
+        employee_id TEXT NOT NULL,
+        style TEXT NOT NULL,
+        vote TEXT NOT NULL,
+        fingerprint_hash TEXT NOT NULL,
+        ip_hash TEXT NOT NULL,
+        user_agent_hash TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_feedback_unique_viewer
+        ON gallery_feedback_votes(gallery_item_id, style, fingerprint_hash);
+      CREATE INDEX IF NOT EXISTS idx_feedback_gallery_item_id
+        ON gallery_feedback_votes(gallery_item_id);
+      CREATE INDEX IF NOT EXISTS idx_feedback_employee_id
+        ON gallery_feedback_votes(employee_id);
+      CREATE INDEX IF NOT EXISTS idx_feedback_ip_hash
+        ON gallery_feedback_votes(ip_hash);
+      CREATE INDEX IF NOT EXISTS idx_feedback_created_at
+        ON gallery_feedback_votes(created_at);
+    `)
+    database.prepare("UPDATE _schema_version SET version = 5").run()
+  }
 }
 
 export function getUploadsDir(): string {

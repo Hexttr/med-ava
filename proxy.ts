@@ -5,6 +5,8 @@ import { isAuthEnabled } from "@/lib/runtime-config"
 
 const PUBLIC_PATHS = [
   "/login",
+  "/review",
+  "/api/public",
   "/api/auth/login",
   "/api/auth/csrf",
   "/api/auth/logout",

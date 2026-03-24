@@ -1,4 +1,5 @@
 export type PortraitStyle = "medical" | "corporate"
+export type FeedbackVoteValue = "like" | "dislike"
 
 export type ProcessingStatus = "idle" | "uploading" | "analyzing" | "generating" | "complete" | "error"
 
@@ -65,6 +66,22 @@ export interface Employee {
   createdAt: number
 }
 
+export interface GalleryStyleFeedbackSummary {
+  likes: number
+  dislikes: number
+}
+
+export interface GalleryViewerVotes {
+  medical: FeedbackVoteValue | null
+  corporate: FeedbackVoteValue | null
+}
+
+export interface GalleryFeedbackSummary {
+  medical: GalleryStyleFeedbackSummary
+  corporate: GalleryStyleFeedbackSummary
+  viewerVotes?: GalleryViewerVotes
+}
+
 export interface GalleryItem {
   id: string
   name: string
@@ -75,4 +92,34 @@ export interface GalleryItem {
   employeeId?: string
   departmentId?: string
   departmentName?: string
+  feedback?: GalleryFeedbackSummary
+}
+
+export interface PublicReviewSearchResult {
+  employeeId: string
+  name: string
+  departmentName?: string
+}
+
+export interface PublicReviewEmployee {
+  employeeId: string
+  name: string
+  departmentName?: string
+  originalUrl: string | null
+  galleryItemId: string | null
+  medicalUrl: string | null
+  corporateUrl: string | null
+  hasGeneratedSet: boolean
+  viewerVotes: GalleryViewerVotes
+}
+
+export interface PublicReviewEmployeeResponse extends PublicReviewEmployee {
+  feedback: GalleryFeedbackSummary
+}
+
+export interface PublicReviewVoteResponse {
+  galleryItemId: string
+  employeeId: string
+  feedback: GalleryFeedbackSummary
+  viewerVotes: GalleryViewerVotes
 }

@@ -6,6 +6,7 @@ import { X, Download, Loader2, AlertCircle, CheckCircle2, RotateCcw } from "luci
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
+import { GalleryFeedbackBadges } from "@/components/gallery-feedback-badges"
 import {
   Select,
   SelectContent,
@@ -14,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import type { GalleryFeedbackSummary } from "@/lib/types"
 
 export interface BatchPortraitCardItem {
   id: string
@@ -28,6 +30,7 @@ export interface BatchPortraitCardItem {
   error?: string
   departmentId?: string
   departmentName?: string
+  feedback?: GalleryFeedbackSummary
 }
 
 export interface DepartmentOption {
@@ -127,8 +130,9 @@ export function BatchPortraitCard({
 
           {/* Стало — медицинский */}
           <div className="flex flex-col border-r border-border">
-            <div className="flex items-center border-b border-border px-2 py-2">
+            <div className="flex items-center justify-between gap-2 border-b border-border px-2 py-2">
               <span className="text-xs font-medium text-muted-foreground">Стало</span>
+              <GalleryFeedbackBadges summary={item.feedback?.medical} className="flex items-center gap-1" />
             </div>
             <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted/30">
               {regeneratingStyle === "medical" ? (
@@ -205,8 +209,9 @@ export function BatchPortraitCard({
 
           {/* Стало — корпоративный */}
           <div className="flex flex-col">
-            <div className="flex items-center border-b border-border px-2 py-2">
+            <div className="flex items-center justify-between gap-2 border-b border-border px-2 py-2">
               <span className="text-xs font-medium text-muted-foreground">Стало</span>
+              <GalleryFeedbackBadges summary={item.feedback?.corporate} className="flex items-center gap-1" />
             </div>
             <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted/30">
               {regeneratingStyle === "corporate" ? (

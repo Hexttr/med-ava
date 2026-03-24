@@ -26,7 +26,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import type { Department, Employee } from "@/lib/types"
+import type { Department, Employee, GalleryFeedbackSummary } from "@/lib/types"
 import { BatchPortraitCard } from "@/components/batch-portrait-card"
 import {
   fetchDepartments,
@@ -82,7 +82,13 @@ function getExtension(mime: string): string {
 export function BatchClient({ hasApiKey }: BatchClientProps) {
   const [departments, setDepartments] = useState<Department[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
-  const [generationState, setGenerationState] = useState<Record<string, { status: GenStatus; medicalUrl?: string | null; corporateUrl?: string | null; error?: string }>>({})
+  const [generationState, setGenerationState] = useState<Record<string, {
+    status: GenStatus
+    medicalUrl?: string | null
+    corporateUrl?: string | null
+    error?: string
+    feedback?: GalleryFeedbackSummary
+  }>>({})
   const [isProcessing, setIsProcessing] = useState(false)
   const [currentId, setCurrentId] = useState<string | null>(null)
   const [newDeptName, setNewDeptName] = useState("")
@@ -112,12 +118,17 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
       setDepartments(depts)
       setEmployees(emps)
       // Показать «Стало» для сотрудников, у которых уже есть результаты в галерее
-      const byEmployee = new Map<string, { medicalUrl: string | null; corporateUrl: string | null }>()
+      const byEmployee = new Map<string, {
+        medicalUrl: string | null
+        corporateUrl: string | null
+        feedback?: GalleryFeedbackSummary
+      }>()
       for (const item of galleryItems) {
         if (item.employeeId && !byEmployee.has(item.employeeId)) {
           byEmployee.set(item.employeeId, {
             medicalUrl: item.medicalUrl ?? null,
             corporateUrl: item.corporateUrl ?? null,
+            feedback: item.feedback,
           })
         }
       }
@@ -128,6 +139,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
             status: "complete",
             medicalUrl: urls.medicalUrl,
             corporateUrl: urls.corporateUrl,
+            feedback: urls.feedback,
           }
         }
         return next
@@ -302,6 +314,10 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
             status: "complete",
             medicalUrl: genMedical ? medicalUrl : prev[id]?.medicalUrl ?? null,
             corporateUrl: genCorporate ? corporateUrl : prev[id]?.corporateUrl ?? null,
+            feedback: {
+              medical: { likes: 0, dislikes: 0 },
+              corporate: { likes: 0, dislikes: 0 },
+            },
           },
         }))
         const finalMedical = genMedical ? medicalUrl : null
@@ -729,6 +745,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
                 error: gen?.error,
                 departmentId: emp.departmentId ?? undefined,
                 departmentName: emp.departmentName,
+                feedback: gen?.feedback,
               }}
               index={displayedEmployees.findIndex((e) => e.id === emp.id)}
               isCurrent={currentId === emp.id}

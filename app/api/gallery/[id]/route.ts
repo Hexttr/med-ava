@@ -4,6 +4,7 @@ import { removeFile, saveBase64Image } from "@/lib/storage"
 import { validateBase64Image } from "@/lib/upload-validation"
 import { logger } from "@/lib/logger"
 import { enforceTrustedOrigin } from "@/lib/request-security"
+import { deleteGalleryFeedbackForGalleryItems, emptyGalleryFeedbackSummary, getGalleryFeedbackMap } from "@/lib/gallery-feedback"
 
 function toItemResponse(row: {
   id: string
@@ -14,7 +15,7 @@ function toItemResponse(row: {
   department_id: string | null
   department_name: string | null
   created_at: number
-}) {
+}, feedback = emptyGalleryFeedbackSummary()) {
   return {
     id: row.id,
     name: row.name,
@@ -24,6 +25,7 @@ function toItemResponse(row: {
     departmentId: row.department_id ?? undefined,
     departmentName: row.department_name ?? undefined,
     createdAt: row.created_at,
+    feedback,
   }
 }
 
@@ -76,7 +78,8 @@ export async function PATCH(
          WHERE g.id = ?`
       )
       .get(id) as Parameters<typeof toItemResponse>[0]
-    return NextResponse.json(toItemResponse(updated))
+    const feedback = getGalleryFeedbackMap(database, [id])[id]
+    return NextResponse.json(toItemResponse(updated, feedback))
   } catch (e) {
     logger.error("GALLERY", "PATCH error", { error: e instanceof Error ? e.message : String(e) })
     return NextResponse.json({ error: "Не удалось обновить" }, { status: 500 })
@@ -101,6 +104,7 @@ export async function DELETE(
     }
     if (row.medical_path) await removeFile(row.medical_path)
     if (row.corporate_path) await removeFile(row.corporate_path)
+    deleteGalleryFeedbackForGalleryItems(database, [id])
     database.prepare("DELETE FROM gallery_items WHERE id = ?").run(id)
     return NextResponse.json({ success: true })
   } catch (e) {

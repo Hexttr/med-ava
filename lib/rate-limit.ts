@@ -3,8 +3,8 @@
  * Ограничение: N запросов в минуту на IP.
  */
 
-const windowMs = 60 * 1000 // 1 минута
-const maxRequests = 60 // analyze и generate по отдельности (до 60 сотрудников в минуту)
+const defaultWindowMs = 60 * 1000 // 1 минута
+const defaultMaxRequests = 60 // analyze и generate по отдельности (до 60 сотрудников в минуту)
 
 const store = new Map<string, { count: number; resetAt: number }>()
 
@@ -15,9 +15,15 @@ function cleanup() {
   }
 }
 
-export function checkRateLimit(identifier: string): { allowed: boolean; remaining: number; resetIn: number } {
+export function checkRateLimit(
+  identifier: string,
+  options?: { windowMs?: number; maxRequests?: number }
+): { allowed: boolean; remaining: number; resetIn: number } {
   const now = Date.now()
   if (store.size > 1000) cleanup()
+
+  const windowMs = options?.windowMs ?? defaultWindowMs
+  const maxRequests = options?.maxRequests ?? defaultMaxRequests
 
   let entry = store.get(identifier)
   if (!entry || entry.resetAt < now) {
