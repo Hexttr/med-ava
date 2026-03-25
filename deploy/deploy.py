@@ -4,7 +4,7 @@
 
 Ожидаемый workflow:
 1. Один раз выполнить bootstrap_production.py
-2. Добавить deploy key в DEPLOY_KEY_FILE
+2. Настроить один из способов доступа: DEPLOY_KEY_FILE / DEPLOY_PASSWORD / ssh-agent / стандартный ключ в ~/.ssh
 3. Выполнять python deploy/deploy.py для каждого релиза
 """
 
@@ -79,6 +79,14 @@ def sudo(command: str) -> str:
     return f"sudo -n bash -lc {command!r}"
 
 
+def describe_auth_method(args: argparse.Namespace) -> str:
+    if args.key_file:
+        return f"key file: {args.key_file}"
+    if args.password:
+        return "password"
+    return "ssh-agent/default ssh keys"
+
+
 def systemd_service(app_dir: str, runtime_user: str) -> str:
     return f"""[Unit]
 Description=PhotoHUB Enterprise (med-ava)
@@ -144,24 +152,36 @@ def main() -> None:
     if not KNOWN_HOSTS.exists():
         raise SystemExit(f"known_hosts file not found: {KNOWN_HOSTS}")
 
-    if not args.key_file and not args.password:
-        raise SystemExit("Specify DEPLOY_KEY_FILE/--key-file or DEPLOY_PASSWORD/--password")
-
     ssh = load_client(KNOWN_HOSTS)
     connect_kwargs = {
         "hostname": args.host,
         "username": args.user,
         "timeout": 30,
-        "look_for_keys": False,
-        "allow_agent": False,
     }
     if args.key_file:
+        if not Path(args.key_file).expanduser().exists():
+            raise SystemExit(f"Key file not found: {args.key_file}")
         connect_kwargs["key_filename"] = args.key_file
-    else:
+        connect_kwargs["look_for_keys"] = False
+        connect_kwargs["allow_agent"] = False
+    elif args.password:
         connect_kwargs["password"] = args.password
+        connect_kwargs["look_for_keys"] = False
+        connect_kwargs["allow_agent"] = False
+    else:
+        connect_kwargs["look_for_keys"] = True
+        connect_kwargs["allow_agent"] = True
 
     safe_print(f"\n=== Подключение к {args.user}@{args.host} ===\n")
-    ssh.connect(**connect_kwargs)
+    safe_print(f"--- Способ аутентификации: {describe_auth_method(args)} ---")
+    try:
+        ssh.connect(**connect_kwargs)
+    except paramiko.AuthenticationException as error:
+        raise SystemExit(
+            "SSH authentication failed. "
+            "Provide DEPLOY_KEY_FILE/--key-file, DEPLOY_PASSWORD/--password, "
+            "or ensure ssh-agent/default ~/.ssh keys are available."
+        ) from error
 
     try:
         safe_print("--- 1. Подготовка репозитория ---")
@@ -176,11 +196,21 @@ def main() -> None:
             )
             run_ssh(ssh, f"tar -xzf {remote_archive} -C {args.app_dir}")
         else:
+            prepare_repo_command = (
+                f"mkdir -p {args.app_dir} && "
+                f"if test -d {args.app_dir}/.git; then "
+                f"cd {args.app_dir} && git fetch origin && git checkout {args.branch} && git pull --ff-only origin {args.branch}; "
+                f"else "
+                "tmp_dir=$(mktemp -d /tmp/med-ava-clone-XXXXXX) && "
+                f"git clone -b {args.branch} {REPO_URL} \"$tmp_dir\" && "
+                f"find {args.app_dir} -mindepth 1 -maxdepth 1 ! -name data ! -name .env -exec rm -rf {{}} + && "
+                f"cp -a \"$tmp_dir\"/. {args.app_dir}/ && "
+                "rm -rf \"$tmp_dir\"; "
+                "fi"
+            )
             run_ssh(
                 ssh,
-                f"mkdir -p {args.app_dir} && "
-                f"(test -d {args.app_dir}/.git && cd {args.app_dir} && git fetch origin && git checkout {args.branch} && git pull --ff-only origin {args.branch}) || "
-                f"(git clone -b {args.branch} {REPO_URL} {args.app_dir})"
+                prepare_repo_command
             )
 
         safe_print("\n--- 2. Настройка окружения и прав ---")
