@@ -98,6 +98,10 @@ def dependency_install_command(app_dir: str) -> str:
     )
 
 
+def clean_build_command(app_dir: str) -> str:
+    return f"cd {app_dir} && rm -rf .next && npm run build"
+
+
 def systemd_service(app_dir: str, runtime_user: str) -> str:
     return f"""[Unit]
 Description=PhotoHUB Enterprise (med-ava)
@@ -255,7 +259,7 @@ def main() -> None:
         run_ssh(ssh, f"cd {args.app_dir} && npm run typecheck")
         run_ssh(ssh, f"cd {args.app_dir} && npm run lint")
         if not args.skip_build:
-            run_ssh(ssh, f"cd {args.app_dir} && npm run build")
+            run_ssh(ssh, clean_build_command(args.app_dir))
 
         safe_print("\n--- 4. Обновление systemd ---")
         service_content = systemd_service(args.app_dir, args.runtime_user)
