@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
     const modelAnalysis = appSettings.modelAnalysis || "gemini-2.5-flash"
     const backgroundMode = appSettings.backgroundMode === "image" ? "image" : "description"
     const defaultBackdropMedical = "Clean, well-lit studio backdrop in light gray or white."
-    const defaultBackdropCorporate = "Clean corporate background in medium gray or soft slate, well-lit."
+    const defaultBackdropCorporate = "Clean corporate background in light gray, well-lit."
 
     // Приоритет: изображение > текст > базовые настройки
     const bgMedicalImagePath = appSettings.backgroundMedicalImage?.trim()
@@ -230,7 +230,7 @@ export async function POST(request: NextRequest) {
       geminiImagePrompt = `Professional studio portrait photo. ${HARD_FRAMING_RULES} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} ${universalFraming} ${prompt}. CRITICAL IDENTITY: The face MUST match the person described above exactly — maximum likeness, same person. Ultra high quality, professional photography, sharp focus, natural skin texture. Clothing must look premium and high-quality. ${
         style === "medical"
           ? (backgroundMedical ? `${backdropMedical} Medical professional aesthetic.` : "Clean white/light gray backdrop, medical professional aesthetic.")
-          : (backgroundCorporate ? `${backdropCorporate} Business professional aesthetic.` : "Medium gray corporate backdrop, business professional aesthetic.")
+          : (backgroundCorporate ? `${backdropCorporate} Business professional aesthetic.` : "Light gray corporate backdrop, business professional aesthetic.")
       }${negativeSuffix}`
     }
 

@@ -76,6 +76,10 @@ function buildSettingsAssetPreviewUrl(assetPath: string): string {
   return `/api/files/${assetPath}?preview=${Date.now()}`
 }
 
+function buildBackgroundPreviewUrl(type: "medical" | "corporate"): string {
+  return `/api/settings/backgrounds?type=${type}&preview=${Date.now()}`
+}
+
 export function SettingsForm({ hasKey, appSettings: initialAppSettings }: SettingsFormProps) {
   const router = useRouter()
   const [apiKey, setApiKey] = useState("")
@@ -143,7 +147,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
     }
 
     if (savedSettings?.backgroundMedicalImage && !clearMedicalRequested) {
-      setBgMedicalPreviewUrl(buildSettingsAssetPreviewUrl(savedSettings.backgroundMedicalImage))
+      setBgMedicalPreviewUrl(buildBackgroundPreviewUrl("medical"))
       return
     }
 
@@ -158,7 +162,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
     }
 
     if (savedSettings?.backgroundCorporateImage && !clearCorporateRequested) {
-      setBgCorporatePreviewUrl(buildSettingsAssetPreviewUrl(savedSettings.backgroundCorporateImage))
+      setBgCorporatePreviewUrl(buildBackgroundPreviewUrl("corporate"))
       return
     }
 
@@ -552,7 +556,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
                     <Label htmlFor="bg-corporate" className="text-sm font-semibold">Фон 2 — корпоративный</Label>
                     <Textarea
                       id="bg-corporate"
-                      placeholder="Оставьте пустым для базовых настроек (тёмно-серый/синий)"
+                      placeholder="Оставьте пустым для базовых настроек (светло-серый)"
                       value={bgCorporate}
                       onChange={(e) => setBgCorporate(e.target.value)}
                       rows={3}

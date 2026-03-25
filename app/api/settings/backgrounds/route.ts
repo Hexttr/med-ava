@@ -1,11 +1,48 @@
 import { NextRequest, NextResponse } from "next/server"
+import fs from "fs/promises"
+import path from "path"
 import { getAppSettings, setAppSettings } from "@/lib/app-settings"
-import { saveBackgroundImage, removeFile } from "@/lib/storage"
+import { getAbsolutePath, saveBackgroundImage, removeFile } from "@/lib/storage"
 import { logger } from "@/lib/logger"
 import { enforceTrustedOrigin } from "@/lib/request-security"
 
 const MAX_SIZE = 10 * 1024 * 1024 // 10 MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"]
+
+export async function GET(request: NextRequest) {
+  try {
+    const type = request.nextUrl.searchParams.get("type")
+    if (type !== "medical" && type !== "corporate") {
+      return NextResponse.json({ error: "Invalid background type" }, { status: 400 })
+    }
+
+    const settings = getAppSettings()
+    const relativePath = type === "medical" ? settings.backgroundMedicalImage : settings.backgroundCorporateImage
+    if (!relativePath) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
+
+    const fullPath = getAbsolutePath(relativePath)
+    const stat = await fs.stat(fullPath).catch(() => null)
+    if (!stat?.isFile()) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
+
+    const buf = await fs.readFile(fullPath)
+    const ext = path.extname(fullPath).toLowerCase()
+    const mime = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg"
+
+    return new NextResponse(buf, {
+      headers: {
+        "Content-Type": mime,
+        "Cache-Control": "private, no-store",
+      },
+    })
+  } catch (e) {
+    logger.error("SETTINGS", "Backgrounds GET error", { error: e instanceof Error ? e.message : String(e) })
+    return NextResponse.json({ error: "Не удалось загрузить превью фона" }, { status: 500 })
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
