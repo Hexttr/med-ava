@@ -53,6 +53,7 @@ interface AppSettingsData {
 interface SettingsFormProps {
   hasKey: boolean
   appSettings?: AppSettingsData
+  buildVersion?: string
 }
 
 type PromptSectionId = "analysis" | "framing" | "medical" | "corporate" | "negative"
@@ -83,7 +84,7 @@ function buildBackgroundPreviewUrl(type: "medical" | "corporate", pathHint?: str
   return `/api/settings/backgrounds?type=${type}${hint}&preview=${Date.now()}`
 }
 
-export function SettingsForm({ hasKey, appSettings: initialAppSettings }: SettingsFormProps) {
+export function SettingsForm({ hasKey, appSettings: initialAppSettings, buildVersion }: SettingsFormProps) {
   const router = useRouter()
   const [apiKey, setApiKey] = useState("")
   const [isPending, startTransition] = useTransition()
@@ -161,6 +162,20 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
   useEffect(() => {
     void refreshSettingsFromServer()
   }, [refreshSettingsFromServer])
+
+  useEffect(() => {
+    if (!buildVersion || typeof window === "undefined") return
+
+    const key = "eam-settings-build-version"
+    const previous = window.sessionStorage.getItem(key)
+    if (previous && previous !== buildVersion) {
+      window.sessionStorage.setItem(key, buildVersion)
+      window.location.reload()
+      return
+    }
+
+    window.sessionStorage.setItem(key, buildVersion)
+  }, [buildVersion])
 
   useEffect(() => {
     if (bgMedicalFile) {

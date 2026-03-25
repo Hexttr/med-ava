@@ -1,3 +1,5 @@
+import fs from "fs/promises"
+import path from "path"
 import { getGeminiKey } from "@/lib/settings"
 import { getAppSettings } from "@/lib/app-settings"
 import { getPromptDefaults } from "@/lib/prompts"
@@ -7,8 +9,16 @@ import { SettingsForm } from "./settings-form"
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 
+async function getBuildVersion(): Promise<string> {
+  try {
+    return (await fs.readFile(path.join(process.cwd(), ".next", "BUILD_ID"), "utf-8")).trim()
+  } catch {
+    return "unknown-build"
+  }
+}
+
 export default async function SettingsPage() {
-  const [geminiKey, appSettings] = await Promise.all([getGeminiKey(), getAppSettings()])
+  const [geminiKey, appSettings, buildVersion] = await Promise.all([getGeminiKey(), getAppSettings(), getBuildVersion()])
   const defaults = getPromptDefaults()
   // Показываем в форме фактические значения: из БД или по умолчанию
   const displaySettings = {
@@ -33,6 +43,7 @@ export default async function SettingsPage() {
         <SettingsForm
           hasKey={!!geminiKey}
           appSettings={displaySettings}
+          buildVersion={buildVersion}
         />
       </div>
     </>
