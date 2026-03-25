@@ -9,6 +9,8 @@ import sharp from "sharp"
 const GEMINI_MAX_SIDE = 1536
 const PORTRAIT_REFERENCE_WIDTH = 1152
 const PORTRAIT_REFERENCE_HEIGHT = 1536
+const PORTRAIT_REFERENCE_INNER_WIDTH = 1008
+const PORTRAIT_REFERENCE_INNER_HEIGHT = 1344
 
 /** Качество JPEG для баланса качества и размера. */
 const JPEG_QUALITY = 94
@@ -37,15 +39,36 @@ export async function preprocessForGemini(
   if (mode === "portrait-reference") {
     // Normalize the source portrait onto a stable 3:4 canvas with extra room
     // below the face so tightly cropped shoulder shots do not force the model
-    // back into a tight bust portrait.
-    pipeline = pipeline
-      .resize(PORTRAIT_REFERENCE_WIDTH, PORTRAIT_REFERENCE_HEIGHT, {
+    // back into a tight bust portrait. Keep wider margins so Gemini treats this
+    // image as an identity reference instead of a final composition to transplant.
+    const normalizedReference = await pipeline
+      .resize(PORTRAIT_REFERENCE_INNER_WIDTH, PORTRAIT_REFERENCE_INNER_HEIGHT, {
         fit: "contain",
         position: "top",
-        background: { r: 245, g: 246, b: 248, alpha: 1 },
+        background: { r: 245, g: 246, b: 248, alpha: 0 },
         withoutEnlargement: true,
       })
+      .modulate({ brightness: 1.01, saturation: 0.97 })
       .sharpen(0.8)
+      .png()
+      .toBuffer()
+
+    const pngBuffer = await sharp({
+      create: {
+        width: PORTRAIT_REFERENCE_WIDTH,
+        height: PORTRAIT_REFERENCE_HEIGHT,
+        channels: 4,
+        background: { r: 245, g: 246, b: 248, alpha: 1 },
+      },
+    })
+      .composite([{ input: normalizedReference, gravity: "north" }])
+      .png({ compressionLevel: 9 })
+      .toBuffer()
+
+    return {
+      base64: pngBuffer.toString("base64"),
+      mimeType: "image/png",
+    }
   } else if (mode === "background-reference") {
     // Turn the uploaded background into a softer portrait plate reference
     // instead of a literal hard composite target.
@@ -65,14 +88,6 @@ export async function preprocessForGemini(
         fit: "inside",
         withoutEnlargement: false,
       })
-    }
-  }
-
-  if (mode === "portrait-reference") {
-    const pngBuffer = await pipeline.png({ compressionLevel: 9 }).toBuffer()
-    return {
-      base64: pngBuffer.toString("base64"),
-      mimeType: "image/png",
     }
   }
 

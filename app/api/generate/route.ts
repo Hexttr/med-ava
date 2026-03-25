@@ -28,6 +28,14 @@ const PRIORITY_ORDER_RULES =
   "PRIORITY ORDER: exact identity and recognizability come first; sharp eyes and facial detail second; stable waist-up framing third; believable premium clothing fourth; recognizable scene usage fifth; exact plate matching last."
 const IDENTITY_USAGE_RULES =
   "IDENTITY ANCHOR RULES: use the supplied identity anchors as immutable guidance for facial structure, age impression, hair, eyes, skin tone, and distinctive traits. Preserve those anchors together with the reference photo. Do not invent or add moles, freckles, beauty marks, acne, blemishes, or any other facial skin marks unless they are clearly visible in the reference photo or explicitly present in the identity anchors."
+const REPHOTOGRAPH_RULES =
+  "RE-PHOTOGRAPH RULES: treat the reference photo as identity guidance only. Re-photograph the same person from scratch as a newly rendered professional portrait. Do not preserve the exact source pixels, exact source lighting, original neckline crop, original clothing folds, or raw background remnants."
+const ANTI_TRANSPLANT_RULES =
+  "ANTI-TRANSPLANT RULES: never perform a simple background swap, pasted cutout, source-photo transplant, or unchanged face/body insertion. The final result must be a fully re-rendered coherent photograph of the same person in the requested styling."
+const SECOND_PASS_REWRITE_RULES =
+  "RETRY CORRECTION: the previous attempt was too close to the source image or looked composited. Start over and synthesize a fresh portrait of the same person with newly rendered clothing, torso, facial shading, edges, and lighting integration."
+const FINAL_PASS_REWRITE_RULES =
+  "FINAL RETRY CORRECTION: absolutely avoid preserving the raw source composition. The result must look like a newly photographed portrait session of the same person, not an edited source image."
 const FRAMING_EXPANSION_RULES =
   "FRAMING EXPANSION RULES: if the reference photo is cropped too tightly, expand the composition naturally to a consistent waist-up portrait instead of copying the tight shoulder crop. Maintain the same person and head scale while revealing more torso below the chest."
 const BACKGROUND_REFERENCE_RULES =
@@ -224,7 +232,9 @@ export async function POST(request: NextRequest) {
         : getCorporateInstruction(backdropCorporate)
 
     const negativePrompt = getNegativePrompt()
-    const negativeSuffix = negativePrompt ? ` ${negativePrompt}` : ""
+    const negativeSuffix = negativePrompt
+      ? ` ${negativePrompt} Avoid: unchanged source photo, direct background replacement, source image transplant, copied cutout edges, copied original clothing, copied original lighting, or a minimally edited source portrait.`
+      : " Avoid: unchanged source photo, direct background replacement, source image transplant, copied cutout edges, copied original clothing, copied original lighting, or a minimally edited source portrait."
     const backgroundSceneSuffix = backgroundSceneAnalysis
       ? ` BACKGROUND SCENE ANALYSIS: ${backgroundSceneAnalysis}`
       : ""
@@ -234,46 +244,60 @@ export async function POST(request: NextRequest) {
       : ""
 
     const hasReferencePhoto = Boolean(referencePhotoBase64?.trim())
-
-    let geminiImagePrompt: string
-    if (useBackgroundImage && hasReferencePhoto) {
-      geminiImagePrompt = `The FIRST attached image is the REFERENCE PHOTO of the person. The SECOND attached image is the BACKGROUND REFERENCE PLATE for the final scene. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, same identity, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. ${IDENTITY_USAGE_RULES}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${FRAMING_EXPANSION_RULES} ${BACKGROUND_REFERENCE_RULES} ${BACKGROUND_PRIORITY_RULES} ${BACKGROUND_INTEGRATION_RULES} ${BACKGROUND_REQUIRED_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES}${backgroundSceneSuffix} ${settingInstruction}. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. Use soft, physically believable transitions between the person and the background. Harmonize with the inferred scene lighting and shadow behavior, but preserve premium studio lighting on the face, clean facial modeling, and glossy commercial portrait contrast. Output the generated portrait image.${negativeSuffix}`
-    } else if (useBackgroundImage && !hasReferencePhoto) {
-      geminiImagePrompt = `The attached image is the BACKGROUND REFERENCE PLATE for the final scene. Generate ONE professional studio portrait photo of the described person. ${IDENTITY_USAGE_RULES}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${FRAMING_EXPANSION_RULES} ${BACKGROUND_REFERENCE_RULES} ${BACKGROUND_PRIORITY_RULES} ${BACKGROUND_INTEGRATION_RULES} ${BACKGROUND_REQUIRED_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES}${backgroundSceneSuffix} ${settingInstruction}. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. Harmonize with the inferred scene lighting and shadow behavior, but preserve premium studio lighting on the face, clean facial modeling, and glossy commercial portrait contrast. Output the generated portrait image.${negativeSuffix}`
-    } else if (hasReferencePhoto) {
-      geminiImagePrompt = `The attached image is the REFERENCE PHOTO of the person. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. ${IDENTITY_USAGE_RULES}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${FRAMING_EXPANSION_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} Only change the setting and clothing as follows: ${settingInstruction}. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. Keep the person's face identical to the reference. Output the generated portrait image.${negativeSuffix}`
-    } else {
-      geminiImagePrompt = `Professional studio portrait photo. ${IDENTITY_USAGE_RULES}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${FRAMING_EXPANSION_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} CRITICAL IDENTITY: The face MUST match the person described above exactly — maximum likeness, same person. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. ${
-        style === "medical"
-          ? (backgroundMedical ? `${backdropMedical} Medical professional aesthetic.` : "Clean white/light gray backdrop, medical professional aesthetic.")
-          : (backgroundCorporate ? `${backdropCorporate} Business professional aesthetic.` : "Medium-gray gradient corporate studio backdrop, business professional aesthetic.")
-      }${negativeSuffix}`
-    }
-
-    const parts: { text?: string; inlineData?: { mimeType: string; data: string } }[] = []
+    const inlineParts: { text?: string; inlineData?: { mimeType: string; data: string } }[] = []
     if (hasReferencePhoto) {
       const rawBase64 = referencePhotoBase64!.replace(/^data:image\/\w+;base64,/, "")
       const buffer = Buffer.from(rawBase64, "base64")
       const { base64, mimeType } = await preprocessForGemini(buffer, { mode: "portrait-reference" })
-      parts.push({
+      inlineParts.push({
         inlineData: { mimeType, data: base64 },
       })
     }
     if (useBackgroundImage) {
       const bgData = useMedicalImage ? backdropMedicalImageBase64! : backdropCorporateImageBase64!
       const bgMime = useMedicalImage ? backdropMedicalMime : backdropCorporateMime
-      parts.push({
+      inlineParts.push({
         inlineData: { mimeType: bgMime, data: bgData },
       })
     }
-    parts.push({ text: `Generate a professional portrait photo. ${geminiImagePrompt}` })
 
-    const geminiBody = {
-      contents: [{ parts }],
-      generationConfig: {
-        responseModalities: ["TEXT", "IMAGE"],
-        imageConfig: { aspectRatio: "3:4" },
-      },
+    function getAttemptCorrection(attempt: number): string {
+      if (attempt <= 1) return ""
+      if (attempt === 2) return ` ${SECOND_PASS_REWRITE_RULES}`
+      return ` ${SECOND_PASS_REWRITE_RULES} ${FINAL_PASS_REWRITE_RULES}`
+    }
+
+    function buildGeminiImagePrompt(attempt: number): string {
+      const attemptCorrection = getAttemptCorrection(attempt)
+      if (useBackgroundImage && hasReferencePhoto) {
+        return `The FIRST attached image is the IDENTITY REFERENCE PHOTO of the person, not the final composition to preserve. The SECOND attached image is the BACKGROUND REFERENCE PLATE for the final scene. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, same identity, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${FRAMING_EXPANSION_RULES} ${BACKGROUND_REFERENCE_RULES} ${BACKGROUND_PRIORITY_RULES} ${BACKGROUND_INTEGRATION_RULES} ${BACKGROUND_REQUIRED_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES}${backgroundSceneSuffix} ${settingInstruction}. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. Use soft, physically believable transitions between the person and the background. Harmonize with the inferred scene lighting and shadow behavior, but preserve premium studio lighting on the face, clean facial modeling, and glossy commercial portrait contrast.${attemptCorrection} Output the generated portrait image.${negativeSuffix}`
+      }
+      if (useBackgroundImage && !hasReferencePhoto) {
+        return `The attached image is the BACKGROUND REFERENCE PLATE for the final scene. Generate ONE professional studio portrait photo of the described person. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${FRAMING_EXPANSION_RULES} ${BACKGROUND_REFERENCE_RULES} ${BACKGROUND_PRIORITY_RULES} ${BACKGROUND_INTEGRATION_RULES} ${BACKGROUND_REQUIRED_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES}${backgroundSceneSuffix} ${settingInstruction}. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. Harmonize with the inferred scene lighting and shadow behavior, but preserve premium studio lighting on the face, clean facial modeling, and glossy commercial portrait contrast.${attemptCorrection} Output the generated portrait image.${negativeSuffix}`
+      }
+      if (hasReferencePhoto) {
+        return `The attached image is the IDENTITY REFERENCE PHOTO of the person, not the final composition to copy. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${FRAMING_EXPANSION_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} Only change the setting and clothing as follows: ${settingInstruction}. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. Keep the person's face identical to the reference.${attemptCorrection} Output the generated portrait image.${negativeSuffix}`
+      }
+      return `Professional studio portrait photo. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${FRAMING_EXPANSION_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} CRITICAL IDENTITY: The face MUST match the person described above exactly — maximum likeness, same person. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. ${
+        style === "medical"
+          ? (backgroundMedical ? `${backdropMedical} Medical professional aesthetic.` : "Clean white/light gray backdrop, medical professional aesthetic.")
+          : (backgroundCorporate ? `${backdropCorporate} Business professional aesthetic.` : "Medium-gray gradient corporate studio backdrop, business professional aesthetic.")
+      }${attemptCorrection}${negativeSuffix}`
+    }
+
+    function buildGeminiBody(attempt: number) {
+      return {
+        contents: [{
+          parts: [
+            ...inlineParts,
+            { text: `Generate a professional portrait photo. ${buildGeminiImagePrompt(attempt)}` },
+          ],
+        }],
+        generationConfig: {
+          responseModalities: ["TEXT", "IMAGE"],
+          imageConfig: { aspectRatio: "3:4" },
+        },
+      }
     }
 
     async function generateWithModel(model: string, attempts: number): Promise<GenerateModelResult> {
@@ -281,6 +305,7 @@ export async function POST(request: NextRequest) {
       let lastErrorText = ""
 
       for (let attempt = 1; attempt <= attempts; attempt++) {
+        const geminiBody = buildGeminiBody(attempt)
         const response = await fetchWithProxy(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
           {
