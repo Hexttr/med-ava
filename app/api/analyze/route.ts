@@ -15,6 +15,8 @@ export const maxDuration = 60
 type ParsedAnalysis = {
   description?: string
   identityAnchors?: string
+  medicalPrompt?: string
+  corporatePrompt?: string
 }
 
 function buildAnalysisRequestBody(
@@ -270,12 +272,16 @@ export async function POST(request: NextRequest) {
     }
 
     logger.info("ANALYZE", "Анализ выполнен", { employeeName })
+    const fallbackIdentity =
+      parsed.identityAnchors?.trim() ||
+      parsed.medicalPrompt?.trim() ||
+      parsed.corporatePrompt?.trim() ||
+      parsed.description?.trim() ||
+      "Preserve exact facial identity, hair, eyes, skin tone, age impression, and distinctive facial features from the source photo."
+
     return NextResponse.json({
       description: parsed.description || "Person analyzed",
-      identityAnchors:
-        parsed.identityAnchors ||
-        parsed.description ||
-        "Preserve exact facial identity, hair, eyes, skin tone, age impression, and distinctive facial features from the source photo.",
+      identityAnchors: fallbackIdentity,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

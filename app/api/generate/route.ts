@@ -27,7 +27,7 @@ const STUDIO_FINISH_RULES =
 const PRIORITY_ORDER_RULES =
   "PRIORITY ORDER: exact identity and recognizability come first; sharp eyes and facial detail second; stable waist-up framing third; believable premium clothing fourth; recognizable scene usage fifth; exact plate matching last."
 const IDENTITY_USAGE_RULES =
-  "IDENTITY ANCHOR RULES: use the supplied identity anchors as immutable guidance for facial structure, age impression, hair, eyes, skin tone, and distinctive traits. Preserve those anchors together with the reference photo."
+  "IDENTITY ANCHOR RULES: use the supplied identity anchors as immutable guidance for facial structure, age impression, hair, eyes, skin tone, and distinctive traits. Preserve those anchors together with the reference photo. Do not invent or add moles, freckles, beauty marks, acne, blemishes, or any other facial skin marks unless they are clearly visible in the reference photo or explicitly present in the identity anchors."
 const FRAMING_EXPANSION_RULES =
   "FRAMING EXPANSION RULES: if the reference photo is cropped too tightly, expand the composition naturally to a consistent waist-up portrait instead of copying the tight shoulder crop. Maintain the same person and head scale while revealing more torso below the chest."
 const BACKGROUND_REFERENCE_RULES =
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
     const modelAnalysis = appSettings.modelAnalysis || "gemini-2.5-flash"
     const backgroundMode = appSettings.backgroundMode === "image" ? "image" : "description"
     const defaultBackdropMedical = "Clean, well-lit studio backdrop in light gray or white."
-    const defaultBackdropCorporate = "Clean corporate background in light gray, well-lit."
+    const defaultBackdropCorporate = "Clean professional studio backdrop with a smooth medium-gray to charcoal-gray gradient, neutral and elegant, not too bright."
 
     // Приоритет: изображение > текст > базовые настройки
     const bgMedicalImagePath = appSettings.backgroundMedicalImage?.trim()
@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
       geminiImagePrompt = `Professional studio portrait photo. ${IDENTITY_USAGE_RULES}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${FRAMING_EXPANSION_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} CRITICAL IDENTITY: The face MUST match the person described above exactly — maximum likeness, same person. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. ${
         style === "medical"
           ? (backgroundMedical ? `${backdropMedical} Medical professional aesthetic.` : "Clean white/light gray backdrop, medical professional aesthetic.")
-          : (backgroundCorporate ? `${backdropCorporate} Business professional aesthetic.` : "Light gray corporate backdrop, business professional aesthetic.")
+          : (backgroundCorporate ? `${backdropCorporate} Business professional aesthetic.` : "Medium-gray gradient corporate studio backdrop, business professional aesthetic.")
       }${negativeSuffix}`
     }
 
