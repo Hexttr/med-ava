@@ -3,6 +3,9 @@ import { getAppSettings, setAppSettings, type OverlayLogoPosition } from "@/lib/
 import { logger } from "@/lib/logger"
 import { enforceTrustedOrigin } from "@/lib/request-security"
 
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+
 export async function GET() {
   try {
     const settings = getAppSettings()
@@ -28,6 +31,8 @@ export async function PATCH(request: NextRequest) {
       backgroundCorporate?: string
       overlayLogoEnabled?: boolean
       overlayLogoPath?: string
+      overlayLogoMedicalPath?: string
+      overlayLogoCorporatePath?: string
       overlayLogoPosition?: OverlayLogoPosition
       overlayLogoSizePercent?: number
       overlayLogoPadding?: number
@@ -45,6 +50,8 @@ export async function PATCH(request: NextRequest) {
     if (typeof body?.backgroundCorporate === "string") updates.backgroundCorporate = body.backgroundCorporate
     if (typeof body?.overlayLogoEnabled === "boolean") updates.overlayLogoEnabled = body.overlayLogoEnabled
     if (typeof body?.overlayLogoPath === "string") updates.overlayLogoPath = body.overlayLogoPath
+    if (typeof body?.overlayLogoMedicalPath === "string") updates.overlayLogoMedicalPath = body.overlayLogoMedicalPath
+    if (typeof body?.overlayLogoCorporatePath === "string") updates.overlayLogoCorporatePath = body.overlayLogoCorporatePath
     if (
       body?.overlayLogoPosition === "top-left" ||
       body?.overlayLogoPosition === "top-right" ||

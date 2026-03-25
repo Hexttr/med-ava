@@ -11,6 +11,8 @@ const KEYS = {
   backgroundCorporateImage: "background_corporate_image",
   overlayLogoEnabled: "overlay_logo_enabled",
   overlayLogoPath: "overlay_logo_path",
+  overlayLogoMedicalPath: "overlay_logo_medical_path",
+  overlayLogoCorporatePath: "overlay_logo_corporate_path",
   overlayLogoPosition: "overlay_logo_position",
   overlayLogoSizePercent: "overlay_logo_size_percent",
   overlayLogoPadding: "overlay_logo_padding",
@@ -32,6 +34,8 @@ export interface AppSettings {
   backgroundCorporateImage: string
   overlayLogoEnabled: boolean
   overlayLogoPath: string
+  overlayLogoMedicalPath: string
+  overlayLogoCorporatePath: string
   overlayLogoPosition: OverlayLogoPosition
   overlayLogoSizePercent: number
   overlayLogoPadding: number
@@ -53,6 +57,8 @@ const ALL_KEYS = [
   KEYS.backgroundCorporateImage,
   KEYS.overlayLogoEnabled,
   KEYS.overlayLogoPath,
+  KEYS.overlayLogoMedicalPath,
+  KEYS.overlayLogoCorporatePath,
   KEYS.overlayLogoPosition,
   KEYS.overlayLogoSizePercent,
   KEYS.overlayLogoPadding,
@@ -82,6 +88,8 @@ export function getAppSettings(): AppSettings {
     backgroundCorporateImage: map.get(KEYS.backgroundCorporateImage) ?? "",
     overlayLogoEnabled: map.get(KEYS.overlayLogoEnabled) === "true",
     overlayLogoPath: map.get(KEYS.overlayLogoPath) ?? "",
+    overlayLogoMedicalPath: map.get(KEYS.overlayLogoMedicalPath) ?? "",
+    overlayLogoCorporatePath: map.get(KEYS.overlayLogoCorporatePath) ?? "",
     overlayLogoPosition:
       overlayLogoPosition === "top-left" ||
       overlayLogoPosition === "bottom-left" ||
@@ -112,6 +120,8 @@ export function setAppSettings(updates: Partial<AppSettings>): void {
     [KEYS.backgroundCorporateImage, "backgroundCorporateImage"],
     [KEYS.overlayLogoEnabled, "overlayLogoEnabled"],
     [KEYS.overlayLogoPath, "overlayLogoPath"],
+    [KEYS.overlayLogoMedicalPath, "overlayLogoMedicalPath"],
+    [KEYS.overlayLogoCorporatePath, "overlayLogoCorporatePath"],
     [KEYS.overlayLogoPosition, "overlayLogoPosition"],
     [KEYS.overlayLogoSizePercent, "overlayLogoSizePercent"],
     [KEYS.overlayLogoPadding, "overlayLogoPadding"],

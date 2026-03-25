@@ -230,10 +230,24 @@ export async function applyOverlayLogo(
   dataUrl: string,
   settings: Pick<
     AppSettings,
-    "overlayLogoEnabled" | "overlayLogoPath" | "overlayLogoPosition" | "overlayLogoSizePercent" | "overlayLogoPadding"
-  >
+    | "overlayLogoEnabled"
+    | "overlayLogoPath"
+    | "overlayLogoMedicalPath"
+    | "overlayLogoCorporatePath"
+    | "overlayLogoPosition"
+    | "overlayLogoSizePercent"
+    | "overlayLogoPadding"
+  >,
+  style?: "medical" | "corporate"
 ): Promise<string> {
-  if (!settings.overlayLogoEnabled || !settings.overlayLogoPath?.trim()) {
+  const selectedLogoPath =
+    style === "medical"
+      ? (settings.overlayLogoMedicalPath?.trim() || settings.overlayLogoPath?.trim())
+      : style === "corporate"
+        ? (settings.overlayLogoCorporatePath?.trim() || settings.overlayLogoPath?.trim())
+        : settings.overlayLogoPath?.trim()
+
+  if (!settings.overlayLogoEnabled || !selectedLogoPath) {
     return dataUrl
   }
 
@@ -245,10 +259,11 @@ export async function applyOverlayLogo(
 
   let overlayBuffer: Buffer
   try {
-    overlayBuffer = await fs.readFile(getAbsolutePath(settings.overlayLogoPath))
+    overlayBuffer = await fs.readFile(getAbsolutePath(selectedLogoPath))
   } catch {
     logger.warn("STORAGE", "Не удалось прочитать PNG-логотип для overlay", {
-      path: settings.overlayLogoPath,
+      path: selectedLogoPath,
+      style,
     })
     return dataUrl
   }

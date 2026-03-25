@@ -6,6 +6,9 @@ import { getAbsolutePath, saveBackgroundImage, removeFile } from "@/lib/storage"
 import { logger } from "@/lib/logger"
 import { enforceTrustedOrigin } from "@/lib/request-security"
 
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+
 const MAX_SIZE = 10 * 1024 * 1024 // 10 MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"]
 

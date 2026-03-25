@@ -35,12 +35,14 @@ export async function preprocessForGemini(
   let pipeline = sharp(buffer).rotate()
 
   if (mode === "portrait-reference") {
-    // Normalize the source portrait closer to the target 3:4 framing so the
-    // generation model receives a more consistent head-to-body scale.
+    // Normalize the source portrait onto a stable 3:4 canvas with extra room
+    // below the face so tightly cropped shoulder shots do not force the model
+    // back into a tight bust portrait.
     pipeline = pipeline
       .resize(PORTRAIT_REFERENCE_WIDTH, PORTRAIT_REFERENCE_HEIGHT, {
-        fit: "cover",
-        position: "attention",
+        fit: "contain",
+        position: "top",
+        background: { r: 245, g: 246, b: 248, alpha: 1 },
         withoutEnlargement: true,
       })
       .sharpen(0.8)
