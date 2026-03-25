@@ -26,10 +26,12 @@ export async function GET(
     const ext = path.extname(fullPath).toLowerCase()
     const mime =
       ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg"
+    const isMutableSettingsAsset =
+      relative.startsWith("backgrounds" + path.sep) || relative.startsWith("branding" + path.sep)
     return new NextResponse(buf, {
       headers: {
         "Content-Type": mime,
-        "Cache-Control": "private, max-age=86400",
+        "Cache-Control": isMutableSettingsAsset ? "private, no-store" : "private, max-age=86400",
       },
     })
   } catch {

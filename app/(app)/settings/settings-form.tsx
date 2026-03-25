@@ -72,6 +72,10 @@ type SettingsPatchPayload = Partial<Pick<
   | "promptNegative"
 >>
 
+function buildSettingsAssetPreviewUrl(assetPath: string): string {
+  return `/api/files/${assetPath}?preview=${Date.now()}`
+}
+
 export function SettingsForm({ hasKey, appSettings: initialAppSettings }: SettingsFormProps) {
   const router = useRouter()
   const [apiKey, setApiKey] = useState("")
@@ -139,7 +143,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
     }
 
     if (savedSettings?.backgroundMedicalImage && !clearMedicalRequested) {
-      setBgMedicalPreviewUrl(`/api/files/${savedSettings.backgroundMedicalImage}`)
+      setBgMedicalPreviewUrl(buildSettingsAssetPreviewUrl(savedSettings.backgroundMedicalImage))
       return
     }
 
@@ -154,7 +158,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
     }
 
     if (savedSettings?.backgroundCorporateImage && !clearCorporateRequested) {
-      setBgCorporatePreviewUrl(`/api/files/${savedSettings.backgroundCorporateImage}`)
+      setBgCorporatePreviewUrl(buildSettingsAssetPreviewUrl(savedSettings.backgroundCorporateImage))
       return
     }
 
@@ -169,7 +173,7 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
     }
 
     if (savedSettings?.overlayLogoPath && !clearOverlayLogoRequested) {
-      setOverlayLogoPreviewUrl(`/api/files/${savedSettings.overlayLogoPath}`)
+      setOverlayLogoPreviewUrl(buildSettingsAssetPreviewUrl(savedSettings.overlayLogoPath))
       return
     }
 
