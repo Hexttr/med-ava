@@ -140,8 +140,7 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
       try {
         const analysis = await analyzePortrait(file, employeeName || "Сотрудник")
         const reference = await fileToReferencePhoto(file)
-        const prompt = style === "medical" ? analysis.medicalPrompt : analysis.corporatePrompt
-        const newUrl = await generatePortrait(prompt, style, reference)
+        const newUrl = await generatePortrait(analysis.identityAnchors, style, reference)
         if (style === "medical") setMedicalUrl(newUrl)
         else setCorporateUrl(newUrl)
         if (galleryItemId) {

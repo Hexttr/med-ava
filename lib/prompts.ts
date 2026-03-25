@@ -6,11 +6,11 @@
 import { getAppSettings } from "./app-settings"
 
 const DEFAULT_UNIVERSAL_FRAMING =
-  "IDENTICAL portrait framing for ALL images: head and upper torso only, bust-length, both shoulders visible. Vertical 3:4 portrait. Head should occupy about 30-35% of total image height, with the eye line around 38-42% from the top edge. Same camera distance, same head size in frame, same crop — medical and corporate MUST have identical proportions. Do not crop tighter or wider. No full body, no hands in frame, no waist crop. Consistent framing across all portraits."
+  "IDENTICAL portrait framing for ALL images: vertical 3:4 waist-up portrait. Show the subject from the top of the head to around the upper waist / mid-torso, with both shoulders and chest clearly visible. Head should occupy about 22-26% of total image height, with the eye line around 30-34% from the top edge. Same camera distance, same head size in frame, same crop, and same torso coverage across all portraits. Do not crop tighter to a bust shot, do not zoom out to full body, and keep hands out of frame. Consistent framing across all portraits."
 
-const DEFAULT_ANALYSIS_PROMPT = `You are a professional portrait photography prompt engineer for an AI image generation system. Your goal is to produce text prompts that will generate portraits with MAXIMUM LIKENESS to the source photo — the person must be instantly recognizable.
+const DEFAULT_ANALYSIS_PROMPT = `You are extracting IDENTITY ANCHORS for portrait generation. Your goal is MAXIMUM LIKENESS to the source photo so the person is instantly recognizable.
 
-Analyze this photo of a person named "{employeeName}". You MUST describe the face in exhaustive, precise detail:
+Analyze this photo of a person named "{employeeName}". Describe only the person's identity features in precise, compact English:
 - Exact face shape (oval, round, square, heart, etc.)
 - Skin tone and texture (specific shade, any visible features)
 - Hair: color, exact style, length, parting, any distinctive detail
@@ -20,31 +20,28 @@ Analyze this photo of a person named "{employeeName}". You MUST describe the fac
 - Any distinguishing features (moles, freckles, scars, glasses — preserve if worn)
 - Facial proportions and any unique characteristics
 
-Based on your analysis, create TWO detailed prompts. Each prompt MUST start with a full, precise description of this person's face and head so the generated image looks like the EXACT SAME person. Identity preservation is mandatory.
+Do NOT describe clothing, background, lighting, pose direction, framing, or style. Do NOT write separate medical/corporate prompts.
 
-UNIVERSAL FRAMING RULE: All portraits MUST use identical composition. Include this phrase in BOTH prompts: "Identical portrait framing: head and upper torso only, bust-length, both shoulders visible, head occupies about 30-35% of image height, eye line around 38-42% from top, same head-to-body scale as all other portraits in the system." Medical and corporate must have the SAME crop and proportions.
+Return ONLY one valid JSON object with exactly these keys:
+- description: a short plain-English summary of the person in 1 sentence
+- identityAnchors: one compact but information-dense paragraph listing the facial and identity traits that MUST stay unchanged in generation
 
-1. MEDICAL PORTRAIT: First describe the person's face in full detail (same person identity), then the framing phrase, then: wearing a premium-quality crisp white medical doctor's coat (expensive fabric, luxury tailoring). NO stethoscope, NO medical accessories — only the white coat. Professional medical setting. Clean, well-lit studio backdrop in light gray or white. Warm, approachable expression. Mouth closed, lips together. High-quality studio photography lighting. Premium glossy editorial portrait finish, polished commercial portrait look, soft controlled key light, gentle fill light, subtle rim light, clean separation from background. Tack-sharp focus on eyes and facial features, crisp hair strands, clear eyelashes, natural skin texture, high micro-contrast, no softness or haze.
+identityAnchors must prioritize immutable identity details and should read like instructions for preserving the same person. Mention what must remain unchanged: facial structure, hair, eyes, skin tone, age impression, distinctive marks, glasses, and proportions.
 
-2. CORPORATE PORTRAIT: First describe the person's face in full detail (identical person), then the same framing phrase (identical wording), then: in premium professional business attire (expensive dark suit or blazer, designer quality, luxury tailoring). Clean corporate background in light gray, well-lit. Confident, professional expression. Mouth closed, lips together. Studio photography with rim lighting. Premium glossy editorial portrait finish, polished commercial portrait look, soft controlled key light, gentle fill light, subtle rim light, clean separation from background. Tack-sharp focus on eyes and facial features, crisp hair strands, clear eyelashes, natural skin texture, high micro-contrast, no softness or haze.
-
-CRITICAL: Both prompts must describe the EXACT SAME person. The face must be identical — recognizable at first glance. Lead with exhaustive facial description. Clothing must be described as premium/expensive/high-quality in both. Framing must be identical in both prompts.
-
-Respond with ONLY one valid JSON object (no markdown, no \`\`\` code fences, no extra text). Use double quotes for keys and strings; escape any " inside strings as \". Required keys: description, medicalPrompt, corporatePrompt. Example structure:
+Respond with ONLY one valid JSON object (no markdown, no \`\`\` code fences, no extra text). Use double quotes for keys and strings; escape any " inside strings as \". Required keys: description, identityAnchors. Example structure:
 {
   "description": "Brief description of the person",
-  "medicalPrompt": "Full prompt for medical portrait...",
-  "corporatePrompt": "Full prompt for corporate portrait..."
+  "identityAnchors": "Identity anchors for preserving the same person..."
 }`
 
 const DEFAULT_MEDICAL_INSTRUCTION =
-  "Show this person in a premium-quality crisp white medical doctor's coat (expensive fabric, luxury tailoring). No stethoscope, no medical accessories — only the white coat. {backdrop} Warm, approachable expression. Mouth closed, lips together. Preserve exact facial likeness. Premium glossy editorial portrait finish, polished commercial portrait look, soft controlled key light, gentle fill light, subtle rim light, clean separation from background. Tack-sharp eyes and facial features, crisp hair detail, clear eyelashes, natural skin texture, high micro-contrast, no soft-focus look."
+  "Show this person in a premium-quality crisp white medical doctor's coat (expensive fabric, luxury tailoring). No stethoscope, no medical accessories — only the white coat. {backdrop} Warm, approachable expression. Mouth closed, lips together."
 
 const DEFAULT_CORPORATE_INSTRUCTION =
-  "Show this person in premium professional business attire (expensive dark suit or blazer, designer quality, luxury tailoring). {backdrop} Confident, professional expression. Mouth closed, lips together. Preserve exact facial likeness. Premium glossy editorial portrait finish, polished commercial portrait look, soft controlled key light, gentle fill light, subtle rim light, clean separation from background. Tack-sharp eyes and facial features, crisp hair detail, clear eyelashes, natural skin texture, high micro-contrast, no soft-focus look."
+  "Show this person in premium professional business attire (expensive dark suit or blazer, designer quality, luxury tailoring). {backdrop} Confident, professional expression. Mouth closed, lips together."
 
 const DEFAULT_NEGATIVE_PROMPT =
-  "Avoid: blurry, soft focus, haze, low-resolution look, smeared details, washed-out details, distorted face, different identity, different person, over-smoothing, artificial skin, plastic skin, wrong proportions, cheap-looking clothing, unnatural lighting, stethoscope, medical accessories, open mouth, mouth open, pasted cutout look, harsh compositing edges, floating subject, extreme close-up, tiny head in frame, oversized head, full-body framing, hands in frame."
+  "Avoid: different identity, blurry face, soft-focus haze, distorted facial features, over-smoothed skin, pasted cutout edges, floating subject, cheap-looking clothing, stethoscope, medical accessories, open mouth, full-body framing, hands in frame."
 
 /** Значения по умолчанию для отображения в настройках (когда поле пустое в БД). */
 export function getPromptDefaults() {

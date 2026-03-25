@@ -5,8 +5,7 @@ export type GenerateMode = "all" | "medical" | "corporate"
 
 export interface PortraitAnalysis {
   description?: string
-  medicalPrompt: string
-  corporatePrompt: string
+  identityAnchors: string
 }
 
 export interface ReferencePhoto {
@@ -61,7 +60,7 @@ export async function analyzePortrait(file: File, employeeName: string): Promise
 }
 
 export async function generatePortrait(
-  prompt: string,
+  identityAnchors: string,
   style: PortraitStyle,
   reference: ReferencePhoto
 ): Promise<string> {
@@ -69,7 +68,7 @@ export async function generatePortrait(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      prompt,
+      prompt: identityAnchors,
       style,
       referencePhotoBase64: reference.base64,
       referencePhotoMimeType: reference.mimeType,
@@ -96,11 +95,11 @@ export async function generatePortraitSet(
   const result = { medicalUrl: null as string | null, corporateUrl: null as string | null }
 
   if (medicalRequested) {
-    result.medicalUrl = await generatePortrait(analysis.medicalPrompt, "medical", reference)
+    result.medicalUrl = await generatePortrait(analysis.identityAnchors, "medical", reference)
   }
 
   if (corporateRequested) {
-    result.corporateUrl = await generatePortrait(analysis.corporatePrompt, "corporate", reference)
+    result.corporateUrl = await generatePortrait(analysis.identityAnchors, "corporate", reference)
   }
 
   return result

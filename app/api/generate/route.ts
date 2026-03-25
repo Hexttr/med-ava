@@ -20,12 +20,14 @@ export const maxDuration = 60
 
 const PRIMARY_MODEL_ATTEMPTS = 3
 const RETRY_DELAY_MS = 500
-const HARD_FRAMING_RULES =
-  "STRICT FRAMING RULES: vertical 3:4 studio portrait only. Head and upper torso only, bust-length, both shoulders visible. The head must occupy about 30-35% of the full image height. Eye line should sit around 38-42% from the top edge. Keep identical camera distance, identical crop, and identical head-to-body scale across all portraits. Do not crop tighter, do not zoom wider, do not show full body, hands, or waist."
 const SHARPNESS_RULES =
   "IMAGE QUALITY RULES: tack-sharp focus on the eyes, eyelashes, eyebrows, lips, and overall facial features. Preserve crisp hair strands, clean edge detail, natural skin texture, and realistic micro-contrast. The final portrait must look sharply resolved and professionally photographed, without soft-focus haze or smeared details."
 const STUDIO_FINISH_RULES =
   "PORTRAIT FINISH RULES: preserve a premium glossy studio portrait look with polished commercial/editorial quality. Use controlled studio-grade lighting on the subject: soft directional key light, balanced fill, subtle rim separation, clean catchlights, refined tonal contrast, and elegant depth. The person must look intentionally photographed in a high-end studio setup, not casually blended into the environment."
+const PRIORITY_ORDER_RULES =
+  "PRIORITY ORDER: exact identity and recognizability come first; sharp eyes and facial detail second; stable waist-up framing third; believable premium clothing fourth; recognizable scene usage fifth; exact plate matching last."
+const IDENTITY_USAGE_RULES =
+  "IDENTITY ANCHOR RULES: use the supplied identity anchors as immutable guidance for facial structure, age impression, hair, eyes, skin tone, and distinctive traits. Preserve those anchors together with the reference photo."
 const BACKGROUND_REFERENCE_RULES =
   "Treat the second image as a BACKGROUND REFERENCE PLATE, not as a literal pasted layer. Recreate the same scene naturally with matching palette, depth, perspective, softness, and lighting direction, but the final portrait must look like one coherent professional photograph. Avoid any cutout, pasted, or composited look."
 const BACKGROUND_PRIORITY_RULES =
@@ -203,31 +205,35 @@ export async function POST(request: NextRequest) {
     const backdropMedical = backgroundMedical ? `Background: ${backgroundMedical}` : defaultBackdropMedical
     const backdropCorporate = backgroundCorporate ? `Background: ${backgroundCorporate}` : defaultBackdropCorporate
 
-    const universalFraming = getUniversalFraming()
+    const framingInstruction = getUniversalFraming()
     const medicalInstruction = getMedicalInstruction(backdropMedical)
     const corporateInstruction = getCorporateInstruction(backdropCorporate)
     const settingInstruction =
       style === "medical"
-        ? `${universalFraming} ${medicalInstruction}`
-        : `${universalFraming} ${corporateInstruction}`
+        ? medicalInstruction
+        : corporateInstruction
 
     const negativePrompt = getNegativePrompt()
     const negativeSuffix = negativePrompt ? ` ${negativePrompt}` : ""
     const backgroundSceneSuffix = backgroundSceneAnalysis
       ? ` BACKGROUND SCENE ANALYSIS: ${backgroundSceneAnalysis}`
       : ""
+    const identityAnchors = prompt.trim()
+    const identityAnchorsSuffix = identityAnchors
+      ? ` IDENTITY ANCHORS: ${identityAnchors}`
+      : ""
 
     const hasReferencePhoto = Boolean(referencePhotoBase64?.trim())
 
     let geminiImagePrompt: string
     if (useBackgroundImage && hasReferencePhoto) {
-      geminiImagePrompt = `The FIRST attached image is the REFERENCE PHOTO of the person. The SECOND attached image is the BACKGROUND REFERENCE PLATE for the final scene. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, same identity, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. Mouth closed, lips together. ${BACKGROUND_REFERENCE_RULES} ${BACKGROUND_PRIORITY_RULES} ${BACKGROUND_INTEGRATION_RULES} ${BACKGROUND_REQUIRED_RULES} ${HARD_FRAMING_RULES} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES}${backgroundSceneSuffix} ${settingInstruction}. Clothing must look premium and high-quality. Use soft, physically believable transitions between the person and the background. Harmonize with the inferred scene lighting and shadow behavior, but preserve premium studio lighting on the face, clean facial modeling, and glossy commercial portrait contrast. Output the generated portrait image.${negativeSuffix}`
+      geminiImagePrompt = `The FIRST attached image is the REFERENCE PHOTO of the person. The SECOND attached image is the BACKGROUND REFERENCE PLATE for the final scene. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, same identity, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. ${IDENTITY_USAGE_RULES}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${BACKGROUND_REFERENCE_RULES} ${BACKGROUND_PRIORITY_RULES} ${BACKGROUND_INTEGRATION_RULES} ${BACKGROUND_REQUIRED_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES}${backgroundSceneSuffix} ${settingInstruction}. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. Use soft, physically believable transitions between the person and the background. Harmonize with the inferred scene lighting and shadow behavior, but preserve premium studio lighting on the face, clean facial modeling, and glossy commercial portrait contrast. Output the generated portrait image.${negativeSuffix}`
     } else if (useBackgroundImage && !hasReferencePhoto) {
-      geminiImagePrompt = `The attached image is the BACKGROUND REFERENCE PLATE for the final scene. Generate ONE professional studio portrait photo. ${BACKGROUND_REFERENCE_RULES} ${BACKGROUND_PRIORITY_RULES} ${BACKGROUND_INTEGRATION_RULES} ${BACKGROUND_REQUIRED_RULES} ${HARD_FRAMING_RULES} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES}${backgroundSceneSuffix} ${universalFraming} ${prompt}. Clothing must look premium and high-quality. Ultra high quality, professional photography, sharp focus, natural skin texture. Harmonize with the inferred scene lighting and shadow behavior, but preserve premium studio lighting on the face, clean facial modeling, and glossy commercial portrait contrast. Output the generated portrait image.${negativeSuffix}`
+      geminiImagePrompt = `The attached image is the BACKGROUND REFERENCE PLATE for the final scene. Generate ONE professional studio portrait photo of the described person. ${IDENTITY_USAGE_RULES}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${BACKGROUND_REFERENCE_RULES} ${BACKGROUND_PRIORITY_RULES} ${BACKGROUND_INTEGRATION_RULES} ${BACKGROUND_REQUIRED_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES}${backgroundSceneSuffix} ${settingInstruction}. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. Harmonize with the inferred scene lighting and shadow behavior, but preserve premium studio lighting on the face, clean facial modeling, and glossy commercial portrait contrast. Output the generated portrait image.${negativeSuffix}`
     } else if (hasReferencePhoto) {
-      geminiImagePrompt = `The attached image is the REFERENCE PHOTO of the person. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. Mouth closed, lips together. ${HARD_FRAMING_RULES} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} Only change the setting and clothing as follows: ${settingInstruction}. Clothing must look premium and high-quality. Keep the person's face identical to the reference. Output the generated portrait image.${negativeSuffix}`
+      geminiImagePrompt = `The attached image is the REFERENCE PHOTO of the person. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. ${IDENTITY_USAGE_RULES}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} Only change the setting and clothing as follows: ${settingInstruction}. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. Keep the person's face identical to the reference. Output the generated portrait image.${negativeSuffix}`
     } else {
-      geminiImagePrompt = `Professional studio portrait photo. ${HARD_FRAMING_RULES} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} ${universalFraming} ${prompt}. CRITICAL IDENTITY: The face MUST match the person described above exactly — maximum likeness, same person. Ultra high quality, professional photography, sharp focus, natural skin texture. Clothing must look premium and high-quality. ${
+      geminiImagePrompt = `Professional studio portrait photo. ${IDENTITY_USAGE_RULES}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} CRITICAL IDENTITY: The face MUST match the person described above exactly — maximum likeness, same person. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. ${
         style === "medical"
           ? (backgroundMedical ? `${backdropMedical} Medical professional aesthetic.` : "Clean white/light gray backdrop, medical professional aesthetic.")
           : (backgroundCorporate ? `${backdropCorporate} Business professional aesthetic.` : "Light gray corporate backdrop, business professional aesthetic.")

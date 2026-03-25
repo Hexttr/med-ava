@@ -14,8 +14,7 @@ export const maxDuration = 60
 
 type ParsedAnalysis = {
   description?: string
-  medicalPrompt?: string
-  corporatePrompt?: string
+  identityAnchors?: string
 }
 
 function buildAnalysisRequestBody(
@@ -39,7 +38,7 @@ function buildAnalysisRequestBody(
       },
     ],
     generationConfig: {
-      temperature: 0.4,
+      temperature: 0.25,
       topP: 0.95,
       maxOutputTokens,
       responseMimeType: "application/json",
@@ -47,10 +46,9 @@ function buildAnalysisRequestBody(
         type: "object",
         properties: {
           description: { type: "string", description: "Brief description of the person in the photo" },
-          medicalPrompt: { type: "string", description: "Full detailed prompt for medical portrait" },
-          corporatePrompt: { type: "string", description: "Full detailed prompt for corporate portrait" },
+          identityAnchors: { type: "string", description: "Compact but information-dense identity anchors to preserve in generation" },
         },
-        required: ["description", "medicalPrompt", "corporatePrompt"],
+        required: ["description", "identityAnchors"],
       },
     },
   }
@@ -233,7 +231,7 @@ export async function POST(request: NextRequest) {
         `${analysisPrompt}\n\n` +
         "IMPORTANT RETRY INSTRUCTIONS: Return a compact JSON object only. " +
         "Keep each field concise but sufficient for generation. " +
-        "Limit description to 300 characters and each portrait prompt to 900 characters. " +
+        "Limit description to 220 characters and identityAnchors to 1200 characters. " +
         "Do not use markdown, code fences, comments, or trailing commas."
 
       logger.warn("ANALYZE", "Повторяем анализ после битого JSON от Gemini", {
@@ -274,8 +272,10 @@ export async function POST(request: NextRequest) {
     logger.info("ANALYZE", "Анализ выполнен", { employeeName })
     return NextResponse.json({
       description: parsed.description || "Person analyzed",
-      medicalPrompt: parsed.medicalPrompt || "Professional medical portrait",
-      corporatePrompt: parsed.corporatePrompt || "Professional corporate portrait",
+      identityAnchors:
+        parsed.identityAnchors ||
+        parsed.description ||
+        "Preserve exact facial identity, hair, eyes, skin tone, age impression, and distinctive facial features from the source photo.",
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

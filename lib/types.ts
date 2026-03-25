@@ -27,8 +27,7 @@ export interface BatchJob {
 
 export interface AnalysisResult {
   description: string
-  medicalPrompt: string
-  corporatePrompt: string
+  identityAnchors: string
 }
 
 export interface OrganizationEmployee {

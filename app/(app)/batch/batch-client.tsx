@@ -376,8 +376,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         const photoUrl = emp.photoUrl.startsWith("http") || emp.photoUrl.startsWith("data:") ? emp.photoUrl : `${window.location.origin}${emp.photoUrl}`
         const { file, reference } = await referencePhotoFromUrl(photoUrl, `${emp.name}.jpg`)
         const analysis = await analyzePortrait(file, emp.name)
-        const prompt = style === "medical" ? analysis.medicalPrompt : analysis.corporatePrompt
-        const newUrl = await generatePortrait(prompt, style, reference)
+        const newUrl = await generatePortrait(analysis.identityAnchors, style, reference)
         setGenerationState((prev) => ({
           ...prev,
           [employeeId]: {
