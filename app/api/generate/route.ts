@@ -38,6 +38,8 @@ const BACKGROUND_INTEGRATION_RULES =
   "SCENE INTEGRATION RULES: use the background plate only to infer environment, perspective, palette, and plausible ambient light direction. Do not let ambient scene lighting flatten the face or remove studio contrast. Keep the subject lit like a premium studio portrait while subtly harmonizing with the scene."
 const BACKGROUND_REQUIRED_RULES =
   "BACKGROUND PRESENCE RULES: the final image must visibly use the supplied background scene or a faithful recreation of it. Do not replace it with a generic plain studio backdrop. Preserve recognizable scene character, palette, depth, and environment cues from the background plate."
+const IMAGE_BACKGROUND_BACKDROP =
+  "Use the supplied background reference plate as the actual final background environment. Do not substitute a generic studio backdrop."
 const BACKGROUND_ANALYSIS_PROMPT =
   "Analyze this portrait background plate for scene integration. Describe in concise professional English: environment type, camera perspective, background depth, likely subject placement, main light direction, light softness, color temperature, brightest areas, likely shadow direction, reflective surfaces, and how a photographed person should be lit to fit naturally into this scene. Keep it compact and practical for image generation."
 
@@ -204,16 +206,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const backdropMedical = backgroundMedical ? `Background: ${backgroundMedical}` : defaultBackdropMedical
-    const backdropCorporate = backgroundCorporate ? `Background: ${backgroundCorporate}` : defaultBackdropCorporate
+    const backdropMedical = useMedicalImage
+      ? IMAGE_BACKGROUND_BACKDROP
+      : backgroundMedical
+        ? `Background: ${backgroundMedical}`
+        : defaultBackdropMedical
+    const backdropCorporate = useCorporateImage
+      ? IMAGE_BACKGROUND_BACKDROP
+      : backgroundCorporate
+        ? `Background: ${backgroundCorporate}`
+        : defaultBackdropCorporate
 
     const framingInstruction = getUniversalFraming()
-    const medicalInstruction = getMedicalInstruction(backdropMedical)
-    const corporateInstruction = getCorporateInstruction(backdropCorporate)
     const settingInstruction =
       style === "medical"
-        ? medicalInstruction
-        : corporateInstruction
+        ? getMedicalInstruction(backdropMedical)
+        : getCorporateInstruction(backdropCorporate)
 
     const negativePrompt = getNegativePrompt()
     const negativeSuffix = negativePrompt ? ` ${negativePrompt}` : ""
