@@ -27,6 +27,31 @@ import type { Department } from "@/lib/types"
 import { fetchGallery, deleteGalleryItem } from "@/lib/gallery-api"
 import { fetchDepartments } from "@/lib/structure-api"
 
+function GalleryPreviewImage({
+  previewUrl,
+  fullUrl,
+  alt,
+}: {
+  previewUrl?: string | null
+  fullUrl: string
+  alt: string
+}) {
+  const [failed, setFailed] = useState(false)
+  const src = !failed && previewUrl ? previewUrl : fullUrl
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="size-full object-cover"
+      draggable={false}
+      onError={() => {
+        if (previewUrl) setFailed(true)
+      }}
+    />
+  )
+}
+
 function sanitizeFileName(name: string): string {
   return name.replace(/[/\\:*?"<>|]/g, "_").trim() || "portrait"
 }
@@ -214,11 +239,11 @@ export function GalleryClient() {
                   onClick={() => setLightboxUrl(item.medicalUrl)}
                   className="aspect-[3/4] w-full overflow-hidden rounded-none border border-border text-left transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  <img
-                    src={item.medicalUrl}
+                  <GalleryPreviewImage
+                    key={`${item.medicalPreviewUrl ?? "none"}|${item.medicalUrl}`}
+                    previewUrl={item.medicalPreviewUrl}
+                    fullUrl={item.medicalUrl}
                     alt={item.name}
-                    className="size-full object-cover"
-                    draggable={false}
                   />
                 </button>
               </div>
@@ -236,11 +261,11 @@ export function GalleryClient() {
                   onClick={() => setLightboxUrl(item.corporateUrl)}
                   className="aspect-[3/4] w-full overflow-hidden rounded-none border border-border text-left transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  <img
-                    src={item.corporateUrl}
+                  <GalleryPreviewImage
+                    key={`${item.corporatePreviewUrl ?? "none"}|${item.corporateUrl}`}
+                    previewUrl={item.corporatePreviewUrl}
+                    fullUrl={item.corporateUrl}
                     alt={item.name}
-                    className="size-full object-cover"
-                    draggable={false}
                   />
                 </button>
               </div>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
-import { removeFile, saveBase64Image } from "@/lib/storage"
+import { getGalleryPreviewRelativePathIfExists, removeGalleryImageFiles, saveGalleryImage } from "@/lib/storage"
 import { validateBase64Image } from "@/lib/upload-validation"
 import { logger } from "@/lib/logger"
 import { enforceTrustedOrigin } from "@/lib/request-security"
@@ -21,6 +21,16 @@ function toItemResponse(row: {
     name: row.name,
     medicalUrl: row.medical_path ? `/api/files/${row.medical_path.replace(/\\/g, "/")}` : null,
     corporateUrl: row.corporate_path ? `/api/files/${row.corporate_path.replace(/\\/g, "/")}` : null,
+    medicalPreviewUrl: row.medical_path
+      ? (getGalleryPreviewRelativePathIfExists(row.medical_path)
+        ? `/api/files/${getGalleryPreviewRelativePathIfExists(row.medical_path)!.replace(/\\/g, "/")}`
+        : null)
+      : null,
+    corporatePreviewUrl: row.corporate_path
+      ? (getGalleryPreviewRelativePathIfExists(row.corporate_path)
+        ? `/api/files/${getGalleryPreviewRelativePathIfExists(row.corporate_path)!.replace(/\\/g, "/")}`
+        : null)
+      : null,
     employeeId: row.employee_id ?? undefined,
     departmentId: row.department_id ?? undefined,
     departmentName: row.department_name ?? undefined,
@@ -57,14 +67,14 @@ export async function PATCH(
     if (medicalUrl) {
       const valid = validateBase64Image(medicalUrl)
       if (!valid.ok) return NextResponse.json({ error: valid.error }, { status: 400 })
-      if (row.medical_path) await removeFile(row.medical_path)
-      medicalPath = await saveBase64Image(medicalUrl, "gallery", `${id}_medical_${ts}`)
+      if (row.medical_path) await removeGalleryImageFiles(row.medical_path)
+      medicalPath = (await saveGalleryImage(medicalUrl, `${id}_medical_${ts}`)).path
     }
     if (corporateUrl) {
       const valid = validateBase64Image(corporateUrl)
       if (!valid.ok) return NextResponse.json({ error: valid.error }, { status: 400 })
-      if (row.corporate_path) await removeFile(row.corporate_path)
-      corporatePath = await saveBase64Image(corporateUrl, "gallery", `${id}_corporate_${ts}`)
+      if (row.corporate_path) await removeGalleryImageFiles(row.corporate_path)
+      corporatePath = (await saveGalleryImage(corporateUrl, `${id}_corporate_${ts}`)).path
     }
     database
       .prepare("UPDATE gallery_items SET medical_path = ?, corporate_path = ? WHERE id = ?")
@@ -102,8 +112,8 @@ export async function DELETE(
     if (!row) {
       return NextResponse.json({ error: "Не найдено" }, { status: 404 })
     }
-    if (row.medical_path) await removeFile(row.medical_path)
-    if (row.corporate_path) await removeFile(row.corporate_path)
+    if (row.medical_path) await removeGalleryImageFiles(row.medical_path)
+    if (row.corporate_path) await removeGalleryImageFiles(row.corporate_path)
     deleteGalleryFeedbackForGalleryItems(database, [id])
     database.prepare("DELETE FROM gallery_items WHERE id = ?").run(id)
     return NextResponse.json({ success: true })

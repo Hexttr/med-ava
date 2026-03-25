@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
-import { saveBase64Image } from "@/lib/storage"
+import { getGalleryPreviewRelativePathIfExists, saveGalleryImage } from "@/lib/storage"
 import { validateBase64Image } from "@/lib/upload-validation"
 import { logger } from "@/lib/logger"
 import { enforceTrustedOrigin } from "@/lib/request-security"
@@ -22,6 +22,16 @@ function toItemResponse(row: {
     name: row.employee_name ?? row.name,
     medicalUrl: row.medical_path ? `/api/files/${row.medical_path.replace(/\\/g, "/")}` : null,
     corporateUrl: row.corporate_path ? `/api/files/${row.corporate_path.replace(/\\/g, "/")}` : null,
+    medicalPreviewUrl: row.medical_path
+      ? (getGalleryPreviewRelativePathIfExists(row.medical_path)
+        ? `/api/files/${getGalleryPreviewRelativePathIfExists(row.medical_path)!.replace(/\\/g, "/")}`
+        : null)
+      : null,
+    corporatePreviewUrl: row.corporate_path
+      ? (getGalleryPreviewRelativePathIfExists(row.corporate_path)
+        ? `/api/files/${getGalleryPreviewRelativePathIfExists(row.corporate_path)!.replace(/\\/g, "/")}`
+        : null)
+      : null,
     employeeId: row.employee_id ?? undefined,
     departmentId: row.department_id ?? undefined,
     departmentName: row.department_name ?? undefined,
@@ -128,8 +138,8 @@ export async function POST(request: NextRequest) {
     const now = Date.now()
     let medicalPath: string | null = null
     let corporatePath: string | null = null
-    if (hasMedical) medicalPath = await saveBase64Image(medicalUrl!, "gallery", `${id}_medical`)
-    if (hasCorporate) corporatePath = await saveBase64Image(corporateUrl!, "gallery", `${id}_corporate`)
+    if (hasMedical) medicalPath = (await saveGalleryImage(medicalUrl!, `${id}_medical`)).path
+    if (hasCorporate) corporatePath = (await saveGalleryImage(corporateUrl!, `${id}_corporate`)).path
     database
       .prepare(
         "INSERT INTO gallery_items (id, name, medical_path, corporate_path, employee_id, created_at) VALUES (?, ?, ?, ?, ?, ?)"

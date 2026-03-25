@@ -1,3 +1,4 @@
+import fsSync from "fs"
 import fs from "fs/promises"
 import path from "path"
 import sharp from "sharp"
@@ -7,6 +8,9 @@ import { logger } from "./logger"
 
 const THUMB_MAX_SIZE = 400
 const THUMB_QUALITY = 0.75
+const GALLERY_PREVIEW_WIDTH = 540
+const GALLERY_PREVIEW_HEIGHT = 720
+const GALLERY_PREVIEW_QUALITY = 84
 
 /**
  * Сохраняет base64 (data URL) в файл. Возвращает путь относительно data/uploads для хранения в БД.
@@ -28,6 +32,56 @@ export async function saveBase64Image(
   const filePath = path.join(fullDir, finalName)
   await fs.writeFile(filePath, buf)
   return path.join(dir, finalName)
+}
+
+export function getGalleryPreviewRelativePath(relativePath: string | null | undefined): string | null {
+  if (!relativePath) return null
+
+  const parsed = path.parse(relativePath)
+  return path.join(parsed.dir, `${parsed.name}_preview.jpg`)
+}
+
+export function getGalleryPreviewRelativePathIfExists(relativePath: string | null | undefined): string | null {
+  const previewPath = getGalleryPreviewRelativePath(relativePath)
+  if (!previewPath) return null
+
+  return fsSync.existsSync(getAbsolutePath(previewPath)) ? previewPath : null
+}
+
+export async function saveGalleryImage(
+  dataUrl: string,
+  filename: string
+): Promise<{ path: string; previewPath: string | null }> {
+  const savedPath = await saveBase64Image(dataUrl, "gallery", filename)
+  const previewPath = getGalleryPreviewRelativePath(savedPath)
+  if (!previewPath) {
+    return { path: savedPath, previewPath: null }
+  }
+
+  try {
+    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
+    if (!match) {
+      return { path: savedPath, previewPath: null }
+    }
+
+    const buffer = Buffer.from(match[2], "base64")
+    await sharp(buffer)
+      .resize(GALLERY_PREVIEW_WIDTH, GALLERY_PREVIEW_HEIGHT, {
+        fit: "cover",
+        position: "attention",
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: GALLERY_PREVIEW_QUALITY, mozjpeg: true })
+      .toFile(getAbsolutePath(previewPath))
+
+    return { path: savedPath, previewPath }
+  } catch (error) {
+    logger.warn("STORAGE", "Не удалось создать мягкое превью для gallery", {
+      path: savedPath,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return { path: savedPath, previewPath: null }
+  }
 }
 
 /**
@@ -242,4 +296,13 @@ export async function removeFile(relativePath: string): Promise<void> {
   const base = getUploadsDir()
   const full = path.join(base, relativePath)
   await fs.unlink(full).catch(() => {})
+}
+
+export async function removeGalleryImageFiles(relativePath: string): Promise<void> {
+  await removeFile(relativePath)
+
+  const previewPath = getGalleryPreviewRelativePath(relativePath)
+  if (previewPath) {
+    await removeFile(previewPath)
+  }
 }

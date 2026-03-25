@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
+import { useState } from "react"
 import { X, Download, Loader2, AlertCircle, CheckCircle2, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -27,6 +28,8 @@ export interface BatchPortraitCardItem {
   status: "pending" | "analyzing" | "generating" | "complete" | "error"
   medicalUrl: string | null
   corporateUrl: string | null
+  medicalPreviewUrl?: string | null
+  corporatePreviewUrl?: string | null
   error?: string
   departmentId?: string
   departmentName?: string
@@ -57,6 +60,30 @@ interface BatchPortraitCardProps {
 function resolvePreviewUrl(preview: string): string {
   if (preview.startsWith("http") || preview.startsWith("data:")) return preview
   return `${typeof window !== "undefined" ? window.location.origin : ""}${preview}`
+}
+
+function GeneratedPreviewImage({
+  previewUrl,
+  fullUrl,
+  alt,
+}: {
+  previewUrl?: string | null
+  fullUrl: string
+  alt: string
+}) {
+  const [failed, setFailed] = useState(false)
+  const src = !failed && previewUrl ? previewUrl : fullUrl
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="size-full object-cover object-top"
+      onError={() => {
+        if (previewUrl) setFailed(true)
+      }}
+    />
+  )
 }
 
 export function BatchPortraitCard({
@@ -142,7 +169,12 @@ export function BatchPortraitCard({
                 </div>
               ) : item.medicalUrl ? (
                 <>
-                  <img src={item.medicalUrl} alt="Медицинский" className="size-full object-cover object-top" />
+                  <GeneratedPreviewImage
+                    key={`${item.medicalPreviewUrl ?? "none"}|${item.medicalUrl}`}
+                    previewUrl={item.medicalPreviewUrl}
+                    fullUrl={item.medicalUrl}
+                    alt="Медицинский"
+                  />
                   <div className="absolute right-1.5 bottom-1.5 z-10 flex gap-1">
                     {onRegenerateOne && (
                       <Button
@@ -221,7 +253,12 @@ export function BatchPortraitCard({
                 </div>
               ) : item.corporateUrl ? (
                 <>
-                  <img src={item.corporateUrl} alt="Корпоративный" className="size-full object-cover object-top" />
+                  <GeneratedPreviewImage
+                    key={`${item.corporatePreviewUrl ?? "none"}|${item.corporateUrl}`}
+                    previewUrl={item.corporatePreviewUrl}
+                    fullUrl={item.corporateUrl}
+                    alt="Корпоративный"
+                  />
                   <div className="absolute right-1.5 bottom-1.5 z-10 flex gap-1">
                     {onRegenerateOne && (
                       <Button

@@ -86,6 +86,8 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
     status: GenStatus
     medicalUrl?: string | null
     corporateUrl?: string | null
+    medicalPreviewUrl?: string | null
+    corporatePreviewUrl?: string | null
     error?: string
     feedback?: GalleryFeedbackSummary
   }>>({})
@@ -121,6 +123,8 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
       const byEmployee = new Map<string, {
         medicalUrl: string | null
         corporateUrl: string | null
+        medicalPreviewUrl: string | null
+        corporatePreviewUrl: string | null
         feedback?: GalleryFeedbackSummary
       }>()
       for (const item of galleryItems) {
@@ -128,6 +132,8 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
           byEmployee.set(item.employeeId, {
             medicalUrl: item.medicalUrl ?? null,
             corporateUrl: item.corporateUrl ?? null,
+            medicalPreviewUrl: item.medicalPreviewUrl ?? null,
+            corporatePreviewUrl: item.corporatePreviewUrl ?? null,
             feedback: item.feedback,
           })
         }
@@ -139,6 +145,8 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
             status: "complete",
             medicalUrl: urls.medicalUrl,
             corporateUrl: urls.corporateUrl,
+            medicalPreviewUrl: urls.medicalPreviewUrl,
+            corporatePreviewUrl: urls.corporatePreviewUrl,
             feedback: urls.feedback,
           }
         }
@@ -314,6 +322,8 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
             status: "complete",
             medicalUrl: genMedical ? medicalUrl : prev[id]?.medicalUrl ?? null,
             corporateUrl: genCorporate ? corporateUrl : prev[id]?.corporateUrl ?? null,
+            medicalPreviewUrl: genMedical ? medicalUrl : prev[id]?.medicalPreviewUrl ?? null,
+            corporatePreviewUrl: genCorporate ? corporateUrl : prev[id]?.corporatePreviewUrl ?? null,
             feedback: {
               medical: { likes: 0, dislikes: 0 },
               corporate: { likes: 0, dislikes: 0 },
@@ -324,12 +334,21 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         const finalCorporate = genCorporate ? corporateUrl : null
         if (finalMedical || finalCorporate) {
           try {
-            await addGalleryItem({
+            const galleryItem = await addGalleryItem({
               name: emp.name,
               medicalUrl: finalMedical ?? undefined,
               corporateUrl: finalCorporate ?? undefined,
               employeeId: id,
             })
+            setGenerationState((prev) => ({
+              ...prev,
+              [id]: {
+                ...prev[id],
+                medicalPreviewUrl: galleryItem.medicalPreviewUrl ?? prev[id]?.medicalUrl ?? null,
+                corporatePreviewUrl: galleryItem.corporatePreviewUrl ?? prev[id]?.corporateUrl ?? null,
+                feedback: galleryItem.feedback ?? prev[id]?.feedback,
+              },
+            }))
           } catch {
             // ignore
           }
@@ -364,6 +383,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
           [employeeId]: {
             ...prev[employeeId],
             [style === "medical" ? "medicalUrl" : "corporateUrl"]: newUrl,
+            [style === "medical" ? "medicalPreviewUrl" : "corporatePreviewUrl"]: newUrl,
           },
         }))
         const newMedical = style === "medical" ? newUrl : gen?.medicalUrl
@@ -371,15 +391,35 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         const galleryItems = await fetchGalleryByEmployeeId(employeeId)
         const item = galleryItems[0]
         if (item?.id) {
-          await updateGalleryItem(item.id, { [style === "medical" ? "medicalUrl" : "corporateUrl"]: newUrl })
+          const updatedItem = await updateGalleryItem(item.id, { [style === "medical" ? "medicalUrl" : "corporateUrl"]: newUrl })
+          setGenerationState((prev) => ({
+            ...prev,
+            [employeeId]: {
+              ...prev[employeeId],
+              medicalUrl: updatedItem.medicalUrl ?? prev[employeeId]?.medicalUrl ?? null,
+              corporateUrl: updatedItem.corporateUrl ?? prev[employeeId]?.corporateUrl ?? null,
+              medicalPreviewUrl: updatedItem.medicalPreviewUrl ?? prev[employeeId]?.medicalPreviewUrl ?? null,
+              corporatePreviewUrl: updatedItem.corporatePreviewUrl ?? prev[employeeId]?.corporatePreviewUrl ?? null,
+              feedback: updatedItem.feedback ?? prev[employeeId]?.feedback,
+            },
+          }))
         } else if (newMedical && newCorporate) {
           try {
-            await addGalleryItem({
+            const galleryItem = await addGalleryItem({
               name: emp.name,
               medicalUrl: newMedical,
               corporateUrl: newCorporate,
               employeeId,
             })
+            setGenerationState((prev) => ({
+              ...prev,
+              [employeeId]: {
+                ...prev[employeeId],
+                medicalPreviewUrl: galleryItem.medicalPreviewUrl ?? prev[employeeId]?.medicalPreviewUrl ?? null,
+                corporatePreviewUrl: galleryItem.corporatePreviewUrl ?? prev[employeeId]?.corporatePreviewUrl ?? null,
+                feedback: galleryItem.feedback ?? prev[employeeId]?.feedback,
+              },
+            }))
           } catch {
             // ignore
           }
@@ -742,6 +782,8 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
                 status: gen?.status ?? "pending",
                 medicalUrl: gen?.medicalUrl ?? null,
                 corporateUrl: gen?.corporateUrl ?? null,
+                medicalPreviewUrl: gen?.medicalPreviewUrl ?? null,
+                corporatePreviewUrl: gen?.corporatePreviewUrl ?? null,
                 error: gen?.error,
                 departmentId: emp.departmentId ?? undefined,
                 departmentName: emp.departmentName,

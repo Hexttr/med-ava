@@ -87,6 +87,8 @@ export interface GalleryItem {
   name: string
   medicalUrl: string | null
   corporateUrl: string | null
+  medicalPreviewUrl?: string | null
+  corporatePreviewUrl?: string | null
   createdAt: number
   /** Для фильтра по отделу в галерее. */
   employeeId?: string

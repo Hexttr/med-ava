@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
-import { saveEmployeePhoto, removeFile } from "@/lib/storage"
+import { saveEmployeePhoto, removeFile, removeGalleryImageFiles } from "@/lib/storage"
 import { validateBase64Image } from "@/lib/upload-validation"
 import { logger } from "@/lib/logger"
 import { enforceTrustedOrigin } from "@/lib/request-security"
@@ -157,8 +157,8 @@ export async function DELETE(
       .all(id) as Array<{ id: string; medical_path: string | null; corporate_path: string | null }>
     deleteGalleryFeedbackForGalleryItems(database, galleryRows.map((item) => item.id))
     for (const g of galleryRows) {
-      if (g.medical_path) await removeFile(g.medical_path).catch(() => {})
-      if (g.corporate_path) await removeFile(g.corporate_path).catch(() => {})
+      if (g.medical_path) await removeGalleryImageFiles(g.medical_path).catch(() => {})
+      if (g.corporate_path) await removeGalleryImageFiles(g.corporate_path).catch(() => {})
       database.prepare("DELETE FROM gallery_items WHERE id = ?").run(g.id)
     }
     await removeFile(row.photo_path)

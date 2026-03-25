@@ -28,10 +28,64 @@ const BACKGROUND_REFERENCE_RULES =
   "Treat the second image as a BACKGROUND REFERENCE PLATE, not as a literal pasted layer. Recreate the same scene naturally with matching palette, depth, perspective, softness, and lighting direction, but the final portrait must look like one coherent professional photograph. Avoid any cutout, pasted, or composited look."
 const BACKGROUND_PRIORITY_RULES =
   "FACIAL PRIORITY RULES: facial fidelity, eye clarity, and facial sharpness are more important than exact background matching. If needed, simplify or approximate the background to preserve a crisp, clean, sharply resolved face. Never sacrifice facial detail for scene fidelity."
+const BACKGROUND_ANALYSIS_PROMPT =
+  "Analyze this portrait background plate for scene integration. Describe in concise professional English: environment type, camera perspective, background depth, likely subject placement, main light direction, light softness, color temperature, brightest areas, likely shadow direction, reflective surfaces, and how a photographed person should be lit to fit naturally into this scene. Keep it compact and practical for image generation."
 
 type GenerateModelResult =
   | { ok: true; imageUrl: string }
   | { ok: false; status?: number; errorText: string }
+
+async function analyzeBackgroundScene(
+  geminiKey: string,
+  model: string,
+  mimeType: string,
+  base64: string
+): Promise<string> {
+  try {
+    const response = await fetchWithProxy(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: BACKGROUND_ANALYSIS_PROMPT },
+              { inlineData: { mimeType, data: base64 } },
+            ],
+          }],
+          generationConfig: {
+            temperature: 0.2,
+            topP: 0.8,
+            maxOutputTokens: 256,
+          },
+        }),
+      }
+    )
+
+    if (!response.ok) {
+      logger.warn("GENERATE", "Не удалось проанализировать background plate", {
+        model,
+        status: response.status,
+      })
+      return ""
+    }
+
+    const payload = await response.json()
+    const text = payload.candidates?.[0]?.content?.parts
+      ?.map((part: { text?: string }) => part.text ?? "")
+      .join(" ")
+      .trim()
+
+    return text || ""
+  } catch (error) {
+    logger.warn("GENERATE", "Ошибка анализа background plate", {
+      model,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return ""
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -73,6 +127,7 @@ export async function POST(request: NextRequest) {
 
     const appSettings = getAppSettings()
     const modelGeneration = appSettings.modelGeneration || "gemini-3-pro-image-preview"
+    const modelAnalysis = appSettings.modelAnalysis || "gemini-2.5-flash"
     const defaultBackdropMedical = "Clean, well-lit studio backdrop in light gray or white."
     const defaultBackdropCorporate = "Clean corporate background in medium gray or soft slate, well-lit."
 
@@ -115,6 +170,28 @@ export async function POST(request: NextRequest) {
     const useMedicalImage = style === "medical" && backdropMedicalImageBase64
     const useCorporateImage = style === "corporate" && backdropCorporateImageBase64
     const useBackgroundImage = useMedicalImage || useCorporateImage
+    let backgroundSceneAnalysis = ""
+
+    if (useBackgroundImage) {
+      try {
+        const selectedBackgroundPath = style === "medical" ? bgMedicalImagePath : bgCorporateImagePath
+        if (selectedBackgroundPath) {
+          const backgroundBuffer = await fs.readFile(getAbsolutePath(selectedBackgroundPath))
+          const processedSceneBackground = await preprocessForGemini(backgroundBuffer)
+          backgroundSceneAnalysis = await analyzeBackgroundScene(
+            geminiKey,
+            modelAnalysis,
+            processedSceneBackground.mimeType,
+            processedSceneBackground.base64
+          )
+        }
+      } catch (error) {
+        logger.warn("GENERATE", "Не удалось подготовить scene analysis для background plate", {
+          style,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
 
     const backdropMedical = backgroundMedical ? `Background: ${backgroundMedical}` : defaultBackdropMedical
     const backdropCorporate = backgroundCorporate ? `Background: ${backgroundCorporate}` : defaultBackdropCorporate
@@ -129,14 +206,17 @@ export async function POST(request: NextRequest) {
 
     const negativePrompt = getNegativePrompt()
     const negativeSuffix = negativePrompt ? ` ${negativePrompt}` : ""
+    const backgroundSceneSuffix = backgroundSceneAnalysis
+      ? ` BACKGROUND SCENE ANALYSIS: ${backgroundSceneAnalysis}`
+      : ""
 
     const hasReferencePhoto = Boolean(referencePhotoBase64?.trim())
 
     let geminiImagePrompt: string
     if (useBackgroundImage && hasReferencePhoto) {
-      geminiImagePrompt = `The FIRST attached image is the REFERENCE PHOTO of the person. The SECOND attached image is the BACKGROUND REFERENCE PLATE for the final scene. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, same identity, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. Mouth closed, lips together. ${BACKGROUND_REFERENCE_RULES} ${BACKGROUND_PRIORITY_RULES} ${HARD_FRAMING_RULES} ${SHARPNESS_RULES} ${settingInstruction}. Clothing must look premium and high-quality. Use soft, physically believable transitions between the person and the background. Output the generated portrait image.${negativeSuffix}`
+      geminiImagePrompt = `The FIRST attached image is the REFERENCE PHOTO of the person. The SECOND attached image is the BACKGROUND REFERENCE PLATE for the final scene. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, same identity, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. Mouth closed, lips together. ${BACKGROUND_REFERENCE_RULES} ${BACKGROUND_PRIORITY_RULES} ${HARD_FRAMING_RULES} ${SHARPNESS_RULES}${backgroundSceneSuffix} ${settingInstruction}. Clothing must look premium and high-quality. Use soft, physically believable transitions between the person and the background. Match the inferred scene lighting and shadow behavior so the subject looks photographed in that environment. Output the generated portrait image.${negativeSuffix}`
     } else if (useBackgroundImage && !hasReferencePhoto) {
-      geminiImagePrompt = `The attached image is the BACKGROUND REFERENCE PLATE for the final scene. Generate ONE professional studio portrait photo. ${BACKGROUND_REFERENCE_RULES} ${BACKGROUND_PRIORITY_RULES} ${HARD_FRAMING_RULES} ${SHARPNESS_RULES} ${universalFraming} ${prompt}. Clothing must look premium and high-quality. Ultra high quality, professional photography, sharp focus, natural skin texture. Output the generated portrait image.${negativeSuffix}`
+      geminiImagePrompt = `The attached image is the BACKGROUND REFERENCE PLATE for the final scene. Generate ONE professional studio portrait photo. ${BACKGROUND_REFERENCE_RULES} ${BACKGROUND_PRIORITY_RULES} ${HARD_FRAMING_RULES} ${SHARPNESS_RULES}${backgroundSceneSuffix} ${universalFraming} ${prompt}. Clothing must look premium and high-quality. Ultra high quality, professional photography, sharp focus, natural skin texture. Match the inferred scene lighting and shadow behavior so the subject looks photographed in that environment. Output the generated portrait image.${negativeSuffix}`
     } else if (hasReferencePhoto) {
       geminiImagePrompt = `The attached image is the REFERENCE PHOTO of the person. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. Mouth closed, lips together. ${HARD_FRAMING_RULES} ${SHARPNESS_RULES} Only change the setting and clothing as follows: ${settingInstruction}. Clothing must look premium and high-quality. Keep the person's face identical to the reference. Output the generated portrait image.${negativeSuffix}`
     } else {
