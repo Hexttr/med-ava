@@ -87,6 +87,17 @@ def describe_auth_method(args: argparse.Namespace) -> str:
     return "ssh-agent/default ssh keys"
 
 
+def dependency_install_command(app_dir: str) -> str:
+    return (
+        f"cd {app_dir} && "
+        "if [ ! -d node_modules ] || [ ! -f .deploy-package-lock ] || ! cmp -s package-lock.json .deploy-package-lock; then "
+        "npm ci --prefer-offline --no-audit --fund false && cp package-lock.json .deploy-package-lock; "
+        "else "
+        "echo 'package-lock unchanged, skipping npm ci'; "
+        "fi"
+    )
+
+
 def systemd_service(app_dir: str, runtime_user: str) -> str:
     return f"""[Unit]
 Description=PhotoHUB Enterprise (med-ava)
@@ -240,7 +251,7 @@ def main() -> None:
         run_ssh(ssh, sudo(f"test -f {args.app_dir}/data/eam-logs.jsonl && chmod 640 {args.app_dir}/data/eam-logs.jsonl || true"))
 
         safe_print("\n--- 3. Установка зависимостей и smoke checks ---")
-        run_ssh(ssh, f"cd {args.app_dir} && npm ci")
+        run_ssh(ssh, dependency_install_command(args.app_dir))
         run_ssh(ssh, f"cd {args.app_dir} && npm run typecheck")
         run_ssh(ssh, f"cd {args.app_dir} && npm run lint")
         if not args.skip_build:

@@ -84,6 +84,8 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
   const [bgCorporateFile, setBgCorporateFile] = useState<File | null>(null)
   const [clearMedicalRequested, setClearMedicalRequested] = useState(false)
   const [clearCorporateRequested, setClearCorporateRequested] = useState(false)
+  const [bgMedicalPreviewUrl, setBgMedicalPreviewUrl] = useState<string | null>(null)
+  const [bgCorporatePreviewUrl, setBgCorporatePreviewUrl] = useState<string | null>(null)
   const medicalFileRef = useRef<HTMLInputElement>(null)
   const corporateFileRef = useRef<HTMLInputElement>(null)
   const overlayLogoFileRef = useRef<HTMLInputElement>(null)
@@ -128,6 +130,36 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
       syncFormWithSettings(initialAppSettings)
     }
   }, [initialAppSettings])
+
+  useEffect(() => {
+    if (bgMedicalFile) {
+      const objectUrl = URL.createObjectURL(bgMedicalFile)
+      setBgMedicalPreviewUrl(objectUrl)
+      return () => URL.revokeObjectURL(objectUrl)
+    }
+
+    if (savedSettings?.backgroundMedicalImage && !clearMedicalRequested) {
+      setBgMedicalPreviewUrl(`/api/files/${savedSettings.backgroundMedicalImage}`)
+      return
+    }
+
+    setBgMedicalPreviewUrl(null)
+  }, [bgMedicalFile, savedSettings?.backgroundMedicalImage, clearMedicalRequested])
+
+  useEffect(() => {
+    if (bgCorporateFile) {
+      const objectUrl = URL.createObjectURL(bgCorporateFile)
+      setBgCorporatePreviewUrl(objectUrl)
+      return () => URL.revokeObjectURL(objectUrl)
+    }
+
+    if (savedSettings?.backgroundCorporateImage && !clearCorporateRequested) {
+      setBgCorporatePreviewUrl(`/api/files/${savedSettings.backgroundCorporateImage}`)
+      return
+    }
+
+    setBgCorporatePreviewUrl(null)
+  }, [bgCorporateFile, savedSettings?.backgroundCorporateImage, clearCorporateRequested])
 
   useEffect(() => {
     if (overlayLogoFile) {
@@ -535,26 +567,23 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
                         <Label className="text-sm font-semibold">Фон 1 — медицинский</Label>
                         <p className="text-xs text-muted-foreground">Светлый фон или интерьер кабинета.</p>
                       </div>
-                      {(bgMedicalFile || (savedSettings?.backgroundMedicalImage && !clearMedicalRequested)) ? (
+                      {bgMedicalPreviewUrl ? (
                         <div className="flex items-center gap-3 rounded-2xl border border-dashed border-border/80 bg-background p-3">
-                          {bgMedicalFile ? (
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium text-foreground">{bgMedicalFile.name}</p>
-                              <p className="text-xs text-muted-foreground">Файл будет сохранён после нажатия кнопки.</p>
-                            </div>
-                          ) : (
-                            <>
-                              <img
-                                src={`/api/files/${savedSettings?.backgroundMedicalImage}`}
-                                alt="Медицинский фон"
-                                className="h-16 w-16 rounded-2xl object-cover"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-foreground">Текущий фон</p>
-                                <p className="text-xs text-muted-foreground">Используется для медицинского портрета.</p>
-                              </div>
-                            </>
-                          )}
+                          <img
+                            src={bgMedicalPreviewUrl}
+                            alt="Медицинский фон"
+                            className="h-16 w-16 rounded-2xl object-cover"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-foreground">
+                              {bgMedicalFile ? bgMedicalFile.name : "Текущий фон"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {bgMedicalFile
+                                ? "Этот файл будет сохранён после нажатия кнопки."
+                                : "Используется для медицинского портрета."}
+                            </p>
+                          </div>
                           <Button
                             type="button"
                             variant="ghost"
@@ -600,26 +629,23 @@ export function SettingsForm({ hasKey, appSettings: initialAppSettings }: Settin
                         <Label className="text-sm font-semibold">Фон 2 — корпоративный</Label>
                         <p className="text-xs text-muted-foreground">Студийный или деловой корпоративный фон.</p>
                       </div>
-                      {(bgCorporateFile || (savedSettings?.backgroundCorporateImage && !clearCorporateRequested)) ? (
+                      {bgCorporatePreviewUrl ? (
                         <div className="flex items-center gap-3 rounded-2xl border border-dashed border-border/80 bg-background p-3">
-                          {bgCorporateFile ? (
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium text-foreground">{bgCorporateFile.name}</p>
-                              <p className="text-xs text-muted-foreground">Файл будет сохранён после нажатия кнопки.</p>
-                            </div>
-                          ) : (
-                            <>
-                              <img
-                                src={`/api/files/${savedSettings?.backgroundCorporateImage}`}
-                                alt="Корпоративный фон"
-                                className="h-16 w-16 rounded-2xl object-cover"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-foreground">Текущий фон</p>
-                                <p className="text-xs text-muted-foreground">Используется для корпоративного портрета.</p>
-                              </div>
-                            </>
-                          )}
+                          <img
+                            src={bgCorporatePreviewUrl}
+                            alt="Корпоративный фон"
+                            className="h-16 w-16 rounded-2xl object-cover"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-foreground">
+                              {bgCorporateFile ? bgCorporateFile.name : "Текущий фон"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {bgCorporateFile
+                                ? "Этот файл будет сохранён после нажатия кнопки."
+                                : "Используется для корпоративного портрета."}
+                            </p>
+                          </div>
                           <Button
                             type="button"
                             variant="ghost"

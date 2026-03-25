@@ -171,7 +171,8 @@ export async function saveBackgroundImage(
   const baseDir = getUploadsDir()
   const fullDir = path.join(baseDir, dir)
   await fs.mkdir(fullDir, { recursive: true })
-  const finalName = `${filename}.${ext}`
+  const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const finalName = `${filename}_${uniqueSuffix}.${ext}`
   const filePath = path.join(fullDir, finalName)
   await fs.writeFile(filePath, buffer)
   return path.join(dir, finalName)
