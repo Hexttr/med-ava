@@ -433,13 +433,13 @@ export function ReviewCatalogClient() {
               <CardTitle className="text-xl">{employee.name}</CardTitle>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                 {employee.departmentName ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/90 px-3 py-1">
-                    <Building2 className="size-4" />
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#1a64a6]/20 bg-[#1a64a6] px-3 py-1 text-white">
+                    <Building2 className="size-4 text-white" />
                     {employee.departmentName}
                   </span>
                 ) : null}
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
-                  <Users className="size-4" />
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#1a64a6]/20 bg-[#1a64a6] px-3 py-1 text-white">
+                  <Users className="size-4 text-white" />
                   Актуальный набор для оценки
                 </span>
               </div>
@@ -531,36 +531,44 @@ export function ReviewCatalogClient() {
 
   return (
     <>
-      <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.18),_transparent_34%),linear-gradient(to_bottom,_#e7effb,_#f8fbff_30%,_#edf3f8_100%)]">
+      <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(26,100,166,0.18),_transparent_34%),linear-gradient(to_bottom,_#e7effb,_#f8fbff_30%,_#edf3f8_100%)]">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-[-10rem] top-16 h-80 w-80 rounded-full bg-blue-500/14 blur-3xl" />
+          <div className="absolute left-[-10rem] top-16 h-80 w-80 rounded-full bg-[#1a64a6]/14 blur-3xl" />
           <div className="absolute right-[-8rem] top-8 h-96 w-96 rounded-full bg-cyan-400/14 blur-3xl" />
         </div>
 
         <div className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-8 md:px-6 md:py-10">
           <section className="rounded-[2rem] border border-slate-300/90 bg-white/96 px-6 py-7 shadow-[0_24px_80px_rgba(15,23,42,0.12)] md:px-8">
-            <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+            <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
               <div className="max-w-3xl">
-                <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50/90 px-3 py-1 text-sm text-muted-foreground">
-                  <Building2 className="size-4" />
+                <img
+                  src="/logo-nczd.png"
+                  alt="Логотип НМИЦ"
+                  className="h-24 w-auto md:h-28"
+                />
+                <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#1a64a6]/20 bg-[#1a64a6] px-3 py-1 text-sm text-white shadow-sm">
+                  <Building2 className="size-4 text-white" />
                   Каталог оценки по отделам
                 </div>
                 <h1 className="mt-5 text-balance text-3xl font-semibold tracking-tight text-foreground md:text-5xl">
-                  Удобный обзор портретов по всем отделам
+                  Портреты НМИЦ
                 </h1>
                 <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground md:text-base">
                   Выберите отдел, переключайте режим просмотра и оценивайте каждое сгенерированное изображение с коротким комментарием прямо в каталоге.
                 </p>
-                <div className="mt-5">
-                  <div className="inline-flex gap-1 rounded-2xl border border-[#2d2188]/20 bg-[#2d2188]/8 p-1.5 shadow-[0_14px_34px_rgba(45,33,136,0.14)]">
+              </div>
+
+              <div className="flex w-full flex-col items-stretch gap-4 xl:max-w-[360px] xl:items-end">
+                <div className="flex justify-start xl:w-full xl:justify-end">
+                  <div className="inline-flex gap-1 rounded-2xl border border-[#1a64a6]/20 bg-[#1a64a6]/8 p-1.5 shadow-[0_14px_34px_rgba(26,100,166,0.14)]">
                     <button
                       type="button"
                       onClick={() => setViewMode("review")}
                       className={cn(
                         "rounded-[0.95rem] px-4 py-2.5 text-sm font-medium transition",
                         viewMode === "review"
-                          ? "bg-[#2d2188] text-white shadow-[0_10px_24px_rgba(45,33,136,0.28)]"
-                          : "text-[#2d2188] hover:bg-white/70"
+                          ? "bg-[#1a64a6] text-white shadow-[0_10px_24px_rgba(26,100,166,0.28)]"
+                          : "text-[#1a64a6] hover:bg-white/70"
                       )}
                     >
                       Режим оценки
@@ -571,24 +579,23 @@ export function ReviewCatalogClient() {
                       className={cn(
                         "rounded-[0.95rem] px-4 py-2.5 text-sm font-medium transition",
                         viewMode === "gallery"
-                          ? "bg-[#2d2188] text-white shadow-[0_10px_24px_rgba(45,33,136,0.28)]"
-                          : "text-[#2d2188] hover:bg-white/70"
+                          ? "bg-[#1a64a6] text-white shadow-[0_10px_24px_rgba(26,100,166,0.28)]"
+                          : "text-[#1a64a6] hover:bg-white/70"
                       )}
                     >
                       Режим галереи
                     </button>
                   </div>
                 </div>
-              </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[360px]">
-                <Card className="rounded-[1.25rem] border-[#2d2188]/85 bg-[#2d2188] shadow-[0_14px_34px_rgba(45,33,136,0.26)]">
+                <div className="grid gap-3 sm:grid-cols-2 xl:w-full">
+                <Card className="rounded-[1.25rem] border-[#1a64a6]/85 bg-[#1a64a6] shadow-[0_14px_34px_rgba(26,100,166,0.24)]">
                   <CardContent className="p-4 text-white">
                     <div className="text-xs uppercase tracking-[0.08em] text-white/80">Всего<br />отделов</div>
                     <div className="mt-2 text-3xl font-semibold text-white">{departments.length}</div>
                   </CardContent>
                 </Card>
-                <Card className="rounded-[1.25rem] border-[#2d2188]/85 bg-[#2d2188] shadow-[0_14px_34px_rgba(45,33,136,0.26)]">
+                <Card className="rounded-[1.25rem] border-[#1a64a6]/85 bg-[#1a64a6] shadow-[0_14px_34px_rgba(26,100,166,0.24)]">
                   <CardContent className="p-4 text-white">
                     <div className="text-xs uppercase tracking-[0.08em] text-white/80">Сотрудников с наборами</div>
                     <div className="mt-2 text-3xl font-semibold text-white">
@@ -596,6 +603,7 @@ export function ReviewCatalogClient() {
                     </div>
                   </CardContent>
                 </Card>
+                </div>
               </div>
             </div>
           </section>
@@ -711,17 +719,17 @@ export function ReviewCatalogClient() {
             </section>
           ) : (
           <section className="mt-6 grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-            <Card className="h-fit rounded-[1.5rem] border-blue-200/90 bg-gradient-to-b from-blue-50 via-white to-blue-50/80 shadow-[0_18px_50px_rgba(37,99,235,0.12)] xl:sticky xl:top-6">
-              <CardHeader className="pb-3">
+            <Card className="h-fit rounded-[1.5rem] border-[#1a64a6]/18 bg-gradient-to-b from-[#1a64a6]/8 via-white to-[#1a64a6]/6 shadow-[0_18px_50px_rgba(26,100,166,0.12)] xl:sticky xl:top-6">
+              <CardHeader className="pb-1">
                 <CardTitle className="text-lg">Отделы</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-2 pt-0">
                 <div className="xl:hidden">
                   <Select value={selectedDepartmentId} onValueChange={setSelectedDepartmentId}>
-                    <SelectTrigger className="h-11 w-full rounded-xl border-blue-200/90 bg-white/95 px-4 text-left shadow-none">
+                    <SelectTrigger className="h-11 w-full rounded-xl border-[#1a64a6]/20 bg-white/95 px-4 text-left shadow-none">
                       <SelectValue placeholder="Выберите отдел" />
                     </SelectTrigger>
-                    <SelectContent className="rounded-xl border-blue-200/90">
+                    <SelectContent className="rounded-xl border-[#1a64a6]/20">
                       <SelectItem value="all">Все отделы</SelectItem>
                       {departments.map((department) => (
                         <SelectItem
@@ -742,8 +750,8 @@ export function ReviewCatalogClient() {
                     className={cn(
                       "w-full rounded-xl border px-4 py-3 text-left transition",
                       selectedDepartmentId === "all"
-                        ? "border-blue-500/50 bg-blue-500/12 shadow-sm"
-                        : "border-blue-200/90 bg-white/95 hover:border-blue-300 hover:bg-blue-50/85"
+                        ? "border-[#1a64a6]/40 bg-[#1a64a6]/12 shadow-sm"
+                        : "border-[#1a64a6]/15 bg-white/95 hover:border-[#1a64a6]/35 hover:bg-[#1a64a6]/7"
                     )}
                   >
                     <div className="text-sm font-semibold text-foreground">Все отделы</div>
@@ -762,8 +770,8 @@ export function ReviewCatalogClient() {
                         className={cn(
                           "w-full rounded-xl border px-4 py-3 text-left transition",
                           selectedDepartmentId === departmentKey
-                            ? "border-blue-500/50 bg-blue-500/12 shadow-sm"
-                            : "border-blue-200/90 bg-white/95 hover:border-blue-300 hover:bg-blue-50/85"
+                            ? "border-[#1a64a6]/40 bg-[#1a64a6]/12 shadow-sm"
+                            : "border-[#1a64a6]/15 bg-white/95 hover:border-[#1a64a6]/35 hover:bg-[#1a64a6]/7"
                         )}
                       >
                         <div className="text-sm font-semibold text-foreground">{department.name}</div>

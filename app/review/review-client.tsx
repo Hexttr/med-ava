@@ -250,9 +250,9 @@ export function ReviewClient() {
 
   return (
     <>
-      <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.22),_transparent_34%),linear-gradient(to_bottom,_#e3eefc,_#f7fbff_28%,_#e8eef6_100%)]">
+      <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(26,100,166,0.22),_transparent_34%),linear-gradient(to_bottom,_#e3eefc,_#f7fbff_28%,_#e8eef6_100%)]">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-[-10rem] top-24 h-72 w-72 rounded-full bg-blue-500/14 blur-3xl" />
+          <div className="absolute left-[-10rem] top-24 h-72 w-72 rounded-full bg-[#1a64a6]/14 blur-3xl" />
           <div className="absolute right-[-6rem] top-16 h-80 w-80 rounded-full bg-cyan-400/14 blur-3xl" />
         </div>
 
@@ -260,8 +260,13 @@ export function ReviewClient() {
           <section className="mx-auto w-full max-w-5xl">
             <div className="rounded-[2rem] border border-slate-300/95 bg-white/96 px-6 py-8 shadow-[0_28px_90px_rgba(15,23,42,0.14)] backdrop-blur md:px-10 md:py-10">
               <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
-                <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1 text-sm text-muted-foreground shadow-sm">
-                  <UserSearch className="size-4" />
+                <img
+                  src="/logo-nczd.png"
+                  alt="Логотип НМИЦ"
+                  className="h-24 w-auto md:h-28"
+                />
+                <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#1a64a6]/20 bg-[#1a64a6] px-3 py-1 text-sm text-white shadow-sm">
+                  <UserSearch className="size-4 text-white" />
                   Публичная оценка портретов
                 </div>
                 <h1 className="mt-6 text-balance text-3xl font-semibold tracking-tight text-foreground md:text-6xl">
@@ -286,7 +291,7 @@ export function ReviewClient() {
                   <Button
                     type="submit"
                     size="lg"
-                    className="h-14 min-w-[180px] rounded-xl px-6"
+                    className="h-14 min-w-[180px] rounded-xl bg-[#1a64a6] px-6 text-white hover:bg-[#1a64a6]/92"
                     disabled={searching}
                   >
                     {searching ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Search className="mr-2 size-4" />}
@@ -332,8 +337,8 @@ export function ReviewClient() {
                     >
                       <div className="text-sm font-semibold leading-5 text-foreground">{item.name}</div>
                       {item.departmentName && (
-                        <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-slate-200/70 px-2.5 py-1 text-xs text-muted-foreground">
-                          <Building2 className="size-3.5" />
+                        <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-[#1a64a6] px-2.5 py-1 text-xs text-white">
+                          <Building2 className="size-3.5 text-white" />
                           {item.departmentName}
                         </div>
                       )}
@@ -363,8 +368,8 @@ export function ReviewClient() {
                         <CardTitle className="text-2xl md:text-3xl">{selectedEmployee.name}</CardTitle>
                         <div className="mt-3 flex flex-wrap items-center gap-2.5 text-sm text-muted-foreground">
                           {selectedEmployee.departmentName && (
-                            <div className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-white/85 px-3 py-1 text-sm">
-                              <Building2 className="size-4" />
+                            <div className="inline-flex items-center gap-1.5 rounded-full border border-[#1a64a6]/20 bg-[#1a64a6] px-3 py-1 text-sm text-white">
+                              <Building2 className="size-4 text-white" />
                               {selectedEmployee.departmentName}
                             </div>
                           )}
