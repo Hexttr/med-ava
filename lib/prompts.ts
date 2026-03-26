@@ -46,12 +46,12 @@ const DEFAULT_NEGATIVE_PROMPT =
 const MEDICAL_CLOTHING_OVERRIDE_SUFFIX =
   "Medical clothing override: even if the reference already shows white clothing, scrubs, or a medical-looking uniform, you must replace it with a newly rendered premium doctor's coat. Do not preserve the source coat, scrub top, zipper, piping, trim, pocket shape, seam layout, neckline, or chest silhouette."
 const CORPORATE_DIVERSITY_SUFFIX =
-  "Corporate wardrobe diversity: choose a premium executive outfit that suits the person's presentation, but vary the wardrobe across different people. Do not default to the same navy suit and blue tie. Vary jacket cut, lapels, shirt or blouse, neckline, fabric texture, and restrained luxury color palette while keeping the result formal and expensive."
+  "Corporate wardrobe diversity: choose a premium executive outfit that suits the person's presentation, but vary the wardrobe across different people. For masculine-presenting subjects, stay within strict business attire: tailored jacket, dress shirt, and tie only, with controlled variation in color and fabric. For feminine-presenting subjects, keep the look formal and luxurious but allow more elegant variation: tailored blazer with silk blouse, refined shell under a structured jacket, or an elegant business dress with a matching jacket. Do not default every subject to the same navy suit and blue tie. Do not push feminine-presenting subjects into overly masculine menswear unless the reference clearly supports it."
 const CORPORATE_VARIATION_OPTIONS = [
-  "Wardrobe direction: charcoal or graphite tailored suit with a refined white or soft ecru shirt, and either no tie or a very subtle dark tie.",
-  "Wardrobe direction: deep navy or midnight blazer with a premium light shirt or blouse, clean structured silhouette, and understated executive styling.",
-  "Wardrobe direction: dark textured suit or blazer in graphite, ink, or deep brown with a premium blouse/shirt and a distinctive but restrained neckline treatment.",
-  "Wardrobe direction: elegant premium business look with a dark blazer and luxurious blouse/top, avoiding the standard blue-tie formula.",
+  "Wardrobe direction: masculine-presenting subjects should wear a charcoal or graphite tailored suit, crisp white or pale blue dress shirt, and a dark restrained tie. Feminine-presenting subjects should wear a charcoal tailored blazer with an ivory silk blouse or shell.",
+  "Wardrobe direction: masculine-presenting subjects should wear a deep navy or midnight suit jacket with a refined light shirt and a burgundy, navy, or dark gray tie. Feminine-presenting subjects should wear a midnight or deep navy blazer with a premium soft blouse and elegant neckline.",
+  "Wardrobe direction: masculine-presenting subjects should wear a graphite or deep gray business suit with a structured shirt and subtle luxury tie pattern. Feminine-presenting subjects should wear a refined business dress or shell with a matching structured jacket in graphite, ink, or deep brown.",
+  "Wardrobe direction: masculine-presenting subjects should wear a dark premium suit with a crisp dress shirt and tie, varying lapels and fabric texture while staying conservative. Feminine-presenting subjects should wear a luxurious feminine business ensemble with a tailored jacket and polished blouse, avoiding masculine uniformity.",
 ]
 
 function hashString(input: string): number {
