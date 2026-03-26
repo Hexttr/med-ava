@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
@@ -413,7 +414,7 @@ export function ReviewCatalogClient() {
                 }
                 onCommentSave={() => handleCommentSave(employee, "original")}
                 onOpen={setLightboxUrl}
-                helperText="Оцените качество исходного фото: свет, резкость, ракурс и пригодность для генерации."
+                helperText="Оцените качество исходного фото: свет, резкость, ракурс"
               />
             ) : null}
 
@@ -495,15 +496,15 @@ export function ReviewCatalogClient() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[360px]">
-                <Card className="rounded-[1.25rem] border-blue-600/80 bg-blue-600 shadow-[0_14px_34px_rgba(37,99,235,0.28)]">
+                <Card className="rounded-[1.25rem] border-blue-400/70 bg-blue-500 shadow-[0_14px_34px_rgba(59,130,246,0.20)]">
                   <CardContent className="p-4 text-white">
-                    <div className="text-xs uppercase tracking-[0.08em] text-blue-100">Всего<br />отделов</div>
+                    <div className="text-xs uppercase tracking-[0.08em] text-blue-50">Всего<br />отделов</div>
                     <div className="mt-2 text-3xl font-semibold text-white">{departments.length}</div>
                   </CardContent>
                 </Card>
-                <Card className="rounded-[1.25rem] border-blue-600/80 bg-blue-600 shadow-[0_14px_34px_rgba(37,99,235,0.28)]">
+                <Card className="rounded-[1.25rem] border-blue-400/70 bg-blue-500 shadow-[0_14px_34px_rgba(59,130,246,0.20)]">
                   <CardContent className="p-4 text-white">
-                    <div className="text-xs uppercase tracking-[0.08em] text-blue-100">Сотрудников с наборами</div>
+                    <div className="text-xs uppercase tracking-[0.08em] text-blue-50">Сотрудников с наборами</div>
                     <div className="mt-2 text-3xl font-semibold text-white">
                       {departments.reduce((sum, department) => sum + department.employeeCount, 0)}
                     </div>
@@ -518,7 +519,27 @@ export function ReviewCatalogClient() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg">Отделы</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-3">
+                <div className="xl:hidden">
+                  <Select value={selectedDepartmentId} onValueChange={setSelectedDepartmentId}>
+                    <SelectTrigger className="h-11 w-full rounded-xl border-blue-200/90 bg-white/95 px-4 text-left shadow-none">
+                      <SelectValue placeholder="Выберите отдел" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-blue-200/90">
+                      <SelectItem value="all">Все отделы</SelectItem>
+                      {departments.map((department) => (
+                        <SelectItem
+                          key={department.departmentId ?? "__no_department__"}
+                          value={department.departmentId ?? "__no_department__"}
+                        >
+                          {department.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="hidden space-y-2 xl:block">
                 <button
                   type="button"
                   onClick={() => setSelectedDepartmentId("all")}
@@ -554,6 +575,7 @@ export function ReviewCatalogClient() {
                     </button>
                   )
                 })}
+                </div>
               </CardContent>
             </Card>
 
@@ -589,8 +611,8 @@ export function ReviewCatalogClient() {
                   </div>
 
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                    <Tabs value={displayMode} onValueChange={(value) => setDisplayMode(value as DisplayMode)}>
-                      <TabsList className="h-auto rounded-xl bg-slate-100 p-1">
+                    <Tabs value={displayMode} onValueChange={(value) => setDisplayMode(value as DisplayMode)} className="min-w-0">
+                      <TabsList className="h-auto w-full max-w-full flex-wrap rounded-xl bg-slate-100 p-1 md:w-fit">
                         <TabsTrigger value="before-after" className="rounded-lg px-4 py-2">
                           Было / стало
                         </TabsTrigger>
@@ -603,7 +625,7 @@ export function ReviewCatalogClient() {
                       </TabsList>
                     </Tabs>
 
-                    <div className="relative w-full xl:max-w-sm">
+                    <div className="relative w-full min-w-0 xl:max-w-sm">
                       <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         value={query}
@@ -614,7 +636,7 @@ export function ReviewCatalogClient() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1">
                       <Users className="size-4" />
                       {totalVisibleEmployees} сотрудников в текущем представлении
