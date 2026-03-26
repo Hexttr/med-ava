@@ -250,15 +250,15 @@ export function ReviewClient() {
 
   return (
     <>
-      <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.16),_transparent_34%),linear-gradient(to_bottom,_#eef5ff,_#ffffff_30%,_#f1f5f9_100%)]">
+      <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.22),_transparent_34%),linear-gradient(to_bottom,_#e3eefc,_#f7fbff_28%,_#e8eef6_100%)]">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-[-10rem] top-24 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl" />
-          <div className="absolute right-[-6rem] top-16 h-80 w-80 rounded-full bg-cyan-400/10 blur-3xl" />
+          <div className="absolute left-[-10rem] top-24 h-72 w-72 rounded-full bg-blue-500/14 blur-3xl" />
+          <div className="absolute right-[-6rem] top-16 h-80 w-80 rounded-full bg-cyan-400/14 blur-3xl" />
         </div>
 
         <div className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-8 md:px-6 md:py-12">
           <section className="mx-auto w-full max-w-5xl">
-            <div className="rounded-[2rem] border border-slate-200/90 bg-white/92 px-6 py-8 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur md:px-10 md:py-10">
+            <div className="rounded-[2rem] border border-slate-300/95 bg-white/96 px-6 py-8 shadow-[0_28px_90px_rgba(15,23,42,0.14)] backdrop-blur md:px-10 md:py-10">
               <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
                 <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1 text-sm text-muted-foreground shadow-sm">
                   <UserSearch className="size-4" />
@@ -272,7 +272,7 @@ export function ReviewClient() {
                 </p>
               </div>
 
-              <div className="mx-auto mt-8 max-w-4xl rounded-[1.5rem] border border-slate-200/90 bg-background/95 p-4 shadow-sm md:p-5">
+              <div className="mx-auto mt-8 max-w-4xl rounded-[1.5rem] border border-slate-300/90 bg-slate-50/95 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.08)] md:p-5">
                 <form onSubmit={handleSearchSubmit} className="flex flex-col gap-3 md:flex-row">
                   <div className="relative flex-1">
                     <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -299,7 +299,7 @@ export function ReviewClient() {
 
           <section className="mt-8">
             {showEmptyState && (
-              <Card className="mx-auto max-w-3xl rounded-[1.5rem] border-slate-200/90 bg-white/95 shadow-[0_16px_48px_rgba(15,23,42,0.08)] backdrop-blur">
+              <Card className="mx-auto max-w-3xl rounded-[1.5rem] border-slate-300/90 bg-white/96 shadow-[0_18px_52px_rgba(15,23,42,0.12)] backdrop-blur">
                 <CardContent className="flex min-h-[240px] flex-col items-center justify-center gap-4 p-8 text-center">
                   <div className="flex size-14 items-center justify-center rounded-full bg-muted/60 text-muted-foreground">
                     <Search className="size-6" />
@@ -315,24 +315,24 @@ export function ReviewClient() {
             )}
 
             {showResultsList && (
-              <Card className="mx-auto max-w-3xl rounded-[1.5rem] border-slate-200/90 bg-white/95 shadow-[0_16px_48px_rgba(15,23,42,0.08)] backdrop-blur">
+              <Card className="mx-auto max-w-5xl rounded-[1.5rem] border-slate-300/90 bg-white/96 shadow-[0_18px_52px_rgba(15,23,42,0.12)] backdrop-blur">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-xl">Найдено несколько вариантов</CardTitle>
                   <p className="text-sm text-muted-foreground">
                     Выберите нужное ФИО из списка.
                   </p>
                 </CardHeader>
-                <CardContent className="space-y-2">
+                <CardContent className="grid gap-3 md:grid-cols-2">
                   {results.map((item) => (
                     <button
                       key={item.employeeId}
                       type="button"
                       onClick={() => handleSelectEmployee(item.employeeId)}
-                      className="w-full rounded-[1.25rem] border border-border/70 bg-background/80 px-4 py-3 text-left transition-all hover:border-primary/30 hover:bg-muted/30"
+                      className="w-full rounded-[1.15rem] border border-slate-300/80 bg-slate-50/88 px-4 py-3 text-left transition-all hover:border-primary/30 hover:bg-slate-100/90"
                     >
-                      <div className="text-sm font-semibold text-foreground">{item.name}</div>
+                      <div className="text-sm font-semibold leading-5 text-foreground">{item.name}</div>
                       {item.departmentName && (
-                        <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground">
+                        <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-slate-200/70 px-2.5 py-1 text-xs text-muted-foreground">
                           <Building2 className="size-3.5" />
                           {item.departmentName}
                         </div>
@@ -344,7 +344,7 @@ export function ReviewClient() {
             )}
 
             {selectedEmployeeId && loadingEmployee && (
-              <Card className="mx-auto max-w-6xl rounded-[1.5rem] border-slate-200/90 bg-white/95 shadow-[0_16px_48px_rgba(15,23,42,0.08)] backdrop-blur">
+              <Card className="mx-auto max-w-6xl rounded-[1.5rem] border-slate-300/90 bg-white/96 shadow-[0_18px_52px_rgba(15,23,42,0.12)] backdrop-blur">
                 <CardContent className="flex min-h-[420px] items-center justify-center">
                   <div className="flex items-center gap-3 text-sm text-muted-foreground">
                     <Loader2 className="size-4 animate-spin text-primary" />
@@ -356,7 +356,7 @@ export function ReviewClient() {
 
             {selectedEmployee && !loadingEmployee && (
               <div className="mx-auto max-w-6xl">
-                <Card className="overflow-hidden rounded-[1.5rem] border-slate-200/90 bg-white/95 shadow-[0_16px_48px_rgba(15,23,42,0.08)] backdrop-blur">
+                <Card className="overflow-hidden rounded-[1.5rem] border-slate-300/90 bg-white/96 shadow-[0_18px_52px_rgba(15,23,42,0.12)] backdrop-blur">
                   <CardHeader className="border-b border-border/70 bg-gradient-to-r from-primary/[0.05] via-transparent to-cyan-500/[0.04] pb-5">
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div>
@@ -426,6 +426,16 @@ export function ReviewClient() {
               </div>
             )}
           </section>
+
+          <div className="mx-auto mt-10 w-full max-w-5xl pb-4 text-center text-sm leading-6 text-slate-600">
+            Не нашли свою фотографию? Вы можете отправить любое свое изображение на{" "}
+            <a
+              href="mailto:ambaryan.ag@nczd.ru"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              ambaryan.ag@nczd.ru
+            </a>
+          </div>
         </div>
       </main>
 
