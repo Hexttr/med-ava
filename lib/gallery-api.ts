@@ -56,3 +56,26 @@ export async function updateGalleryItem(
   }
   return res.json()
 }
+
+export async function saveGalleryItemSet(body: {
+  name: string
+  medicalUrl?: string | null
+  corporateUrl?: string | null
+  employeeId?: string
+}): Promise<GalleryItem> {
+  const { medicalUrl, corporateUrl, ...rest } = body
+
+  if (!medicalUrl && !corporateUrl) {
+    throw new Error("Не указаны изображения для сохранения")
+  }
+
+  if (medicalUrl && corporateUrl) {
+    const created = await addGalleryItem({
+      ...rest,
+      medicalUrl,
+    })
+    return updateGalleryItem(created.id, { corporateUrl })
+  }
+
+  return addGalleryItem(body)
+}

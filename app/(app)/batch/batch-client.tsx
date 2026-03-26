@@ -38,7 +38,7 @@ import {
   updateDepartment,
   deleteDepartment,
 } from "@/lib/structure-api"
-import { fetchGallery, addGalleryItem, fetchGalleryByEmployeeId, updateGalleryItem } from "@/lib/gallery-api"
+import { fetchGallery, saveGalleryItemSet, fetchGalleryByEmployeeId, updateGalleryItem } from "@/lib/gallery-api"
 import {
   analyzePortrait,
   generatePortrait,
@@ -334,7 +334,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         const finalCorporate = genCorporate ? corporateUrl : null
         if (finalMedical || finalCorporate) {
           try {
-            const galleryItem = await addGalleryItem({
+            const galleryItem = await saveGalleryItemSet({
               name: emp.name,
               medicalUrl: finalMedical ?? undefined,
               corporateUrl: finalCorporate ?? undefined,
@@ -350,7 +350,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
               },
             }))
           } catch {
-            // ignore
+            toast.warning(`Портреты для "${emp.name}" сгенерированы, но не сохранены в галерею`)
           }
         }
       } catch (error) {
@@ -404,7 +404,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
           }))
         } else if (newMedical && newCorporate) {
           try {
-            const galleryItem = await addGalleryItem({
+            const galleryItem = await saveGalleryItemSet({
               name: emp.name,
               medicalUrl: newMedical,
               corporateUrl: newCorporate,
@@ -420,7 +420,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
               },
             }))
           } catch {
-            // ignore
+            toast.warning(`Портреты для "${emp.name}" сгенерированы, но не сохранены в галерею`)
           }
         }
         toast.success("Портрет перегенерирован")

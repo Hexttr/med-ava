@@ -23,7 +23,7 @@ import { Progress } from "@/components/ui/progress"
 import type { ProcessingStatus } from "@/lib/types"
 import type { Department } from "@/lib/types"
 import { fetchDepartments, createEmployee } from "@/lib/structure-api"
-import { addGalleryItem, updateGalleryItem } from "@/lib/gallery-api"
+import { saveGalleryItemSet, updateGalleryItem } from "@/lib/gallery-api"
 import { fileToDataUrl } from "@/lib/file-utils"
 import {
   analyzePortrait,
@@ -114,7 +114,7 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
 
       if (medicalData?.imageUrl || corporateData?.imageUrl) {
         try {
-          const item = await addGalleryItem({
+          const item = await saveGalleryItemSet({
             name,
             medicalUrl: medicalData?.imageUrl,
             corporateUrl: corporateData?.imageUrl,
@@ -122,7 +122,7 @@ export function GenerateClient({ hasApiKey }: GenerateClientProps) {
           })
           setGalleryItemId(item.id)
         } catch {
-          // ignore
+          toast.warning("Портреты сгенерированы, но сохранить их в галерею не удалось")
         }
       }
 
