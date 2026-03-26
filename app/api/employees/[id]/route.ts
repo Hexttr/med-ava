@@ -4,7 +4,7 @@ import { saveEmployeePhoto, removeFile, removeGalleryImageFiles } from "@/lib/st
 import { validateBase64Image } from "@/lib/upload-validation"
 import { logger } from "@/lib/logger"
 import { enforceTrustedOrigin } from "@/lib/request-security"
-import { deleteGalleryFeedbackForGalleryItems } from "@/lib/gallery-feedback"
+import { deleteGalleryCommentsForGalleryItems, deleteGalleryFeedbackForGalleryItems } from "@/lib/gallery-feedback"
 
 function toResponse(row: {
   id: string
@@ -156,6 +156,7 @@ export async function DELETE(
       .prepare("SELECT id, medical_path, corporate_path FROM gallery_items WHERE employee_id = ?")
       .all(id) as Array<{ id: string; medical_path: string | null; corporate_path: string | null }>
     deleteGalleryFeedbackForGalleryItems(database, galleryRows.map((item) => item.id))
+    deleteGalleryCommentsForGalleryItems(database, galleryRows.map((item) => item.id))
     for (const g of galleryRows) {
       if (g.medical_path) await removeGalleryImageFiles(g.medical_path).catch(() => {})
       if (g.corporate_path) await removeGalleryImageFiles(g.corporate_path).catch(() => {})

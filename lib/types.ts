@@ -70,6 +70,16 @@ export interface GalleryStyleFeedbackSummary {
   dislikes: number
 }
 
+export interface GalleryImageComment {
+  text: string
+  updatedAt: number
+}
+
+export interface GalleryImageComments {
+  medical: GalleryImageComment | null
+  corporate: GalleryImageComment | null
+}
+
 export interface GalleryViewerVotes {
   medical: FeedbackVoteValue | null
   corporate: FeedbackVoteValue | null
@@ -123,4 +133,38 @@ export interface PublicReviewVoteResponse {
   employeeId: string
   feedback: GalleryFeedbackSummary
   viewerVotes: GalleryViewerVotes
+}
+
+export interface PublicReviewCommentResponse {
+  galleryItemId: string
+  employeeId: string
+  style: PortraitStyle
+  comments: GalleryImageComments
+}
+
+export interface PublicReviewCatalogEmployee {
+  employeeId: string
+  name: string
+  departmentId: string | null
+  departmentName?: string
+  originalUrl: string | null
+  galleryItemId: string
+  medicalUrl: string | null
+  corporateUrl: string | null
+  hasGeneratedSet: boolean
+  feedback: GalleryFeedbackSummary
+  viewerVotes: GalleryViewerVotes
+  comments: GalleryImageComments
+}
+
+export interface PublicReviewCatalogDepartment {
+  departmentId: string | null
+  name: string
+  employeeCount: number
+  employees: PublicReviewCatalogEmployee[]
+}
+
+export interface PublicReviewCatalogResponse {
+  departments: PublicReviewCatalogDepartment[]
+  totalEmployees: number
 }

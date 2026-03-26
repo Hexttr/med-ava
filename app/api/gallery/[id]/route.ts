@@ -4,7 +4,12 @@ import { getGalleryPreviewRelativePathIfExists, removeGalleryImageFiles, saveGal
 import { validateBase64Image } from "@/lib/upload-validation"
 import { logger } from "@/lib/logger"
 import { enforceTrustedOrigin } from "@/lib/request-security"
-import { deleteGalleryFeedbackForGalleryItems, emptyGalleryFeedbackSummary, getGalleryFeedbackMap } from "@/lib/gallery-feedback"
+import {
+  deleteGalleryCommentsForGalleryItems,
+  deleteGalleryFeedbackForGalleryItems,
+  emptyGalleryFeedbackSummary,
+  getGalleryFeedbackMap,
+} from "@/lib/gallery-feedback"
 
 function toItemResponse(row: {
   id: string
@@ -115,6 +120,7 @@ export async function DELETE(
     if (row.medical_path) await removeGalleryImageFiles(row.medical_path)
     if (row.corporate_path) await removeGalleryImageFiles(row.corporate_path)
     deleteGalleryFeedbackForGalleryItems(database, [id])
+    deleteGalleryCommentsForGalleryItems(database, [id])
     database.prepare("DELETE FROM gallery_items WHERE id = ?").run(id)
     return NextResponse.json({ success: true })
   } catch (e) {

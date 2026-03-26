@@ -211,6 +211,28 @@ function runMigrations(database: Database.Database) {
     `)
     database.prepare("UPDATE _schema_version SET version = 5").run()
   }
+
+  if (version < 6) {
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS gallery_image_comments (
+        id TEXT PRIMARY KEY,
+        gallery_item_id TEXT NOT NULL,
+        employee_id TEXT NOT NULL,
+        style TEXT NOT NULL,
+        comment_text TEXT NOT NULL,
+        editor_fingerprint_hash TEXT NOT NULL,
+        editor_ip_hash TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_gallery_image_comments_unique_style
+        ON gallery_image_comments(gallery_item_id, style);
+      CREATE INDEX IF NOT EXISTS idx_gallery_image_comments_employee_id
+        ON gallery_image_comments(employee_id);
+      CREATE INDEX IF NOT EXISTS idx_gallery_image_comments_updated_at
+        ON gallery_image_comments(updated_at);
+    `)
+    database.prepare("UPDATE _schema_version SET version = 6").run()
+  }
 }
 
 export function getUploadsDir(): string {
