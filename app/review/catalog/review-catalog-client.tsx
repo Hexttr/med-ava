@@ -552,12 +552,12 @@ export function ReviewCatalogClient() {
                   Выберите отдел, переключайте режим просмотра и оценивайте каждое сгенерированное изображение с коротким комментарием прямо в каталоге.
                 </p>
                 <div className="mt-5">
-                  <div className="inline-flex rounded-2xl border border-[#2d2188]/20 bg-[#2d2188]/8 p-1.5 shadow-[0_14px_34px_rgba(45,33,136,0.14)]">
+                  <div className="inline-flex gap-1 rounded-2xl border border-[#2d2188]/20 bg-[#2d2188]/8 p-1.5 shadow-[0_14px_34px_rgba(45,33,136,0.14)]">
                     <button
                       type="button"
                       onClick={() => setViewMode("review")}
                       className={cn(
-                        "rounded-xl px-4 py-2.5 text-sm font-medium transition",
+                        "rounded-[0.95rem] px-4 py-2.5 text-sm font-medium transition",
                         viewMode === "review"
                           ? "bg-[#2d2188] text-white shadow-[0_10px_24px_rgba(45,33,136,0.28)]"
                           : "text-[#2d2188] hover:bg-white/70"
@@ -569,7 +569,7 @@ export function ReviewCatalogClient() {
                       type="button"
                       onClick={() => setViewMode("gallery")}
                       className={cn(
-                        "rounded-xl px-4 py-2.5 text-sm font-medium transition",
+                        "rounded-[0.95rem] px-4 py-2.5 text-sm font-medium transition",
                         viewMode === "gallery"
                           ? "bg-[#2d2188] text-white shadow-[0_10px_24px_rgba(45,33,136,0.28)]"
                           : "text-[#2d2188] hover:bg-white/70"
