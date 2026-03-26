@@ -36,7 +36,7 @@ Respond with ONLY one valid JSON object (no markdown, no \`\`\` code fences, no 
 }`
 
 const DEFAULT_MEDICAL_INSTRUCTION =
-  "Show this person in a premium-quality crisp white medical doctor's coat (expensive fabric, luxury tailoring). No stethoscope, no medical accessories — only the white coat. {backdrop} Warm, approachable expression. Mouth closed, lips together."
+  "Show this person in a premium-quality crisp white medical doctor's coat (expensive fabric, luxury tailoring). No stethoscope, no medical accessories — only the white coat. Fully replace the original clothing and upper torso styling with a newly rendered medical uniform: new collar, new neckline, new shoulders, new chest area, and new coat structure. Do not preserve the source garment, blouse, shirt, zipper, trim, neckline, or copied torso folds. {backdrop} Warm, approachable expression. Mouth closed, lips together."
 
 const DEFAULT_CORPORATE_INSTRUCTION =
   "Show this person in premium professional business attire (expensive dark suit or blazer, designer quality, luxury tailoring). {backdrop} Confident, professional expression. Mouth closed, lips together."
