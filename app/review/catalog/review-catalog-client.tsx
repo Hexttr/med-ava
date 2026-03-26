@@ -76,9 +76,6 @@ function GalleryTile({
       </div>
       <CardContent className="p-4">
         <div className="text-base font-semibold text-foreground">{employee.name}</div>
-        {employee.departmentName ? (
-          <div className="mt-1 text-sm text-muted-foreground">{employee.departmentName}</div>
-        ) : null}
       </CardContent>
     </Card>
   )
@@ -555,15 +552,15 @@ export function ReviewCatalogClient() {
                   Выберите отдел, переключайте режим просмотра и оценивайте каждое сгенерированное изображение с коротким комментарием прямо в каталоге.
                 </p>
                 <div className="mt-5">
-                  <div className="inline-flex rounded-2xl border border-slate-200/90 bg-slate-100/90 p-1 shadow-sm">
+                  <div className="inline-flex rounded-2xl border border-[#2d2188]/20 bg-[#2d2188]/8 p-1.5 shadow-[0_14px_34px_rgba(45,33,136,0.14)]">
                     <button
                       type="button"
                       onClick={() => setViewMode("review")}
                       className={cn(
                         "rounded-xl px-4 py-2.5 text-sm font-medium transition",
                         viewMode === "review"
-                          ? "bg-white text-slate-900 shadow-sm"
-                          : "text-slate-600 hover:text-slate-900"
+                          ? "bg-[#2d2188] text-white shadow-[0_10px_24px_rgba(45,33,136,0.28)]"
+                          : "text-[#2d2188] hover:bg-white/70"
                       )}
                     >
                       Режим оценки
@@ -574,8 +571,8 @@ export function ReviewCatalogClient() {
                       className={cn(
                         "rounded-xl px-4 py-2.5 text-sm font-medium transition",
                         viewMode === "gallery"
-                          ? "bg-blue-600 text-white shadow-sm"
-                          : "text-slate-600 hover:text-slate-900"
+                          ? "bg-[#2d2188] text-white shadow-[0_10px_24px_rgba(45,33,136,0.28)]"
+                          : "text-[#2d2188] hover:bg-white/70"
                       )}
                     >
                       Режим галереи
@@ -585,15 +582,15 @@ export function ReviewCatalogClient() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[360px]">
-                <Card className="rounded-[1.25rem] border-blue-400/70 bg-blue-500 shadow-[0_14px_34px_rgba(59,130,246,0.20)]">
+                <Card className="rounded-[1.25rem] border-[#2d2188]/85 bg-[#2d2188] shadow-[0_14px_34px_rgba(45,33,136,0.26)]">
                   <CardContent className="p-4 text-white">
-                    <div className="text-xs uppercase tracking-[0.08em] text-blue-50">Всего<br />отделов</div>
+                    <div className="text-xs uppercase tracking-[0.08em] text-white/80">Всего<br />отделов</div>
                     <div className="mt-2 text-3xl font-semibold text-white">{departments.length}</div>
                   </CardContent>
                 </Card>
-                <Card className="rounded-[1.25rem] border-blue-400/70 bg-blue-500 shadow-[0_14px_34px_rgba(59,130,246,0.20)]">
+                <Card className="rounded-[1.25rem] border-[#2d2188]/85 bg-[#2d2188] shadow-[0_14px_34px_rgba(45,33,136,0.26)]">
                   <CardContent className="p-4 text-white">
-                    <div className="text-xs uppercase tracking-[0.08em] text-blue-50">Сотрудников с наборами</div>
+                    <div className="text-xs uppercase tracking-[0.08em] text-white/80">Сотрудников с наборами</div>
                     <div className="mt-2 text-3xl font-semibold text-white">
                       {departments.reduce((sum, department) => sum + department.employeeCount, 0)}
                     </div>
