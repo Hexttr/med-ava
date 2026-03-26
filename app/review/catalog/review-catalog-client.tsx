@@ -539,26 +539,30 @@ export function ReviewCatalogClient() {
 
         <div className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-8 md:px-6 md:py-10">
           <section className="rounded-[2rem] border border-slate-300/90 bg-white/96 px-6 py-7 shadow-[0_24px_80px_rgba(15,23,42,0.12)] md:px-8">
-            <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+            <div className="flex flex-col gap-6 xl:flex-row xl:items-stretch xl:justify-between">
               <div className="max-w-3xl">
-                <img
-                  src="/logo-nczd.png"
-                  alt="Логотип НМИЦ"
-                  className="h-24 w-auto md:h-28"
-                />
-                <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#1a64a6]/20 bg-[#1a64a6] px-3 py-1 text-sm text-white shadow-sm">
-                  <Building2 className="size-4 text-white" />
-                  Каталог оценки по отделам
+                <div className="flex flex-col items-center gap-5 text-center md:flex-row md:items-center md:gap-6 md:text-left">
+                  <img
+                    src="/logo-nczd.png"
+                    alt="Логотип НМИЦ"
+                    className="h-24 w-auto md:h-28"
+                  />
+                  <div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[#1a64a6]/20 bg-[#1a64a6] px-3 py-1 text-sm text-white shadow-sm">
+                      <Building2 className="size-4 text-white" />
+                      Каталог оценки по отделам
+                    </div>
+                    <h1 className="mt-4 text-balance text-3xl font-semibold tracking-tight text-foreground md:text-5xl">
+                      Портреты НМИЦ
+                    </h1>
+                    <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground md:text-base">
+                      Выберите отдел, переключайте режим просмотра и оценивайте каждое сгенерированное изображение с коротким комментарием прямо в каталоге.
+                    </p>
+                  </div>
                 </div>
-                <h1 className="mt-5 text-balance text-3xl font-semibold tracking-tight text-foreground md:text-5xl">
-                  Портреты НМИЦ
-                </h1>
-                <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground md:text-base">
-                  Выберите отдел, переключайте режим просмотра и оценивайте каждое сгенерированное изображение с коротким комментарием прямо в каталоге.
-                </p>
               </div>
 
-              <div className="flex w-full flex-col items-stretch gap-4 xl:max-w-[360px] xl:items-end">
+              <div className="flex w-full flex-col items-stretch gap-4 xl:max-w-[360px] xl:self-stretch xl:items-end xl:justify-between">
                 <div className="flex justify-start xl:w-full xl:justify-end">
                   <div className="inline-flex gap-1 rounded-2xl border border-[#1a64a6]/20 bg-[#1a64a6]/8 p-1.5 shadow-[0_14px_34px_rgba(26,100,166,0.14)]">
                     <button
@@ -588,21 +592,21 @@ export function ReviewCatalogClient() {
                   </div>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2 xl:w-full">
-                <Card className="rounded-[1.25rem] border-[#1a64a6]/85 bg-[#1a64a6] shadow-[0_14px_34px_rgba(26,100,166,0.24)]">
-                  <CardContent className="p-4 text-white">
-                    <div className="text-xs uppercase tracking-[0.08em] text-white/80">Всего<br />отделов</div>
-                    <div className="mt-2 text-3xl font-semibold text-white">{departments.length}</div>
-                  </CardContent>
-                </Card>
-                <Card className="rounded-[1.25rem] border-[#1a64a6]/85 bg-[#1a64a6] shadow-[0_14px_34px_rgba(26,100,166,0.24)]">
-                  <CardContent className="p-4 text-white">
-                    <div className="text-xs uppercase tracking-[0.08em] text-white/80">Сотрудников с наборами</div>
-                    <div className="mt-2 text-3xl font-semibold text-white">
-                      {departments.reduce((sum, department) => sum + department.employeeCount, 0)}
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="grid gap-3 sm:grid-cols-2 xl:ml-auto xl:w-full">
+                  <Card className="rounded-[1.25rem] border-[#1a64a6]/85 bg-[#1a64a6] shadow-[0_14px_34px_rgba(26,100,166,0.24)]">
+                    <CardContent className="p-4 text-white">
+                      <div className="text-xs uppercase tracking-[0.08em] text-white/80">Всего<br />отделов</div>
+                      <div className="mt-2 text-3xl font-semibold text-white">{departments.length}</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="rounded-[1.25rem] border-[#1a64a6]/85 bg-[#1a64a6] shadow-[0_14px_34px_rgba(26,100,166,0.24)]">
+                    <CardContent className="p-4 text-white">
+                      <div className="text-xs uppercase tracking-[0.08em] text-white/80">Сотрудников с наборами</div>
+                      <div className="mt-2 text-3xl font-semibold text-white">
+                        {departments.reduce((sum, department) => sum + department.employeeCount, 0)}
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
             </div>
@@ -719,9 +723,12 @@ export function ReviewCatalogClient() {
             </section>
           ) : (
           <section className="mt-6 grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-            <Card className="h-fit rounded-[1.5rem] border-[#1a64a6]/18 bg-gradient-to-b from-[#1a64a6]/8 via-white to-[#1a64a6]/6 shadow-[0_18px_50px_rgba(26,100,166,0.12)] xl:sticky xl:top-6">
+            <Card className="h-fit rounded-[1.5rem] border-slate-200/90 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)] xl:sticky xl:top-6">
               <CardHeader className="pb-1">
-                <CardTitle className="text-lg">Отделы</CardTitle>
+                <CardTitle className="inline-flex items-center gap-2 text-lg uppercase tracking-[0.08em] text-[#1a64a6]">
+                  <Building2 className="size-5" />
+                  Отделы
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 pt-0">
                 <div className="xl:hidden">
@@ -750,13 +757,23 @@ export function ReviewCatalogClient() {
                     className={cn(
                       "w-full rounded-xl border px-4 py-3 text-left transition",
                       selectedDepartmentId === "all"
-                        ? "border-[#1a64a6]/40 bg-[#1a64a6]/12 shadow-sm"
-                        : "border-[#1a64a6]/15 bg-white/95 hover:border-[#1a64a6]/35 hover:bg-[#1a64a6]/7"
+                        ? "border-[#1a64a6]/40 bg-[#1a64a6] text-white shadow-sm"
+                        : "border-[#1a64a6]/20 bg-[#eef6fc] hover:border-[#1a64a6]/35 hover:bg-[#dcecf8]"
                     )}
                   >
-                    <div className="text-sm font-semibold text-foreground">Все отделы</div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {departments.reduce((sum, department) => sum + department.employeeCount, 0)} сотрудников
+                    <div className="flex items-start gap-3">
+                      <span className={cn(
+                        "mt-0.5 inline-flex size-8 items-center justify-center rounded-full",
+                        selectedDepartmentId === "all" ? "bg-white/18" : "bg-white"
+                      )}>
+                        <Building2 className={cn("size-4", selectedDepartmentId === "all" ? "text-white" : "text-[#1a64a6]")} />
+                      </span>
+                      <div>
+                        <div className={cn("text-sm font-semibold", selectedDepartmentId === "all" ? "text-white" : "text-foreground")}>Все отделы</div>
+                        <div className={cn("mt-1 text-xs", selectedDepartmentId === "all" ? "text-white/80" : "text-muted-foreground")}>
+                          {departments.reduce((sum, department) => sum + department.employeeCount, 0)} сотрудников
+                        </div>
+                      </div>
                     </div>
                   </button>
 
@@ -770,12 +787,22 @@ export function ReviewCatalogClient() {
                         className={cn(
                           "w-full rounded-xl border px-4 py-3 text-left transition",
                           selectedDepartmentId === departmentKey
-                            ? "border-[#1a64a6]/40 bg-[#1a64a6]/12 shadow-sm"
-                            : "border-[#1a64a6]/15 bg-white/95 hover:border-[#1a64a6]/35 hover:bg-[#1a64a6]/7"
+                            ? "border-[#1a64a6]/40 bg-[#1a64a6] text-white shadow-sm"
+                            : "border-[#1a64a6]/20 bg-[#eef6fc] hover:border-[#1a64a6]/35 hover:bg-[#dcecf8]"
                         )}
                       >
-                        <div className="text-sm font-semibold text-foreground">{department.name}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">{department.employeeCount} сотрудников</div>
+                        <div className="flex items-start gap-3">
+                          <span className={cn(
+                            "mt-0.5 inline-flex size-8 items-center justify-center rounded-full",
+                            selectedDepartmentId === departmentKey ? "bg-white/18" : "bg-white"
+                          )}>
+                            <Building2 className={cn("size-4", selectedDepartmentId === departmentKey ? "text-white" : "text-[#1a64a6]")} />
+                          </span>
+                          <div>
+                            <div className={cn("text-sm font-semibold", selectedDepartmentId === departmentKey ? "text-white" : "text-foreground")}>{department.name}</div>
+                            <div className={cn("mt-1 text-xs", selectedDepartmentId === departmentKey ? "text-white/80" : "text-muted-foreground")}>{department.employeeCount} сотрудников</div>
+                          </div>
+                        </div>
                       </button>
                     )
                   })}
@@ -816,14 +843,14 @@ export function ReviewCatalogClient() {
 
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                     <Tabs value={displayMode} onValueChange={(value) => setDisplayMode(value as DisplayMode)} className="min-w-0">
-                      <TabsList className="h-auto w-full max-w-full flex-wrap rounded-xl bg-slate-100 p-1 md:w-fit">
-                        <TabsTrigger value="before-after" className="rounded-lg px-4 py-2">
+                      <TabsList className="h-auto w-full max-w-full flex-wrap gap-2 bg-transparent p-0 md:w-fit">
+                        <TabsTrigger value="before-after" className="rounded-xl border border-[#b8d8f2] bg-[#dff0fb] px-4 py-2 text-black data-[state=active]:border-[#1a64a6] data-[state=active]:bg-[#1a64a6] data-[state=active]:text-white">
                           Было / стало
                         </TabsTrigger>
-                        <TabsTrigger value="medical-only" className="rounded-lg px-4 py-2">
+                        <TabsTrigger value="medical-only" className="rounded-xl border border-[#b8d8f2] bg-[#dff0fb] px-4 py-2 text-black data-[state=active]:border-[#1a64a6] data-[state=active]:bg-[#1a64a6] data-[state=active]:text-white">
                           Только медицинские
                         </TabsTrigger>
-                        <TabsTrigger value="corporate-only" className="rounded-lg px-4 py-2">
+                        <TabsTrigger value="corporate-only" className="rounded-xl border border-[#b8d8f2] bg-[#dff0fb] px-4 py-2 text-black data-[state=active]:border-[#1a64a6] data-[state=active]:bg-[#1a64a6] data-[state=active]:text-white">
                           Только бизнес
                         </TabsTrigger>
                       </TabsList>
