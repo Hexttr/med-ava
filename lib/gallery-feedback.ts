@@ -7,6 +7,7 @@ import type {
   GalleryImageComments,
   GalleryViewerVotes,
   PortraitStyle,
+  ReviewImageStyle,
 } from "@/lib/types"
 
 export const REVIEW_VIEWER_COOKIE = "eam_review_viewer"
@@ -17,6 +18,7 @@ function emptyStyleSummary() {
 
 export function emptyViewerVotes(): GalleryViewerVotes {
   return {
+    original: null,
     medical: null,
     corporate: null,
   }
@@ -24,6 +26,7 @@ export function emptyViewerVotes(): GalleryViewerVotes {
 
 export function emptyGalleryFeedbackSummary(): GalleryFeedbackSummary {
   return {
+    original: emptyStyleSummary(),
     medical: emptyStyleSummary(),
     corporate: emptyStyleSummary(),
   }
@@ -31,6 +34,7 @@ export function emptyGalleryFeedbackSummary(): GalleryFeedbackSummary {
 
 export function emptyGalleryImageComments(): GalleryImageComments {
   return {
+    original: null,
     medical: null,
     corporate: null,
   }
@@ -56,6 +60,10 @@ export function isFeedbackStyle(value: string): value is PortraitStyle {
   return value === "medical" || value === "corporate"
 }
 
+export function isReviewImageStyle(value: string): value is ReviewImageStyle {
+  return value === "original" || isFeedbackStyle(value)
+}
+
 export function isFeedbackVote(value: string): value is FeedbackVoteValue {
   return value === "like" || value === "dislike"
 }
@@ -74,7 +82,7 @@ export function getGalleryFeedbackMap(
      GROUP BY gallery_item_id, style, vote`
   ).all(...galleryItemIds) as Array<{
     gallery_item_id: string
-    style: PortraitStyle
+    style: ReviewImageStyle
     vote: FeedbackVoteValue
     total: number
   }>
@@ -108,7 +116,7 @@ export function getViewerVotesForGalleryItem(
      FROM gallery_feedback_votes
      WHERE gallery_item_id = ? AND fingerprint_hash = ?`
   ).all(galleryItemId, fingerprintHash) as Array<{
-    style: PortraitStyle
+    style: ReviewImageStyle
     vote: FeedbackVoteValue
   }>
 
@@ -134,7 +142,7 @@ export function getViewerVotesMapForGalleryItems(
      WHERE fingerprint_hash = ? AND gallery_item_id IN (${placeholders})`
   ).all(fingerprintHash, ...galleryItemIds) as Array<{
     gallery_item_id: string
-    style: PortraitStyle
+    style: ReviewImageStyle
     vote: FeedbackVoteValue
   }>
 
@@ -165,7 +173,7 @@ export function getGalleryImageCommentsMap(
      WHERE gallery_item_id IN (${placeholders})`
   ).all(...galleryItemIds) as Array<{
     gallery_item_id: string
-    style: PortraitStyle
+    style: ReviewImageStyle
     comment_text: string
     updated_at: number
   }>
@@ -193,7 +201,7 @@ export function upsertGalleryImageComment(
     id: string
     galleryItemId: string
     employeeId: string
-    style: PortraitStyle
+    style: ReviewImageStyle
     commentText: string
     editorFingerprintHash: string
     editorIpHash: string
@@ -233,7 +241,7 @@ export function upsertGalleryImageComment(
 export function deleteGalleryImageComment(
   database: Database.Database,
   galleryItemId: string,
-  style: PortraitStyle
+  style: ReviewImageStyle
 ) {
   database.prepare(
     `DELETE FROM gallery_image_comments

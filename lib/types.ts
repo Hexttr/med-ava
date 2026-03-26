@@ -1,4 +1,5 @@
 export type PortraitStyle = "medical" | "corporate"
+export type ReviewImageStyle = "original" | PortraitStyle
 export type FeedbackVoteValue = "like" | "dislike"
 
 export type ProcessingStatus = "idle" | "uploading" | "analyzing" | "generating" | "complete" | "error"
@@ -76,16 +77,19 @@ export interface GalleryImageComment {
 }
 
 export interface GalleryImageComments {
+  original: GalleryImageComment | null
   medical: GalleryImageComment | null
   corporate: GalleryImageComment | null
 }
 
 export interface GalleryViewerVotes {
+  original: FeedbackVoteValue | null
   medical: FeedbackVoteValue | null
   corporate: FeedbackVoteValue | null
 }
 
 export interface GalleryFeedbackSummary {
+  original: GalleryStyleFeedbackSummary
   medical: GalleryStyleFeedbackSummary
   corporate: GalleryStyleFeedbackSummary
   viewerVotes?: GalleryViewerVotes
@@ -138,7 +142,7 @@ export interface PublicReviewVoteResponse {
 export interface PublicReviewCommentResponse {
   galleryItemId: string
   employeeId: string
-  style: PortraitStyle
+  style: ReviewImageStyle
   comments: GalleryImageComments
 }
 

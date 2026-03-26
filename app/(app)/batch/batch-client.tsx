@@ -325,6 +325,7 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
             medicalPreviewUrl: genMedical ? medicalUrl : prev[id]?.medicalPreviewUrl ?? null,
             corporatePreviewUrl: genCorporate ? corporateUrl : prev[id]?.corporatePreviewUrl ?? null,
             feedback: {
+              original: { likes: 0, dislikes: 0 },
               medical: { likes: 0, dislikes: 0 },
               corporate: { likes: 0, dislikes: 0 },
             },

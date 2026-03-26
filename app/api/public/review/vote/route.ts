@@ -7,13 +7,14 @@ import {
   getOrCreateReviewViewerId,
   getViewerVotesForGalleryItem,
   hashFeedbackValue,
-  isFeedbackStyle,
+  isReviewImageStyle,
   isFeedbackVote,
   REVIEW_VIEWER_COOKIE,
 } from "@/lib/gallery-feedback"
 import { logger } from "@/lib/logger"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { enforceTrustedOrigin, getClientIp, withNoStore } from "@/lib/request-security"
+import type { FeedbackVoteValue } from "@/lib/types"
 
 function applyViewerCookie(response: NextResponse, viewerId: string) {
   response.cookies.set(REVIEW_VIEWER_COOKIE, viewerId, {
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
     const style = String(body?.style ?? "").trim()
     const vote = String(body?.vote ?? "").trim()
 
-    if (!galleryItemId || !employeeId || !isFeedbackStyle(style) || !isFeedbackVote(vote)) {
+    if (!galleryItemId || !employeeId || !isReviewImageStyle(style) || !isFeedbackVote(vote)) {
       return withNoStore(
         NextResponse.json({ error: "Некорректные параметры голосования" }, { status: 400 })
       )
@@ -87,37 +88,50 @@ export async function POST(request: NextRequest) {
     const userAgentHash = hashFeedbackValue(request.headers.get("user-agent") || "unknown")
     const now = Date.now()
 
-    database.prepare(
-      `INSERT INTO gallery_feedback_votes (
-         id,
-         gallery_item_id,
-         employee_id,
-         style,
-         vote,
-         fingerprint_hash,
-         ip_hash,
-         user_agent_hash,
-         created_at,
-         updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(gallery_item_id, style, fingerprint_hash)
-       DO UPDATE SET
-         vote = excluded.vote,
-         ip_hash = excluded.ip_hash,
-         user_agent_hash = excluded.user_agent_hash,
-         updated_at = excluded.updated_at`
-    ).run(
-      crypto.randomUUID(),
-      galleryItemId,
-      employeeId,
-      style,
-      vote,
-      fingerprintHash,
-      ipHash,
-      userAgentHash,
-      now,
-      now
-    )
+    const existingVote = database.prepare(
+      `SELECT vote
+       FROM gallery_feedback_votes
+       WHERE gallery_item_id = ? AND style = ? AND fingerprint_hash = ?`
+    ).get(galleryItemId, style, fingerprintHash) as { vote: FeedbackVoteValue } | undefined
+
+    if (existingVote?.vote === vote) {
+      database.prepare(
+        `DELETE FROM gallery_feedback_votes
+         WHERE gallery_item_id = ? AND style = ? AND fingerprint_hash = ?`
+      ).run(galleryItemId, style, fingerprintHash)
+    } else {
+      database.prepare(
+        `INSERT INTO gallery_feedback_votes (
+           id,
+           gallery_item_id,
+           employee_id,
+           style,
+           vote,
+           fingerprint_hash,
+           ip_hash,
+           user_agent_hash,
+           created_at,
+           updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(gallery_item_id, style, fingerprint_hash)
+         DO UPDATE SET
+           vote = excluded.vote,
+           ip_hash = excluded.ip_hash,
+           user_agent_hash = excluded.user_agent_hash,
+           updated_at = excluded.updated_at`
+      ).run(
+        crypto.randomUUID(),
+        galleryItemId,
+        employeeId,
+        style,
+        vote,
+        fingerprintHash,
+        ipHash,
+        userAgentHash,
+        now,
+        now
+      )
+    }
 
     const feedback = getGalleryFeedbackMap(database, [galleryItemId])[galleryItemId]
     const viewerVotes = getViewerVotesForGalleryItem(database, galleryItemId, fingerprintHash)

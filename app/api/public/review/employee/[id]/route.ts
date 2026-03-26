@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { getDb } from "@/lib/db"
 import {
+  emptyViewerVotes,
   emptyGalleryFeedbackSummary,
   getGalleryFeedbackMap,
   getOrCreateReviewViewerId,
@@ -80,7 +81,7 @@ export async function GET(
     const feedback = latestGalleryItem ? getGalleryFeedbackMap(database, [latestGalleryItem.id])[latestGalleryItem.id] : emptyGalleryFeedbackSummary()
     const viewerVotes = latestGalleryItem
       ? getViewerVotesForGalleryItem(database, latestGalleryItem.id, viewerFingerprint)
-      : { medical: null, corporate: null }
+      : emptyViewerVotes()
 
     const payload: PublicReviewEmployee & { feedback: typeof feedback } = {
       employeeId: employee.id,

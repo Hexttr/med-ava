@@ -1,6 +1,6 @@
 import type {
   FeedbackVoteValue,
-  PortraitStyle,
+  ReviewImageStyle,
   PublicReviewCatalogResponse,
   PublicReviewCommentResponse,
   PublicReviewEmployeeResponse,
@@ -50,7 +50,7 @@ export async function fetchPublicReviewEmployee(employeeId: string): Promise<Pub
 export async function submitPublicReviewVote(body: {
   employeeId: string
   galleryItemId: string
-  style: PortraitStyle
+  style: ReviewImageStyle
   vote: FeedbackVoteValue
 }): Promise<PublicReviewVoteResponse> {
   const res = await fetch(VOTE_BASE, {
@@ -68,7 +68,7 @@ export async function submitPublicReviewVote(body: {
 export async function submitPublicReviewComment(body: {
   employeeId: string
   galleryItemId: string
-  style: PortraitStyle
+  style: ReviewImageStyle
   commentText: string
 }): Promise<PublicReviewCommentResponse> {
   const res = await fetch(COMMENT_BASE, {

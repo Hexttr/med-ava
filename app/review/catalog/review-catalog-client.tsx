@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react"
 import {
   ArrowUpRight,
   Building2,
+  ImageIcon,
   Loader2,
   MessageSquareText,
   Search,
@@ -28,7 +29,7 @@ import { fetchPublicReviewCatalog, submitPublicReviewComment, submitPublicReview
 import type {
   FeedbackVoteValue,
   GalleryImageComment,
-  PortraitStyle,
+  ReviewImageStyle,
   PublicReviewCatalogDepartment,
   PublicReviewCatalogEmployee,
 } from "@/lib/types"
@@ -36,8 +37,9 @@ import type {
 type DisplayMode = "before-after" | "medical-only" | "corporate-only"
 
 const COMMENT_MAX_LENGTH = 240
+const REVIEW_STYLES: ReviewImageStyle[] = ["original", "medical", "corporate"]
 
-function imageCommentKey(galleryItemId: string, style: PortraitStyle) {
+function imageCommentKey(galleryItemId: string, style: ReviewImageStyle) {
   return `${galleryItemId}:${style}`
 }
 
@@ -70,6 +72,8 @@ function PanelImage({
         src={imageUrl}
         alt={title}
         className="size-full object-cover object-top transition duration-300 group-hover:scale-[1.02]"
+        loading="lazy"
+        decoding="async"
         onError={() => setFailed(true)}
       />
       <div className="absolute inset-x-3 bottom-3 flex items-center justify-between rounded-xl bg-black/55 px-3 py-2 text-xs text-white opacity-0 transition group-hover:opacity-100">
@@ -80,35 +84,7 @@ function PanelImage({
   )
 }
 
-function OriginalPanel({
-  title,
-  imageUrl,
-  footer,
-  onOpen,
-}: {
-  title: string
-  imageUrl: string | null
-  footer?: string
-  onOpen: (url: string) => void
-}) {
-  return (
-    <div className="overflow-hidden rounded-[1.25rem] border border-slate-200/90 bg-white/95 shadow-sm">
-      <div className="border-b border-slate-200/80 px-4 py-3">
-        <p className="text-sm font-semibold text-foreground">{title}</p>
-      </div>
-      <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted/20">
-        <PanelImage imageUrl={imageUrl} title={title} onOpen={onOpen} />
-      </div>
-      {footer ? (
-        <div className="border-t border-slate-200/80 bg-slate-50/90 px-4 py-3 text-center text-sm text-muted-foreground">
-          {footer}
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-function GeneratedPanel({
+function ReviewPanel({
   title,
   style,
   imageUrl,
@@ -122,9 +98,10 @@ function GeneratedPanel({
   onCommentDraftChange,
   onCommentSave,
   onOpen,
+  helperText,
 }: {
   title: string
-  style: PortraitStyle
+  style: ReviewImageStyle
   imageUrl: string | null
   currentVote: FeedbackVoteValue | null
   feedback?: { likes: number; dislikes: number }
@@ -136,6 +113,7 @@ function GeneratedPanel({
   onCommentDraftChange: (value: string) => void
   onCommentSave: () => void
   onOpen: (url: string) => void
+  helperText: string
 }) {
   const hasChanges = commentDraft.trim() !== (comment?.text ?? "")
 
@@ -145,7 +123,7 @@ function GeneratedPanel({
         <div>
           <p className="text-sm font-semibold text-foreground">{title}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Оцените изображение и при необходимости обновите короткий комментарий.
+            {helperText}
           </p>
         </div>
         <GalleryFeedbackBadges summary={feedback} className="shrink-0" />
@@ -198,7 +176,9 @@ function GeneratedPanel({
             value={commentDraft}
             onChange={(event) => onCommentDraftChange(event.target.value.slice(0, COMMENT_MAX_LENGTH))}
             placeholder={
-              style === "medical"
+              style === "original"
+                ? "Например: исходник слишком тёмный, мягкий или требует другой кадрировки"
+                : style === "medical"
                 ? "Например: удачный медицинский образ, но стоит доработать фон"
                 : "Например: хороший деловой образ, но выражение лица слишком строгое"
             }
@@ -295,13 +275,36 @@ export function ReviewCatalogClient() {
   }, [departments, normalizedQuery, selectedDepartmentId])
 
   const totalVisibleEmployees = filteredDepartments.reduce((sum, department) => sum + department.employeeCount, 0)
+  const visibleProgress = useMemo(() => {
+    const stylesForMode =
+      displayMode === "before-after"
+        ? REVIEW_STYLES
+        : displayMode === "medical-only"
+          ? (["medical"] as ReviewImageStyle[])
+          : (["corporate"] as ReviewImageStyle[])
 
-  function getCommentDraft(employee: PublicReviewCatalogEmployee, style: PortraitStyle) {
+    let likes = 0
+    let dislikes = 0
+    for (const department of filteredDepartments) {
+      for (const employee of department.employees) {
+        for (const style of stylesForMode) {
+          likes += employee.feedback[style].likes
+          dislikes += employee.feedback[style].dislikes
+        }
+      }
+    }
+
+    const total = likes + dislikes
+    const likePct = total > 0 ? Math.round((likes / total) * 100) : 0
+    return { likes, dislikes, total, likePct }
+  }, [displayMode, filteredDepartments])
+
+  function getCommentDraft(employee: PublicReviewCatalogEmployee, style: ReviewImageStyle) {
     const key = imageCommentKey(employee.galleryItemId, style)
     return commentDrafts[key] ?? employee.comments[style]?.text ?? ""
   }
 
-  async function handleVote(employee: PublicReviewCatalogEmployee, style: PortraitStyle, vote: FeedbackVoteValue) {
+  async function handleVote(employee: PublicReviewCatalogEmployee, style: ReviewImageStyle, vote: FeedbackVoteValue) {
     const key = `${employee.employeeId}:${style}`
     setVotingTarget(key)
     try {
@@ -326,7 +329,7 @@ export function ReviewCatalogClient() {
     }
   }
 
-  async function handleCommentSave(employee: PublicReviewCatalogEmployee, style: PortraitStyle) {
+  async function handleCommentSave(employee: PublicReviewCatalogEmployee, style: ReviewImageStyle) {
     const key = imageCommentKey(employee.galleryItemId, style)
     setSavingCommentTarget(key)
     try {
@@ -391,16 +394,31 @@ export function ReviewCatalogClient() {
         <CardContent className="p-4 md:p-5">
           <div className={contentGridClass}>
             {displayMode === "before-after" ? (
-              <OriginalPanel
+              <ReviewPanel
                 title="Исходное фото"
+                style="original"
                 imageUrl={employee.originalUrl}
-                footer="Только для сравнения"
+                currentVote={employee.viewerVotes.original}
+                feedback={employee.feedback.original}
+                comment={employee.comments.original}
+                commentDraft={getCommentDraft(employee, "original")}
+                voting={votingTarget === `${employee.employeeId}:original`}
+                savingComment={savingCommentTarget === imageCommentKey(employee.galleryItemId, "original")}
+                onVote={(vote) => handleVote(employee, "original", vote)}
+                onCommentDraftChange={(value) =>
+                  setCommentDrafts((prev) => ({
+                    ...prev,
+                    [imageCommentKey(employee.galleryItemId, "original")]: value,
+                  }))
+                }
+                onCommentSave={() => handleCommentSave(employee, "original")}
                 onOpen={setLightboxUrl}
+                helperText="Оцените качество исходного фото: свет, резкость, ракурс и пригодность для генерации."
               />
             ) : null}
 
             {displayMode !== "corporate-only" ? (
-              <GeneratedPanel
+              <ReviewPanel
                 title="Медицинский портрет"
                 style="medical"
                 imageUrl={employee.medicalUrl}
@@ -419,11 +437,12 @@ export function ReviewCatalogClient() {
                 }
                 onCommentSave={() => handleCommentSave(employee, "medical")}
                 onOpen={setLightboxUrl}
+                helperText="Оцените изображение и при необходимости обновите короткий комментарий."
               />
             ) : null}
 
             {displayMode !== "medical-only" ? (
-              <GeneratedPanel
+              <ReviewPanel
                 title="Корпоративный портрет"
                 style="corporate"
                 imageUrl={employee.corporateUrl}
@@ -442,6 +461,7 @@ export function ReviewCatalogClient() {
                 }
                 onCommentSave={() => handleCommentSave(employee, "corporate")}
                 onOpen={setLightboxUrl}
+                helperText="Оцените изображение и при необходимости обновите короткий комментарий."
               />
             ) : null}
           </div>
@@ -475,16 +495,16 @@ export function ReviewCatalogClient() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[360px]">
-                <Card className="rounded-[1.25rem] border-slate-200/90 bg-slate-50/90 shadow-none">
-                  <CardContent className="p-4">
-                    <div className="text-xs uppercase tracking-[0.08em] text-muted-foreground">Отделов</div>
-                    <div className="mt-2 text-3xl font-semibold text-foreground">{departments.length}</div>
+                <Card className="rounded-[1.25rem] border-blue-600/80 bg-blue-600 shadow-[0_14px_34px_rgba(37,99,235,0.28)]">
+                  <CardContent className="p-4 text-white">
+                    <div className="text-xs uppercase tracking-[0.08em] text-blue-100">Всего<br />отделов</div>
+                    <div className="mt-2 text-3xl font-semibold text-white">{departments.length}</div>
                   </CardContent>
                 </Card>
-                <Card className="rounded-[1.25rem] border-slate-200/90 bg-slate-50/90 shadow-none">
-                  <CardContent className="p-4">
-                    <div className="text-xs uppercase tracking-[0.08em] text-muted-foreground">Сотрудников с наборами</div>
-                    <div className="mt-2 text-3xl font-semibold text-foreground">
+                <Card className="rounded-[1.25rem] border-blue-600/80 bg-blue-600 shadow-[0_14px_34px_rgba(37,99,235,0.28)]">
+                  <CardContent className="p-4 text-white">
+                    <div className="text-xs uppercase tracking-[0.08em] text-blue-100">Сотрудников с наборами</div>
+                    <div className="mt-2 text-3xl font-semibold text-white">
                       {departments.reduce((sum, department) => sum + department.employeeCount, 0)}
                     </div>
                   </CardContent>
@@ -494,7 +514,7 @@ export function ReviewCatalogClient() {
           </section>
 
           <section className="mt-6 grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-            <Card className="h-fit rounded-[1.5rem] border-slate-300/90 bg-white/96 shadow-[0_16px_48px_rgba(15,23,42,0.10)] xl:sticky xl:top-6">
+            <Card className="h-fit rounded-[1.5rem] border-blue-200/90 bg-gradient-to-b from-blue-50 via-white to-blue-50/80 shadow-[0_18px_50px_rgba(37,99,235,0.12)] xl:sticky xl:top-6">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg">Отделы</CardTitle>
               </CardHeader>
@@ -505,8 +525,8 @@ export function ReviewCatalogClient() {
                   className={cn(
                     "w-full rounded-xl border px-4 py-3 text-left transition",
                     selectedDepartmentId === "all"
-                      ? "border-primary/40 bg-primary/10"
-                      : "border-slate-200 bg-slate-50/80 hover:bg-slate-100/90"
+                      ? "border-blue-500/50 bg-blue-500/12 shadow-sm"
+                      : "border-blue-200/90 bg-white/95 hover:border-blue-300 hover:bg-blue-50/85"
                   )}
                 >
                   <div className="text-sm font-semibold text-foreground">Все отделы</div>
@@ -525,8 +545,8 @@ export function ReviewCatalogClient() {
                       className={cn(
                         "w-full rounded-xl border px-4 py-3 text-left transition",
                         selectedDepartmentId === departmentKey
-                          ? "border-primary/40 bg-primary/10"
-                          : "border-slate-200 bg-slate-50/80 hover:bg-slate-100/90"
+                          ? "border-blue-500/50 bg-blue-500/12 shadow-sm"
+                          : "border-blue-200/90 bg-white/95 hover:border-blue-300 hover:bg-blue-50/85"
                       )}
                     >
                       <div className="text-sm font-semibold text-foreground">{department.name}</div>
@@ -540,6 +560,34 @@ export function ReviewCatalogClient() {
             <div className="space-y-6">
               <Card className="rounded-[1.5rem] border-slate-300/90 bg-white/96 shadow-[0_16px_48px_rgba(15,23,42,0.10)]">
                 <CardContent className="space-y-4 p-4 md:p-5">
+                  <div className="overflow-hidden rounded-full border border-slate-200/90 bg-slate-100">
+                    <div className="flex h-3 w-full">
+                      <div
+                        className="bg-emerald-500 transition-all"
+                        style={{ width: `${visibleProgress.total > 0 ? visibleProgress.likePct : 50}%` }}
+                      />
+                      <div
+                        className="bg-rose-500 transition-all"
+                        style={{ width: `${visibleProgress.total > 0 ? 100 - visibleProgress.likePct : 50}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <div className="flex items-center gap-2 text-emerald-700">
+                      <ThumbsUp className="size-4" />
+                      <span className="font-medium">{visibleProgress.likes}</span>
+                    </div>
+                    <div className="text-muted-foreground">
+                      {visibleProgress.total > 0
+                        ? `Соотношение оценок в текущем представлении: ${visibleProgress.likePct}% / ${100 - visibleProgress.likePct}%`
+                        : "Оценок пока нет"}
+                    </div>
+                    <div className="flex items-center gap-2 text-rose-700">
+                      <ThumbsDown className="size-4" />
+                      <span className="font-medium">{visibleProgress.dislikes}</span>
+                    </div>
+                  </div>
+
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                     <Tabs value={displayMode} onValueChange={(value) => setDisplayMode(value as DisplayMode)}>
                       <TabsList className="h-auto rounded-xl bg-slate-100 p-1">
@@ -571,6 +619,12 @@ export function ReviewCatalogClient() {
                       <Users className="size-4" />
                       {totalVisibleEmployees} сотрудников в текущем представлении
                     </span>
+                    {displayMode === "before-after" ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1">
+                        <ImageIcon className="size-4" />
+                        Исходники тоже участвуют в оценке
+                      </span>
+                    ) : null}
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1">
                       <MessageSquareText className="size-4" />
                       Один общий миниотзыв на изображение

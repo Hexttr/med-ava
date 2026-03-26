@@ -7,7 +7,7 @@ import {
   getGalleryImageCommentsMap,
   getOrCreateReviewViewerId,
   hashFeedbackValue,
-  isFeedbackStyle,
+  isReviewImageStyle,
   REVIEW_VIEWER_COOKIE,
   upsertGalleryImageComment,
 } from "@/lib/gallery-feedback"
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     const style = String(body?.style ?? "").trim()
     const commentText = String(body?.commentText ?? "").trim()
 
-    if (!galleryItemId || !employeeId || !isFeedbackStyle(style)) {
+    if (!galleryItemId || !employeeId || !isReviewImageStyle(style)) {
       return withNoStore(
         NextResponse.json({ error: "Некорректные параметры отзыва" }, { status: 400 })
       )
