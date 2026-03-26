@@ -43,6 +43,24 @@ const DEFAULT_CORPORATE_INSTRUCTION =
 
 const DEFAULT_NEGATIVE_PROMPT =
   "Avoid: different identity, blurry face, soft-focus haze, distorted facial features, over-smoothed skin, pasted cutout edges, floating subject, invented moles, invented freckles, invented beauty marks, acne, blemishes, skin spots not visible in the source, cheap-looking clothing, stethoscope, medical accessories, open mouth, full-body framing, hands in frame."
+const MEDICAL_CLOTHING_OVERRIDE_SUFFIX =
+  "Medical clothing override: even if the reference already shows white clothing, scrubs, or a medical-looking uniform, you must replace it with a newly rendered premium doctor's coat. Do not preserve the source coat, scrub top, zipper, piping, trim, pocket shape, seam layout, neckline, or chest silhouette."
+const CORPORATE_DIVERSITY_SUFFIX =
+  "Corporate wardrobe diversity: choose a premium executive outfit that suits the person's presentation, but vary the wardrobe across different people. Do not default to the same navy suit and blue tie. Vary jacket cut, lapels, shirt or blouse, neckline, fabric texture, and restrained luxury color palette while keeping the result formal and expensive."
+const CORPORATE_VARIATION_OPTIONS = [
+  "Wardrobe direction: charcoal or graphite tailored suit with a refined white or soft ecru shirt, and either no tie or a very subtle dark tie.",
+  "Wardrobe direction: deep navy or midnight blazer with a premium light shirt or blouse, clean structured silhouette, and understated executive styling.",
+  "Wardrobe direction: dark textured suit or blazer in graphite, ink, or deep brown with a premium blouse/shirt and a distinctive but restrained neckline treatment.",
+  "Wardrobe direction: elegant premium business look with a dark blazer and luxurious blouse/top, avoiding the standard blue-tie formula.",
+]
+
+function hashString(input: string): number {
+  let hash = 0
+  for (let i = 0; i < input.length; i++) {
+    hash = (hash * 31 + input.charCodeAt(i)) >>> 0
+  }
+  return hash
+}
 
 function normalizePromptTemplate(template: string): string {
   return template.replace(/\s+/g, " ").trim().toLowerCase()
@@ -91,13 +109,17 @@ export function getUniversalFraming(): string {
 export function getMedicalInstruction(backdrop: string): string {
   const s = getAppSettings()
   const template = s.promptMedicalInstruction.trim() || DEFAULT_MEDICAL_INSTRUCTION
-  return template.replace(/\{backdrop\}/g, backdrop)
+  return `${template.replace(/\{backdrop\}/g, backdrop)} ${MEDICAL_CLOTHING_OVERRIDE_SUFFIX}`.trim()
 }
 
-export function getCorporateInstruction(backdrop: string): string {
+export function getCorporateInstruction(backdrop: string, seedSource = ""): string {
   const s = getAppSettings()
   const template = s.promptCorporateInstruction.trim() || DEFAULT_CORPORATE_INSTRUCTION
-  return template.replace(/\{backdrop\}/g, backdrop)
+  const variant =
+    CORPORATE_VARIATION_OPTIONS[
+      hashString(seedSource || backdrop || "corporate") % CORPORATE_VARIATION_OPTIONS.length
+    ]!
+  return `${template.replace(/\{backdrop\}/g, backdrop)} ${CORPORATE_DIVERSITY_SUFFIX} ${variant}`.trim()
 }
 
 export function getNegativePrompt(): string {

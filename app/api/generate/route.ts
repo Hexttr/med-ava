@@ -229,11 +229,12 @@ export async function POST(request: NextRequest) {
         ? `Background: ${backgroundCorporate}`
         : defaultBackdropCorporate
 
+    const identityAnchors = prompt.trim()
     const framingInstruction = getUniversalFraming()
     const settingInstruction =
       style === "medical"
         ? getMedicalInstruction(backdropMedical)
-        : getCorporateInstruction(backdropCorporate)
+        : getCorporateInstruction(backdropCorporate, identityAnchors)
 
     const negativePrompt = getNegativePrompt()
     const styleNegativeSuffix = style === "medical"
@@ -245,7 +246,6 @@ export async function POST(request: NextRequest) {
     const backgroundSceneSuffix = backgroundSceneAnalysis
       ? ` BACKGROUND SCENE ANALYSIS: ${backgroundSceneAnalysis}`
       : ""
-    const identityAnchors = prompt.trim()
     const identityAnchorsSuffix = identityAnchors
       ? ` IDENTITY ANCHORS: ${identityAnchors}`
       : ""
