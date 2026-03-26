@@ -36,12 +36,52 @@ import type {
 } from "@/lib/types"
 
 type DisplayMode = "before-after" | "medical-only" | "corporate-only"
+type ViewMode = "review" | "gallery"
+type GalleryStyle = "original" | "medical" | "corporate"
 
 const COMMENT_MAX_LENGTH = 240
 const REVIEW_STYLES: ReviewImageStyle[] = ["original", "medical", "corporate"]
 
 function imageCommentKey(galleryItemId: string, style: ReviewImageStyle) {
   return `${galleryItemId}:${style}`
+}
+
+function GalleryTile({
+  employee,
+  style,
+  onOpen,
+}: {
+  employee: PublicReviewCatalogEmployee
+  style: GalleryStyle
+  onOpen: (url: string) => void
+}) {
+  const imageUrl =
+    style === "original"
+      ? employee.originalUrl
+      : style === "medical"
+        ? employee.medicalUrl
+        : employee.corporateUrl
+
+  const title =
+    style === "original"
+      ? `Исходное фото: ${employee.name}`
+      : style === "medical"
+        ? `Медицинский портрет: ${employee.name}`
+        : `Бизнес-портрет: ${employee.name}`
+
+  return (
+    <Card className="overflow-hidden rounded-[1.35rem] border-slate-300/90 bg-white/96 shadow-[0_16px_42px_rgba(15,23,42,0.08)]">
+      <div className="relative aspect-[3/4] overflow-hidden bg-slate-100">
+        <PanelImage imageUrl={imageUrl} title={title} onOpen={onOpen} />
+      </div>
+      <CardContent className="p-4">
+        <div className="text-base font-semibold text-foreground">{employee.name}</div>
+        {employee.departmentName ? (
+          <div className="mt-1 text-sm text-muted-foreground">{employee.departmentName}</div>
+        ) : null}
+      </CardContent>
+    </Card>
+  )
 }
 
 function PanelImage({
@@ -224,6 +264,9 @@ export function ReviewCatalogClient() {
   const [loading, setLoading] = useState(true)
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>("all")
   const [displayMode, setDisplayMode] = useState<DisplayMode>("before-after")
+  const [viewMode, setViewMode] = useState<ViewMode>("review")
+  const [galleryDepartmentId, setGalleryDepartmentId] = useState<string>("")
+  const [galleryStyle, setGalleryStyle] = useState<GalleryStyle>("original")
   const [query, setQuery] = useState("")
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [votingTarget, setVotingTarget] = useState<string | null>(null)
@@ -299,6 +342,24 @@ export function ReviewCatalogClient() {
     const likePct = total > 0 ? Math.round((likes / total) * 100) : 0
     return { likes, dislikes, total, likePct }
   }, [displayMode, filteredDepartments])
+
+  const galleryDepartment = useMemo(
+    () =>
+      galleryDepartmentId
+        ? departments.find((department) => (department.departmentId ?? "__no_department__") === galleryDepartmentId) ?? null
+        : null,
+    [departments, galleryDepartmentId]
+  )
+
+  const galleryEmployees = useMemo(() => {
+    if (!galleryDepartment) return []
+
+    return galleryDepartment.employees.filter((employee) => {
+      if (galleryStyle === "original") return Boolean(employee.originalUrl)
+      if (galleryStyle === "medical") return Boolean(employee.medicalUrl)
+      return Boolean(employee.corporateUrl)
+    })
+  }, [galleryDepartment, galleryStyle])
 
   function getCommentDraft(employee: PublicReviewCatalogEmployee, style: ReviewImageStyle) {
     const key = imageCommentKey(employee.galleryItemId, style)
@@ -493,6 +554,34 @@ export function ReviewCatalogClient() {
                 <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground md:text-base">
                   Выберите отдел, переключайте режим просмотра и оценивайте каждое сгенерированное изображение с коротким комментарием прямо в каталоге.
                 </p>
+                <div className="mt-5">
+                  <div className="inline-flex rounded-2xl border border-slate-200/90 bg-slate-100/90 p-1 shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("review")}
+                      className={cn(
+                        "rounded-xl px-4 py-2.5 text-sm font-medium transition",
+                        viewMode === "review"
+                          ? "bg-white text-slate-900 shadow-sm"
+                          : "text-slate-600 hover:text-slate-900"
+                      )}
+                    >
+                      Режим оценки
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("gallery")}
+                      className={cn(
+                        "rounded-xl px-4 py-2.5 text-sm font-medium transition",
+                        viewMode === "gallery"
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "text-slate-600 hover:text-slate-900"
+                      )}
+                    >
+                      Режим галереи
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[360px]">
@@ -514,6 +603,116 @@ export function ReviewCatalogClient() {
             </div>
           </section>
 
+          {viewMode === "gallery" ? (
+            <section className="mt-6 space-y-6">
+              <Card className="rounded-[1.5rem] border-slate-300/90 bg-white/96 shadow-[0_16px_48px_rgba(15,23,42,0.10)]">
+                <CardContent className="grid gap-4 p-4 md:p-5 lg:grid-cols-2">
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-slate-700">Выберите отдел</div>
+                    <Select value={galleryDepartmentId} onValueChange={setGalleryDepartmentId}>
+                      <SelectTrigger className="h-12 w-full rounded-xl border-slate-200 bg-slate-50/80 px-4 shadow-none">
+                        <SelectValue placeholder="Выберите отдел" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-slate-200">
+                        {departments.map((department) => (
+                          <SelectItem
+                            key={department.departmentId ?? "__no_department__"}
+                            value={department.departmentId ?? "__no_department__"}
+                          >
+                            {department.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-slate-700">Режим изображения</div>
+                    <Select value={galleryStyle} onValueChange={(value) => setGalleryStyle(value as GalleryStyle)}>
+                      <SelectTrigger className="h-12 w-full rounded-xl border-slate-200 bg-slate-50/80 px-4 shadow-none">
+                        <SelectValue placeholder="Выберите режим" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-slate-200">
+                        <SelectItem value="original">Было</SelectItem>
+                        <SelectItem value="medical">Медицинский портрет</SelectItem>
+                        <SelectItem value="corporate">Бизнес портрет</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {loading ? (
+                <Card className="rounded-[1.5rem] border-slate-300/90 bg-white/96 shadow-[0_16px_48px_rgba(15,23,42,0.10)]">
+                  <CardContent className="flex min-h-[320px] items-center justify-center">
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                      <Loader2 className="size-4 animate-spin text-primary" />
+                      Загрузка каталога отделов...
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : !galleryDepartment ? (
+                <Card className="rounded-[1.5rem] border-slate-300/90 bg-white/96 shadow-[0_16px_48px_rgba(15,23,42,0.10)]">
+                  <CardContent className="flex min-h-[280px] flex-col items-center justify-center gap-4 text-center">
+                    <Building2 className="size-8 text-muted-foreground/60" />
+                    <div>
+                      <p className="text-lg font-semibold text-foreground">Выберите отдел</p>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        После выбора отдела откроется галерея сотрудников в режиме{" "}
+                        <span className="font-medium text-foreground">
+                          {galleryStyle === "original"
+                            ? "«Было»"
+                            : galleryStyle === "medical"
+                              ? "«Медицинский портрет»"
+                              : "«Бизнес портрет»"}
+                        </span>
+                        .
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : galleryEmployees.length === 0 ? (
+                <Card className="rounded-[1.5rem] border-slate-300/90 bg-white/96 shadow-[0_16px_48px_rgba(15,23,42,0.10)]">
+                  <CardContent className="flex min-h-[280px] flex-col items-center justify-center gap-4 text-center">
+                    <ImageIcon className="size-8 text-muted-foreground/60" />
+                    <div>
+                      <p className="text-lg font-semibold text-foreground">Для этого режима пока нет изображений</p>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Попробуйте переключить тип изображения или выберите другой отдел.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <section className="space-y-4">
+                  <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                    <div>
+                      <h2 className="text-2xl font-semibold tracking-tight text-foreground">{galleryDepartment.name}</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {galleryEmployees.length} сотрудников в режиме{" "}
+                        {galleryStyle === "original"
+                          ? "«Было»"
+                          : galleryStyle === "medical"
+                            ? "«Медицинский портрет»"
+                            : "«Бизнес портрет»"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    {galleryEmployees.map((employee) => (
+                      <GalleryTile
+                        key={`${employee.employeeId}:${galleryStyle}`}
+                        employee={employee}
+                        style={galleryStyle}
+                        onOpen={setLightboxUrl}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
+            </section>
+          ) : (
           <section className="mt-6 grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
             <Card className="h-fit rounded-[1.5rem] border-blue-200/90 bg-gradient-to-b from-blue-50 via-white to-blue-50/80 shadow-[0_18px_50px_rgba(37,99,235,0.12)] xl:sticky xl:top-6">
               <CardHeader className="pb-3">
@@ -540,41 +739,41 @@ export function ReviewCatalogClient() {
                 </div>
 
                 <div className="hidden space-y-2 xl:block">
-                <button
-                  type="button"
-                  onClick={() => setSelectedDepartmentId("all")}
-                  className={cn(
-                    "w-full rounded-xl border px-4 py-3 text-left transition",
-                    selectedDepartmentId === "all"
-                      ? "border-blue-500/50 bg-blue-500/12 shadow-sm"
-                      : "border-blue-200/90 bg-white/95 hover:border-blue-300 hover:bg-blue-50/85"
-                  )}
-                >
-                  <div className="text-sm font-semibold text-foreground">Все отделы</div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {departments.reduce((sum, department) => sum + department.employeeCount, 0)} сотрудников
-                  </div>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDepartmentId("all")}
+                    className={cn(
+                      "w-full rounded-xl border px-4 py-3 text-left transition",
+                      selectedDepartmentId === "all"
+                        ? "border-blue-500/50 bg-blue-500/12 shadow-sm"
+                        : "border-blue-200/90 bg-white/95 hover:border-blue-300 hover:bg-blue-50/85"
+                    )}
+                  >
+                    <div className="text-sm font-semibold text-foreground">Все отделы</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {departments.reduce((sum, department) => sum + department.employeeCount, 0)} сотрудников
+                    </div>
+                  </button>
 
-                {departments.map((department) => {
-                  const departmentKey = department.departmentId ?? "__no_department__"
-                  return (
-                    <button
-                      key={departmentKey}
-                      type="button"
-                      onClick={() => setSelectedDepartmentId(departmentKey)}
-                      className={cn(
-                        "w-full rounded-xl border px-4 py-3 text-left transition",
-                        selectedDepartmentId === departmentKey
-                          ? "border-blue-500/50 bg-blue-500/12 shadow-sm"
-                          : "border-blue-200/90 bg-white/95 hover:border-blue-300 hover:bg-blue-50/85"
-                      )}
-                    >
-                      <div className="text-sm font-semibold text-foreground">{department.name}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">{department.employeeCount} сотрудников</div>
-                    </button>
-                  )
-                })}
+                  {departments.map((department) => {
+                    const departmentKey = department.departmentId ?? "__no_department__"
+                    return (
+                      <button
+                        key={departmentKey}
+                        type="button"
+                        onClick={() => setSelectedDepartmentId(departmentKey)}
+                        className={cn(
+                          "w-full rounded-xl border px-4 py-3 text-left transition",
+                          selectedDepartmentId === departmentKey
+                            ? "border-blue-500/50 bg-blue-500/12 shadow-sm"
+                            : "border-blue-200/90 bg-white/95 hover:border-blue-300 hover:bg-blue-50/85"
+                        )}
+                      >
+                        <div className="text-sm font-semibold text-foreground">{department.name}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">{department.employeeCount} сотрудников</div>
+                      </button>
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -703,6 +902,7 @@ export function ReviewCatalogClient() {
               )}
             </div>
           </section>
+          )}
         </div>
       </main>
 
