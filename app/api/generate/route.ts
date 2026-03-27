@@ -319,8 +319,12 @@ export async function POST(request: NextRequest) {
 
     function buildGeminiBody(attempt: number, variant: PromptVariant) {
       const selectedInlineParts =
-        variant === "simple" && hasReferencePhoto
-          ? inlineParts.slice(0, 1)
+        variant === "simple"
+          ? hasReferencePhoto && useBackgroundImage
+            ? inlineParts.slice(0, 2)
+            : hasReferencePhoto
+              ? inlineParts.slice(0, 1)
+              : inlineParts
           : inlineParts
 
       return {

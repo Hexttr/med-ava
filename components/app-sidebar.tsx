@@ -112,22 +112,22 @@ export function AppSidebar() {
         >
           <div className="hidden items-center justify-center group-data-[collapsible=icon]:flex">
             <Image
-              src="/nczd-logo-blue.png"
+              src="/logo-nczd-white.png"
               alt="Логотип НМИЦ здоровья детей"
-              width={34}
-              height={34}
-              className="h-[34px] w-auto object-contain"
+              width={40}
+              height={40}
+              className="h-10 w-auto object-contain"
             />
           </div>
           <div className="group-data-[collapsible=icon]:hidden">
             <div className="px-1">
-              <div className="flex items-start gap-3">
+              <div className="flex flex-col items-start gap-3">
                 <Image
-                  src="/nczd-logo-blue.png"
+                  src="/logo-nczd-white.png"
                   alt="Логотип НМИЦ здоровья детей"
-                  width={48}
-                  height={48}
-                  className="mt-0.5 h-12 w-auto object-contain"
+                  width={72}
+                  height={72}
+                  className="h-[72px] w-auto object-contain"
                 />
                 <div className="min-w-0 space-y-1.5">
                   <div className="space-y-0.5">
