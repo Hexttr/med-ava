@@ -20,12 +20,15 @@ export const maxDuration = 60
 
 const PRIMARY_MODEL_ATTEMPTS = 3
 const RETRY_DELAY_MS = 500
+const NO_IMAGE_ERROR = "Модель не вернула изображение"
 const SHARPNESS_RULES =
   "IMAGE QUALITY RULES: tack-sharp focus on the eyes, eyelashes, eyebrows, lips, and overall facial features. Preserve crisp hair strands, clean edge detail, natural skin texture, and realistic micro-contrast. The final portrait must look sharply resolved and professionally photographed, without soft-focus haze or smeared details."
 const STUDIO_FINISH_RULES =
   "PORTRAIT FINISH RULES: preserve a premium glossy studio portrait look with polished commercial/editorial quality. Use controlled studio-grade lighting on the subject: soft directional key light, balanced fill, subtle rim separation, clean catchlights, refined tonal contrast, and elegant depth. The person must look intentionally photographed in a high-end studio setup, not casually blended into the environment."
 const FACE_RELIGHT_RULES =
   "FACE RE-RENDER RULES: preserve the person's identity and natural skin tone, but re-render the face as a fresh studio portrait with new facial lighting, new tonal modeling, new shadows, new highlights, and new photographic depth. Do not keep the flat source-photo lighting, source exposure balance, raw facial tonality, or original phone-camera shading pattern."
+const GLASSES_CLARITY_RULES =
+  "GLASSES RULES: if the person wears glasses, preserve the frame shape, size, fit, and overall style as part of the identity. However, re-render the lenses as clean, transparent, and optically clear. Remove glare, flash hotspots, opaque reflections, muddy tint, haze, or any reflections that hide the eyes. Both eyes must remain clearly visible through the glasses unless the original eyewear is intentionally opaque."
 const PRIORITY_ORDER_RULES =
   "PRIORITY ORDER: exact identity and recognizability come first; sharp eyes and facial detail second; stable waist-up framing third; believable premium clothing fourth; recognizable scene usage fifth; exact plate matching last."
 const IDENTITY_USAGE_RULES =
@@ -58,10 +61,16 @@ const IMAGE_BACKGROUND_BACKDROP =
   "Use the supplied background reference plate as the actual final background environment. Do not substitute a generic studio backdrop."
 const BACKGROUND_ANALYSIS_PROMPT =
   "Analyze this portrait background plate for scene integration. Describe in concise professional English: environment type, camera perspective, background depth, likely subject placement, main light direction, light softness, color temperature, brightest areas, likely shadow direction, reflective surfaces, and how a photographed person should be lit to fit naturally into this scene. Keep it compact and practical for image generation."
+const SIMPLE_MEDICAL_INSTRUCTION =
+  "Dress the person in a realistic premium white doctor's coat and keep the result clean, believable, and photographic."
+const SIMPLE_CORPORATE_INSTRUCTION =
+  "Dress the person in realistic premium business attire and keep the result clean, believable, and photographic."
+
+type PromptVariant = "full" | "simple"
 
 type GenerateModelResult =
   | { ok: true; imageUrl: string }
-  | { ok: false; status?: number; errorText: string }
+  | { ok: false; status?: number; errorText: string; reason: "no-image" | "error" }
 
 async function analyzeBackgroundScene(
   geminiKey: string,
@@ -280,31 +289,45 @@ export async function POST(request: NextRequest) {
       return ` ${SECOND_PASS_REWRITE_RULES} ${FINAL_PASS_REWRITE_RULES}${medicalRetry}${faceRetry}`
     }
 
-    function buildGeminiImagePrompt(attempt: number): string {
+    function buildGeminiImagePrompt(attempt: number, variant: PromptVariant): string {
       const attemptCorrection = getAttemptCorrection(attempt)
       const styleTransformationRules = style === "medical" ? ` ${MEDICAL_RESTYLE_RULES}` : ""
+      const simpleStyleInstruction = style === "medical" ? SIMPLE_MEDICAL_INSTRUCTION : SIMPLE_CORPORATE_INSTRUCTION
+
+      if (variant === "simple") {
+        if (hasReferencePhoto) {
+          return `The attached image is the identity reference of the exact same person. Re-generate this person as ONE highly realistic professional portrait with maximum realism and strong likeness. Preserve the same face, age impression, skin tone, hair, and eyewear frame/style. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${identityAnchorsSuffix} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} ${FACE_RELIGHT_RULES} ${GLASSES_CLARITY_RULES} ${simpleStyleInstruction} Keep the composition simple, coherent, and photographic. Use a clean professional background if needed. Keep a stable 3:4 waist-up portrait with both shoulders visible and hands out of frame.${attemptCorrection} Output only the generated portrait image.${negativeSuffix}`
+        }
+        return `Generate ONE highly realistic professional portrait of the described person with maximum realism and natural facial detail. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${identityAnchorsSuffix} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} ${FACE_RELIGHT_RULES} ${GLASSES_CLARITY_RULES} ${simpleStyleInstruction} Keep the composition simple, coherent, and photographic. Use a clean professional background if needed. Keep a stable 3:4 waist-up portrait with both shoulders visible and hands out of frame.${attemptCorrection}${negativeSuffix}`
+      }
+
       if (useBackgroundImage && hasReferencePhoto) {
-        return `The FIRST attached image is the IDENTITY REFERENCE PHOTO of the person, not the final composition to preserve. The SECOND attached image is the BACKGROUND REFERENCE PLATE for the final scene. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, same identity, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${styleTransformationRules}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${FRAMING_EXPANSION_RULES} ${BACKGROUND_REFERENCE_RULES} ${BACKGROUND_PRIORITY_RULES} ${BACKGROUND_INTEGRATION_RULES} ${BACKGROUND_REQUIRED_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} ${FACE_RELIGHT_RULES}${backgroundSceneSuffix} ${settingInstruction}. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. Use soft, physically believable transitions between the person and the background. Harmonize with the inferred scene lighting and shadow behavior, but preserve premium studio lighting on the face, clean facial modeling, and glossy commercial portrait contrast.${attemptCorrection} Output the generated portrait image.${negativeSuffix}`
+        return `The FIRST attached image is the IDENTITY REFERENCE PHOTO of the person, not the final composition to preserve. The SECOND attached image is the BACKGROUND REFERENCE PLATE for the final scene. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, same identity, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${styleTransformationRules}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${FRAMING_EXPANSION_RULES} ${BACKGROUND_REFERENCE_RULES} ${BACKGROUND_PRIORITY_RULES} ${BACKGROUND_INTEGRATION_RULES} ${BACKGROUND_REQUIRED_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} ${FACE_RELIGHT_RULES} ${GLASSES_CLARITY_RULES}${backgroundSceneSuffix} ${settingInstruction}. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. Use soft, physically believable transitions between the person and the background. Harmonize with the inferred scene lighting and shadow behavior, but preserve premium studio lighting on the face, clean facial modeling, and glossy commercial portrait contrast.${attemptCorrection} Output the generated portrait image.${negativeSuffix}`
       }
       if (useBackgroundImage && !hasReferencePhoto) {
-        return `The attached image is the BACKGROUND REFERENCE PLATE for the final scene. Generate ONE professional studio portrait photo of the described person. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${styleTransformationRules}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${FRAMING_EXPANSION_RULES} ${BACKGROUND_REFERENCE_RULES} ${BACKGROUND_PRIORITY_RULES} ${BACKGROUND_INTEGRATION_RULES} ${BACKGROUND_REQUIRED_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} ${FACE_RELIGHT_RULES}${backgroundSceneSuffix} ${settingInstruction}. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. Harmonize with the inferred scene lighting and shadow behavior, but preserve premium studio lighting on the face, clean facial modeling, and glossy commercial portrait contrast.${attemptCorrection} Output the generated portrait image.${negativeSuffix}`
+        return `The attached image is the BACKGROUND REFERENCE PLATE for the final scene. Generate ONE professional studio portrait photo of the described person. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${styleTransformationRules}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${FRAMING_EXPANSION_RULES} ${BACKGROUND_REFERENCE_RULES} ${BACKGROUND_PRIORITY_RULES} ${BACKGROUND_INTEGRATION_RULES} ${BACKGROUND_REQUIRED_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} ${FACE_RELIGHT_RULES} ${GLASSES_CLARITY_RULES}${backgroundSceneSuffix} ${settingInstruction}. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. Harmonize with the inferred scene lighting and shadow behavior, but preserve premium studio lighting on the face, clean facial modeling, and glossy commercial portrait contrast.${attemptCorrection} Output the generated portrait image.${negativeSuffix}`
       }
       if (hasReferencePhoto) {
-        return `The attached image is the IDENTITY REFERENCE PHOTO of the person, not the final composition to copy. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${styleTransformationRules}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${FRAMING_EXPANSION_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} ${FACE_RELIGHT_RULES} Only change the setting and clothing as follows: ${settingInstruction}. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. Keep the person's face identical to the reference.${attemptCorrection} Output the generated portrait image.${negativeSuffix}`
+        return `The attached image is the IDENTITY REFERENCE PHOTO of the person, not the final composition to copy. Your task: generate ONE professional studio portrait photo of THIS EXACT SAME PERSON. CRITICAL IDENTITY: the face must remain identical — same person, maximum likeness. Do NOT change the face, do NOT generate a different person. Preserve every facial detail: skin tone, hair, eyes, nose, mouth, and distinctive features. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${styleTransformationRules}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${FRAMING_EXPANSION_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} ${FACE_RELIGHT_RULES} ${GLASSES_CLARITY_RULES} Only change the setting and clothing as follows: ${settingInstruction}. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. Keep the person's face identical to the reference.${attemptCorrection} Output the generated portrait image.${negativeSuffix}`
       }
-      return `Professional studio portrait photo. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${styleTransformationRules}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${FRAMING_EXPANSION_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} ${FACE_RELIGHT_RULES} CRITICAL IDENTITY: The face MUST match the person described above exactly — maximum likeness, same person. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. ${
+      return `Professional studio portrait photo. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${styleTransformationRules}${identityAnchorsSuffix} ${PRIORITY_ORDER_RULES} ${FRAMING_EXPANSION_RULES} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} ${FACE_RELIGHT_RULES} ${GLASSES_CLARITY_RULES} CRITICAL IDENTITY: The face MUST match the person described above exactly — maximum likeness, same person. Keep the subject framed as a consistent waist-up portrait with visible torso to around the upper waist, both shoulders visible, and hands out of frame. ${
         style === "medical"
           ? (backgroundMedical ? `${backdropMedical} Medical professional aesthetic.` : "Clean white/light gray backdrop, medical professional aesthetic.")
           : (backgroundCorporate ? `${backdropCorporate} Business professional aesthetic.` : "Medium-gray gradient corporate studio backdrop, business professional aesthetic.")
       }${attemptCorrection}${negativeSuffix}`
     }
 
-    function buildGeminiBody(attempt: number) {
+    function buildGeminiBody(attempt: number, variant: PromptVariant) {
+      const selectedInlineParts =
+        variant === "simple" && hasReferencePhoto
+          ? inlineParts.slice(0, 1)
+          : inlineParts
+
       return {
         contents: [{
           parts: [
-            ...inlineParts,
-            { text: `Generate a professional portrait photo. ${buildGeminiImagePrompt(attempt)}` },
+            ...selectedInlineParts,
+            { text: `Generate a professional portrait photo. ${buildGeminiImagePrompt(attempt, variant)}` },
           ],
         }],
         generationConfig: {
@@ -314,12 +337,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    async function generateWithModel(model: string, attempts: number): Promise<GenerateModelResult> {
+    async function generateWithModel(model: string, attempts: number, variant: PromptVariant = "full"): Promise<GenerateModelResult> {
       let lastStatus: number | undefined
       let lastErrorText = ""
 
       for (let attempt = 1; attempt <= attempts; attempt++) {
-        const geminiBody = buildGeminiBody(attempt)
+        const geminiBody = buildGeminiBody(attempt, variant)
         const response = await fetchWithProxy(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
           {
@@ -361,10 +384,11 @@ export async function POST(request: NextRequest) {
           }
 
           lastStatus = response.status
-          lastErrorText = "Модель не вернула изображение"
+          lastErrorText = NO_IMAGE_ERROR
           logger.warn("GENERATE", "Модель не вернула изображение, повторяем запрос", {
             model,
             attempt,
+            variant,
           })
         } else {
           lastStatus = response.status
@@ -372,6 +396,7 @@ export async function POST(request: NextRequest) {
           logger.warn("GENERATE", "Модель генерации вернула ошибку", {
             model,
             attempt,
+            variant,
             status: response.status,
             body: lastErrorText.slice(0, 400),
           })
@@ -382,12 +407,32 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return { ok: false, status: lastStatus, errorText: lastErrorText }
+      return {
+        ok: false,
+        status: lastStatus,
+        errorText: lastErrorText,
+        reason: lastErrorText === NO_IMAGE_ERROR ? "no-image" : "error",
+      }
     }
 
-    const primaryResult = await generateWithModel(modelGeneration, PRIMARY_MODEL_ATTEMPTS)
+    let primaryResult = await generateWithModel(modelGeneration, PRIMARY_MODEL_ATTEMPTS)
     if (primaryResult.ok) {
       return NextResponse.json({ imageUrl: primaryResult.imageUrl })
+    }
+
+    if (primaryResult.reason === "no-image") {
+      logger.warn("GENERATE", "Повторяем генерацию с упрощённым промптом на основной модели", {
+        model: modelGeneration,
+      })
+      const simplifiedPrimaryResult = await generateWithModel(modelGeneration, 1, "simple")
+      if (simplifiedPrimaryResult.ok) {
+        logger.info("GENERATE", "Изображение сгенерировано через упрощённый промпт на основной модели", {
+          style,
+          model: modelGeneration,
+        })
+        return NextResponse.json({ imageUrl: simplifiedPrimaryResult.imageUrl })
+      }
+      primaryResult = simplifiedPrimaryResult
     }
 
     // 2) Fallback: gemini-2.5-flash-image (тот же API generateContent)
@@ -401,10 +446,25 @@ export async function POST(request: NextRequest) {
         attempts: PRIMARY_MODEL_ATTEMPTS,
       })
 
-      const fallbackResult = await generateWithModel(fallbackModel, 1)
+      let fallbackResult = await generateWithModel(fallbackModel, 1)
       if (fallbackResult.ok) {
         logger.info("GENERATE", "Изображение сгенерировано через fallback", { style, model: fallbackModel })
         return NextResponse.json({ imageUrl: fallbackResult.imageUrl })
+      }
+
+      if (fallbackResult.reason === "no-image") {
+        logger.warn("GENERATE", "Повторяем fallback с упрощённым промптом", {
+          model: fallbackModel,
+        })
+        const simplifiedFallbackResult = await generateWithModel(fallbackModel, 1, "simple")
+        if (simplifiedFallbackResult.ok) {
+          logger.info("GENERATE", "Изображение сгенерировано через упрощённый fallback", {
+            style,
+            model: fallbackModel,
+          })
+          return NextResponse.json({ imageUrl: simplifiedFallbackResult.imageUrl })
+        }
+        fallbackResult = simplifiedFallbackResult
       }
 
       finalErrorText = fallbackResult.errorText || finalErrorText

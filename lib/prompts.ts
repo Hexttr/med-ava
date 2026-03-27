@@ -17,7 +17,7 @@ Analyze this photo of a person named "{employeeName}". Describe only the person'
 - Eyes: color, shape, spacing, eyebrows (shape and color)
 - Nose and mouth: shape, lip fullness, any distinctive traits
 - Approximate age and gender presentation
-- Any distinguishing features only if they are clearly visible in the source (moles, freckles, scars, glasses — preserve if worn)
+- Any distinguishing features only if they are clearly visible in the source (moles, freckles, scars, glasses frame/style — preserve if worn, but do not treat glare, lens reflections, tint, dirt, or opacity as identity features)
 - Facial proportions and any unique characteristics
 
 Do NOT infer or invent facial marks, freckles, moles, scars, acne, skin spots, or blemishes that are not clearly visible in the source photo.
@@ -27,7 +27,7 @@ Return ONLY one valid JSON object with exactly these keys:
 - description: a short plain-English summary of the person in 1 sentence
 - identityAnchors: one compact but information-dense paragraph listing the facial and identity traits that MUST stay unchanged in generation
 
-identityAnchors must prioritize immutable identity details and should read like instructions for preserving the same person. Mention what must remain unchanged: facial structure, hair, eyes, skin tone, age impression, clearly visible distinctive marks only, glasses, and proportions.
+identityAnchors must prioritize immutable identity details and should read like instructions for preserving the same person. Mention what must remain unchanged: facial structure, hair, eyes, skin tone, age impression, clearly visible distinctive marks only, glasses frame/style if worn, and proportions. Treat lens glare, reflections, haze, tint, or darkened lenses as removable capture artifacts, not identity anchors.
 
 Respond with ONLY one valid JSON object (no markdown, no \`\`\` code fences, no extra text). Use double quotes for keys and strings; escape any " inside strings as \". Required keys: description, identityAnchors. Example structure:
 {
@@ -42,7 +42,7 @@ const DEFAULT_CORPORATE_INSTRUCTION =
   "Show this person in premium professional business attire (expensive dark suit or blazer, designer quality, luxury tailoring). {backdrop} Confident, professional expression. Mouth closed, lips together."
 
 const DEFAULT_NEGATIVE_PROMPT =
-  "Avoid: different identity, blurry face, soft-focus haze, distorted facial features, over-smoothed skin, pasted cutout edges, floating subject, invented moles, invented freckles, invented beauty marks, acne, blemishes, skin spots not visible in the source, cheap-looking clothing, stethoscope, medical accessories, open mouth, full-body framing, hands in frame."
+  "Avoid: different identity, blurry face, soft-focus haze, distorted facial features, over-smoothed skin, pasted cutout edges, floating subject, invented moles, invented freckles, invented beauty marks, acne, blemishes, skin spots not visible in the source, cheap-looking clothing, stethoscope, medical accessories, open mouth, full-body framing, hands in frame, glare on eyeglass lenses, opaque lenses, mirrored lens reflections, eyes obscured by glasses reflections, copied flash hotspots on glasses."
 const MEDICAL_CLOTHING_OVERRIDE_SUFFIX =
   "Medical clothing override: even if the reference already shows white clothing, scrubs, or a medical-looking uniform, you must replace it with a newly rendered premium doctor's coat. Do not preserve the source coat, scrub top, zipper, piping, trim, pocket shape, seam layout, neckline, or chest silhouette."
 const CORPORATE_DIVERSITY_SUFFIX =
