@@ -65,6 +65,8 @@ const SIMPLE_MEDICAL_INSTRUCTION =
   "Dress the person in a realistic premium white doctor's coat and keep the result clean, believable, and photographic."
 const SIMPLE_CORPORATE_INSTRUCTION =
   "Dress the person in realistic premium business attire and keep the result clean, believable, and photographic."
+const SIMPLE_BACKGROUND_RULES =
+  "SIMPLE BACKGROUND RULES: if a background reference image is attached, preserve its overall environment type, palette, depth impression, and broad light direction, but simplify fine background detail whenever needed for a stable realistic portrait. Keep the result visibly related to the background reference, but prioritize facial realism, identity, clean edges, and coherent lighting over exact scene reconstruction. Avoid plain generic backdrops unless absolutely necessary."
 
 type PromptVariant = "full" | "simple"
 
@@ -293,12 +295,21 @@ export async function POST(request: NextRequest) {
       const attemptCorrection = getAttemptCorrection(attempt)
       const styleTransformationRules = style === "medical" ? ` ${MEDICAL_RESTYLE_RULES}` : ""
       const simpleStyleInstruction = style === "medical" ? SIMPLE_MEDICAL_INSTRUCTION : SIMPLE_CORPORATE_INSTRUCTION
+      const simpleTextBackdropInstruction = style === "medical"
+        ? backdropMedical
+        : backdropCorporate
 
       if (variant === "simple") {
-        if (hasReferencePhoto) {
-          return `The attached image is the identity reference of the exact same person. Re-generate this person as ONE highly realistic professional portrait with maximum realism and strong likeness. Preserve the same face, age impression, skin tone, hair, and eyewear frame/style. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${identityAnchorsSuffix} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} ${FACE_RELIGHT_RULES} ${GLASSES_CLARITY_RULES} ${simpleStyleInstruction} Keep the composition simple, coherent, and photographic. Use a clean professional background if needed. Keep a stable 3:4 waist-up portrait with both shoulders visible and hands out of frame.${attemptCorrection} Output only the generated portrait image.${negativeSuffix}`
+        if (useBackgroundImage && hasReferencePhoto) {
+          return `The FIRST attached image is the identity reference of the exact same person. The SECOND attached image is a background reference plate for the target scene. Re-generate this person as ONE highly realistic professional portrait with maximum realism and strong likeness. Preserve the same face, age impression, skin tone, hair, and eyewear frame/style. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${identityAnchorsSuffix} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} ${FACE_RELIGHT_RULES} ${GLASSES_CLARITY_RULES} ${SIMPLE_BACKGROUND_RULES}${backgroundSceneSuffix} ${simpleStyleInstruction} Keep the composition simple, coherent, and photographic. Maintain a stable 3:4 waist-up portrait with both shoulders visible and hands out of frame. Keep the face highly realistic and let the background be a simplified but recognizable interpretation of the supplied scene.${attemptCorrection} Output only the generated portrait image.${negativeSuffix}`
         }
-        return `Generate ONE highly realistic professional portrait of the described person with maximum realism and natural facial detail. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${identityAnchorsSuffix} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} ${FACE_RELIGHT_RULES} ${GLASSES_CLARITY_RULES} ${simpleStyleInstruction} Keep the composition simple, coherent, and photographic. Use a clean professional background if needed. Keep a stable 3:4 waist-up portrait with both shoulders visible and hands out of frame.${attemptCorrection}${negativeSuffix}`
+        if (useBackgroundImage && !hasReferencePhoto) {
+          return `The attached image is a background reference plate for the target scene. Generate ONE highly realistic professional portrait of the described person with maximum realism and natural facial detail. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${identityAnchorsSuffix} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} ${FACE_RELIGHT_RULES} ${GLASSES_CLARITY_RULES} ${SIMPLE_BACKGROUND_RULES}${backgroundSceneSuffix} ${simpleStyleInstruction} Keep the composition simple, coherent, and photographic. Maintain a stable 3:4 waist-up portrait with both shoulders visible and hands out of frame. Keep the person realistic and let the background be a simplified but recognizable interpretation of the supplied scene.${attemptCorrection}${negativeSuffix}`
+        }
+        if (hasReferencePhoto) {
+          return `The attached image is the identity reference of the exact same person. Re-generate this person as ONE highly realistic professional portrait with maximum realism and strong likeness. Preserve the same face, age impression, skin tone, hair, and eyewear frame/style. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${identityAnchorsSuffix} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} ${FACE_RELIGHT_RULES} ${GLASSES_CLARITY_RULES} ${simpleStyleInstruction} ${simpleTextBackdropInstruction} Keep the composition simple, coherent, and photographic. Use a clean professional background only if no specific backdrop was supplied. Keep a stable 3:4 waist-up portrait with both shoulders visible and hands out of frame.${attemptCorrection} Output only the generated portrait image.${negativeSuffix}`
+        }
+        return `Generate ONE highly realistic professional portrait of the described person with maximum realism and natural facial detail. ${IDENTITY_USAGE_RULES} ${REPHOTOGRAPH_RULES} ${ANTI_TRANSPLANT_RULES}${identityAnchorsSuffix} ${framingInstruction} ${SHARPNESS_RULES} ${STUDIO_FINISH_RULES} ${FACE_RELIGHT_RULES} ${GLASSES_CLARITY_RULES} ${simpleStyleInstruction} ${simpleTextBackdropInstruction} Keep the composition simple, coherent, and photographic. Use a clean professional background only if no specific backdrop was supplied. Keep a stable 3:4 waist-up portrait with both shoulders visible and hands out of frame.${attemptCorrection}${negativeSuffix}`
       }
 
       if (useBackgroundImage && hasReferencePhoto) {

@@ -121,13 +121,13 @@ export function AppSidebar() {
           </div>
           <div className="group-data-[collapsible=icon]:hidden">
             <div className="px-1">
-              <div className="flex flex-col items-start gap-3">
+              <div className="flex flex-col items-center gap-3 text-center">
                 <Image
                   src="/logo-nczd-white.png"
                   alt="Логотип НМИЦ здоровья детей"
-                  width={72}
-                  height={72}
-                  className="h-[72px] w-auto object-contain"
+                  width={108}
+                  height={108}
+                  className="h-[108px] w-auto object-contain"
                 />
                 <div className="min-w-0 space-y-1.5">
                   <div className="space-y-0.5">
