@@ -25,6 +25,7 @@ import { GalleryFeedbackBadges } from "@/components/gallery-feedback-badges"
 import type { GalleryItem } from "@/lib/types"
 import type { Department } from "@/lib/types"
 import { fetchGallery, deleteGalleryItem } from "@/lib/gallery-api"
+import { buildPortraitArchiveBaseName, ensureUniqueArchiveBaseName } from "@/lib/file-utils"
 import { fetchDepartments } from "@/lib/structure-api"
 
 function GalleryPreviewImage({
@@ -50,10 +51,6 @@ function GalleryPreviewImage({
       }}
     />
   )
-}
-
-function sanitizeFileName(name: string): string {
-  return name.replace(/[/\\:*?"<>|]/g, "_").trim() || "portrait"
 }
 
 async function urlToBlob(url: string): Promise<Blob> {
@@ -114,22 +111,22 @@ export function GalleryClient() {
   async function downloadItem(item: GalleryItem) {
     try {
       const zip = new JSZip()
-      const folderName = sanitizeFileName(item.name)
+      const baseName = buildPortraitArchiveBaseName(item.name)
       if (item.medicalUrl) {
         const blob = await urlToBlob(item.medicalUrl)
         const ext = getExtension(blob.type || "image/png")
-        zip.file(`${folderName}/medical.${ext}`, blob)
+        zip.file(`medical/${baseName}.${ext}`, blob)
       }
       if (item.corporateUrl) {
         const blob = await urlToBlob(item.corporateUrl)
         const ext = getExtension(blob.type || "image/png")
-        zip.file(`${folderName}/corporate.${ext}`, blob)
+        zip.file(`corporate/${baseName}.${ext}`, blob)
       }
       const content = await zip.generateAsync({ type: "blob" })
       const url = URL.createObjectURL(content)
       const a = document.createElement("a")
       a.href = url
-      a.download = `${folderName}.zip`
+      a.download = `${baseName}.zip`
       a.click()
       URL.revokeObjectURL(url)
       toast.success("Архив скачан")
@@ -142,17 +139,21 @@ export function GalleryClient() {
     if (items.length === 0) return
     try {
       const zip = new JSZip()
+      const usedFileNames = new Set<string>()
       for (const item of items) {
-        const folderName = sanitizeFileName(item.name)
+        const baseName = ensureUniqueArchiveBaseName(
+          buildPortraitArchiveBaseName(item.name),
+          usedFileNames
+        )
         if (item.medicalUrl) {
           const blob = await urlToBlob(item.medicalUrl)
           const ext = getExtension(blob.type || "image/png")
-          zip.file(`${folderName}/medical.${ext}`, blob)
+          zip.file(`medical/${baseName}.${ext}`, blob)
         }
         if (item.corporateUrl) {
           const blob = await urlToBlob(item.corporateUrl)
           const ext = getExtension(blob.type || "image/png")
-          zip.file(`${folderName}/corporate.${ext}`, blob)
+          zip.file(`corporate/${baseName}.${ext}`, blob)
         }
       }
       const content = await zip.generateAsync({ type: "blob" })

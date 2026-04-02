@@ -45,6 +45,7 @@ import {
   generatePortraitSet,
   referencePhotoFromUrl,
 } from "@/lib/portrait-generation-client"
+import { buildPortraitArchiveBaseName, ensureUniqueArchiveBaseName } from "@/lib/file-utils"
 import { cn } from "@/lib/utils"
 
 const UPLOAD_BATCH_LIMIT = 50
@@ -54,10 +55,6 @@ type GenStatus = "pending" | "analyzing" | "generating" | "complete" | "error"
 
 interface BatchClientProps {
   hasApiKey: boolean
-}
-
-function sanitizeFileName(name: string): string {
-  return name.replace(/[/\\:*?"<>|]/g, "_").trim() || "portrait"
 }
 
 async function urlToBlob(url: string): Promise<Blob> {
@@ -506,26 +503,23 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
     }
     try {
       const zip = new JSZip()
-      const usedFolders = new Set<string>()
+      const usedFileNames = new Set<string>()
       for (const emp of toDownload) {
         const gen = generationState[emp.id]
         if (!gen) continue
-        let folderName = sanitizeFileName(emp.name)
-        if (usedFolders.has(folderName)) {
-          let suffix = 2
-          while (usedFolders.has(`${folderName}_${suffix}`)) suffix++
-          folderName = `${folderName}_${suffix}`
-        }
-        usedFolders.add(folderName)
+        const baseName = ensureUniqueArchiveBaseName(
+          buildPortraitArchiveBaseName(emp.name),
+          usedFileNames
+        )
         if (gen.medicalUrl) {
           const blob = await urlToBlob(gen.medicalUrl)
           const ext = getExtension(blob.type || "image/png")
-          zip.file(`${folderName}/medical.${ext}`, blob)
+          zip.file(`medical/${baseName}.${ext}`, blob)
         }
         if (gen.corporateUrl) {
           const blob = await urlToBlob(gen.corporateUrl)
           const ext = getExtension(blob.type || "image/png")
-          zip.file(`${folderName}/corporate.${ext}`, blob)
+          zip.file(`corporate/${baseName}.${ext}`, blob)
         }
       }
       const content = await zip.generateAsync({ type: "blob" })
