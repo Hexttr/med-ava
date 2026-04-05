@@ -21,6 +21,7 @@ import { GenerateModeSwitch } from "@/components/generate-mode-switch"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -817,6 +818,9 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Новый отдел</DialogTitle>
+            <DialogDescription>
+              Создайте новый отдел для сотрудников пакетной обработки.
+            </DialogDescription>
           </DialogHeader>
           <Input
             placeholder="Название отдела"
@@ -837,6 +841,9 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Редактировать отдел</DialogTitle>
+            <DialogDescription>
+              Обновите название выбранного отдела.
+            </DialogDescription>
           </DialogHeader>
           <Input
             placeholder="Название отдела"
@@ -857,6 +864,9 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Добавить сотрудников</DialogTitle>
+            <DialogDescription>
+              Загрузите фотографии новых сотрудников для пакетной генерации портретов.
+            </DialogDescription>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             Перетащите сюда несколько фотографий или нажмите для выбора. Каждое фото — отдельный сотрудник. Рекомендуется не более 50 за раз. Фото сохраняются без сжатия для лучшей похожести при генерации.

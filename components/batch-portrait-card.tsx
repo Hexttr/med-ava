@@ -59,7 +59,7 @@ interface BatchPortraitCardProps {
 
 function resolvePreviewUrl(preview: string): string {
   if (preview.startsWith("http") || preview.startsWith("data:")) return preview
-  return `${typeof window !== "undefined" ? window.location.origin : ""}${preview}`
+  return preview
 }
 
 function GeneratedPreviewImage({
