@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import fs from "fs/promises"
 import { getGeminiKey } from "@/lib/settings"
 import { getAppSettings } from "@/lib/app-settings"
-import { applyOverlayLogo, enhanceGeneratedPortrait, getAbsolutePath } from "@/lib/storage"
+import {
+  applyOverlayLogo,
+  enhanceGeneratedPortrait,
+  getAbsolutePath,
+  normalizeGeneratedPortraitToJpeg,
+} from "@/lib/storage"
 import { fetchWithProxy } from "@/lib/fetch-proxy"
 import { logger } from "@/lib/logger"
 import { checkRateLimit } from "@/lib/rate-limit"
@@ -387,6 +392,15 @@ export async function POST(request: NextRequest) {
                   imageUrl = await applyOverlayLogo(imageUrl, appSettings, style === "medical" || style === "corporate" ? style : undefined)
                 } catch (error) {
                   logger.warn("GENERATE", "Не удалось наложить логотип поверх изображения", {
+                    model,
+                    attempt,
+                    error: error instanceof Error ? error.message : String(error),
+                  })
+                }
+                try {
+                  imageUrl = await normalizeGeneratedPortraitToJpeg(imageUrl)
+                } catch (error) {
+                  logger.warn("GENERATE", "Не удалось привести изображение к JPEG", {
                     model,
                     attempt,
                     error: error instanceof Error ? error.message : String(error),

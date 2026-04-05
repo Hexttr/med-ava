@@ -226,6 +226,33 @@ export async function enhanceGeneratedPortrait(dataUrl: string): Promise<string>
   return `data:image/jpeg;base64,${(await output.jpeg({ quality: 96 }).toBuffer()).toString("base64")}`
 }
 
+export async function normalizeGeneratedPortraitToJpeg(dataUrl: string): Promise<string> {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
+  if (!match) return dataUrl
+
+  const inputBuffer = Buffer.from(match[2], "base64")
+  const image = sharp(inputBuffer, { failOn: "none" })
+  const metadata = await image.metadata()
+
+  if (!metadata.width || !metadata.height) {
+    return dataUrl
+  }
+
+  const needsFlatten = Boolean(metadata.hasAlpha) || metadata.channels === 4
+  const pipeline = needsFlatten ? image.flatten({ background: "#ffffff" }) : image
+
+  return `data:image/jpeg;base64,${(
+    await pipeline
+      .jpeg({
+        quality: 96,
+        mozjpeg: true,
+        progressive: true,
+        chromaSubsampling: "4:4:4",
+      })
+      .toBuffer()
+  ).toString("base64")}`
+}
+
 export async function applyOverlayLogo(
   dataUrl: string,
   settings: Pick<
