@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { getImageDownloadExtension } from "@/lib/file-utils"
 import { cn } from "@/lib/utils"
 import type { GalleryFeedbackSummary } from "@/lib/types"
 
@@ -197,7 +198,7 @@ export function BatchPortraitCard({
                       onClick={() => {
                         const a = document.createElement("a")
                         a.href = item.medicalUrl!
-                        a.download = `${item.name || "photo"}-medical.png`
+                        a.download = `${item.name || "photo"}-medical.${getImageDownloadExtension(item.medicalUrl)}`
                         a.click()
                       }}
                       aria-label="Скачать"
@@ -281,7 +282,7 @@ export function BatchPortraitCard({
                       onClick={() => {
                         const a = document.createElement("a")
                         a.href = item.corporateUrl!
-                        a.download = `${item.name || "photo"}-corporate.png`
+                        a.download = `${item.name || "photo"}-corporate.${getImageDownloadExtension(item.corporateUrl)}`
                         a.click()
                       }}
                       aria-label="Скачать"

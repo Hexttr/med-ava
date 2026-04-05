@@ -5,6 +5,7 @@
 import { Download, Loader2, ImageIcon, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { getImageDownloadExtension } from "@/lib/file-utils"
 import type { PortraitStyle, ProcessingStatus } from "@/lib/types"
 
 interface PortraitCardProps {
@@ -31,7 +32,7 @@ export function PortraitCard({
     if (!imageUrl) return
     const a = document.createElement("a")
     a.href = imageUrl
-    a.download = `portrait-${style}-${Date.now()}.png`
+    a.download = `portrait-${style}-${Date.now()}.${getImageDownloadExtension(imageUrl)}`
     a.click()
   }
 

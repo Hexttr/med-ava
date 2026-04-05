@@ -96,3 +96,23 @@ export function ensureUniqueArchiveBaseName(baseName: string, usedNames: Set<str
   usedNames.add(candidate)
   return candidate
 }
+
+export function getImageDownloadExtension(url: string | null | undefined): string {
+  if (!url) return "jpg"
+
+  const dataUrlMatch = url.match(/^data:image\/([a-zA-Z0-9.+-]+);base64,/)
+  if (dataUrlMatch) {
+    const format = dataUrlMatch[1].toLowerCase()
+    if (format === "jpeg" || format === "jpg") return "jpg"
+    if (format === "png") return "png"
+    if (format === "webp") return "webp"
+    return "jpg"
+  }
+
+  const normalizedUrl = url.split("?")[0]?.toLowerCase() ?? ""
+  if (normalizedUrl.endsWith(".png")) return "png"
+  if (normalizedUrl.endsWith(".webp")) return "webp"
+  if (normalizedUrl.endsWith(".jpeg") || normalizedUrl.endsWith(".jpg")) return "jpg"
+
+  return "jpg"
+}
