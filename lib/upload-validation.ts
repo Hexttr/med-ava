@@ -2,7 +2,7 @@
  * Валидация загружаемых изображений.
  */
 
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
+const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024 // 20 MB
 const MAX_BASE64_IMAGE_SIZE_BYTES = 15 * 1024 * 1024 // 15 MB (base64 ~33% больше)
 const ALLOWED_MIMES = ["image/jpeg", "image/png", "image/webp"] as const
 

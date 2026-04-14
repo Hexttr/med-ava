@@ -51,6 +51,9 @@ import { cn } from "@/lib/utils"
 
 const UPLOAD_BATCH_LIMIT = 50
 const CARDS_PER_PAGE = 30
+const CLIENT_MAX_FILE_SIZE_MB = 20
+const CLIENT_MAX_TOTAL_UPLOAD_SIZE_MB = 100
+const CLIENT_MAX_TOTAL_UPLOAD_SIZE_BYTES = CLIENT_MAX_TOTAL_UPLOAD_SIZE_MB * 1024 * 1024
 
 type GenStatus = "pending" | "analyzing" | "generating" | "complete" | "error"
 
@@ -223,10 +226,28 @@ export function BatchClient({ hasApiKey }: BatchClientProps) {
     async (files: FileList | File[], departmentId: string | null) => {
       const list = Array.from("length" in files ? files : files).filter((f) => f.type.startsWith("image/"))
       if (list.length === 0) return
+      const oversizedFiles = list.filter((file) => file.size > CLIENT_MAX_FILE_SIZE_MB * 1024 * 1024)
+      if (oversizedFiles.length > 0) {
+        toast.error(
+          `Некоторые файлы превышают ${CLIENT_MAX_FILE_SIZE_MB} MB: ${oversizedFiles
+            .slice(0, 2)
+            .map((file) => file.name)
+            .join(", ")}${oversizedFiles.length > 2 ? "..." : ""}`
+        )
+        return
+      }
       if (list.length > UPLOAD_BATCH_LIMIT) {
         toast.warning(`Загружено ${UPLOAD_BATCH_LIMIT} из ${list.length}. Остальные можно добавить повторной загрузкой.`)
       }
       const toUpload = list.slice(0, UPLOAD_BATCH_LIMIT)
+      const totalSize = toUpload.reduce((sum, file) => sum + file.size, 0)
+      if (totalSize > CLIENT_MAX_TOTAL_UPLOAD_SIZE_BYTES) {
+        toast.error(
+          `Пачка слишком большая: ${Math.ceil(totalSize / 1024 / 1024)} MB. ` +
+          `Максимум ${CLIENT_MAX_TOTAL_UPLOAD_SIZE_MB} MB за одну загрузку.`
+        )
+        return
+      }
       setUploading(true)
       setUploadProgress(`Загрузка ${toUpload.length} фото...`)
       try {

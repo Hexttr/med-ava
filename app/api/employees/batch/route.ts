@@ -6,7 +6,7 @@ import { logger } from "@/lib/logger"
 import { enforceTrustedOrigin } from "@/lib/request-security"
 
 const MAX_FILES = 100
-const MAX_TOTAL_SIZE = 50 * 1024 * 1024 // 50 MB суммарно
+const MAX_TOTAL_SIZE = 100 * 1024 * 1024 // 100 MB суммарно
 
 function toResponse(row: {
   id: string
@@ -56,7 +56,11 @@ export async function POST(request: NextRequest) {
     const totalSize = validFiles.reduce((s, f) => s + f.size, 0)
     if (totalSize > MAX_TOTAL_SIZE) {
       return NextResponse.json(
-        { error: `Суммарный размер файлов превышает ${MAX_TOTAL_SIZE / 1024 / 1024} MB` },
+        {
+          error:
+            `Суммарный размер файлов превышает ${MAX_TOTAL_SIZE / 1024 / 1024} MB. ` +
+            `Уменьшите количество фото в пачке или загрузите их в несколько подходов.`,
+        },
         { status: 400 }
       )
     }
