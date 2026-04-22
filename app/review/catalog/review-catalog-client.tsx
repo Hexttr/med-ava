@@ -38,6 +38,7 @@ import type {
 type DisplayMode = "before-after" | "medical-only" | "corporate-only"
 type ViewMode = "review" | "gallery"
 type GalleryStyle = "original" | "medical" | "corporate"
+type VoteFilter = "all" | "like" | "unrated" | "dislike"
 
 const COMMENT_MAX_LENGTH = 240
 const REVIEW_STYLES: ReviewImageStyle[] = ["original", "medical", "corporate"]
@@ -261,6 +262,7 @@ export function ReviewCatalogClient() {
   const [loading, setLoading] = useState(true)
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>("all")
   const [displayMode, setDisplayMode] = useState<DisplayMode>("before-after")
+  const [voteFilter, setVoteFilter] = useState<VoteFilter>("all")
   const [viewMode, setViewMode] = useState<ViewMode>("review")
   const [galleryDepartmentId, setGalleryDepartmentId] = useState<string>("")
   const [galleryStyle, setGalleryStyle] = useState<GalleryStyle>("original")
@@ -297,11 +299,33 @@ export function ReviewCatalogClient() {
   }, [])
 
   const normalizedQuery = query.trim().toLocaleLowerCase("ru")
+  const stylesForDisplayMode = useMemo<ReviewImageStyle[]>(
+    () =>
+      displayMode === "before-after"
+        ? REVIEW_STYLES
+        : displayMode === "medical-only"
+          ? ["medical"]
+          : ["corporate"],
+    [displayMode]
+  )
+
   const filteredDepartments = useMemo(() => {
+    function matchesVoteFilter(employee: PublicReviewCatalogEmployee) {
+      if (voteFilter === "all") return true
+
+      const votes = stylesForDisplayMode.map((style) => employee.viewerVotes[style])
+      if (voteFilter === "unrated") {
+        return votes.some((vote) => vote === null)
+      }
+
+      return votes.some((vote) => vote === voteFilter)
+    }
+
     const nextDepartments = departments
       .map((department) => {
         const employees = department.employees.filter((employee) =>
-          normalizedQuery ? employee.name.toLocaleLowerCase("ru").includes(normalizedQuery) : true
+          (normalizedQuery ? employee.name.toLocaleLowerCase("ru").includes(normalizedQuery) : true) &&
+          matchesVoteFilter(employee)
         )
         return {
           ...department,
@@ -313,22 +337,15 @@ export function ReviewCatalogClient() {
 
     if (selectedDepartmentId === "all") return nextDepartments
     return nextDepartments.filter((department) => (department.departmentId ?? "__no_department__") === selectedDepartmentId)
-  }, [departments, normalizedQuery, selectedDepartmentId])
+  }, [departments, normalizedQuery, selectedDepartmentId, stylesForDisplayMode, voteFilter])
 
   const totalVisibleEmployees = filteredDepartments.reduce((sum, department) => sum + department.employeeCount, 0)
   const visibleProgress = useMemo(() => {
-    const stylesForMode =
-      displayMode === "before-after"
-        ? REVIEW_STYLES
-        : displayMode === "medical-only"
-          ? (["medical"] as ReviewImageStyle[])
-          : (["corporate"] as ReviewImageStyle[])
-
     let likes = 0
     let dislikes = 0
     for (const department of filteredDepartments) {
       for (const employee of department.employees) {
-        for (const style of stylesForMode) {
+        for (const style of stylesForDisplayMode) {
           likes += employee.feedback[style].likes
           dislikes += employee.feedback[style].dislikes
         }
@@ -338,7 +355,7 @@ export function ReviewCatalogClient() {
     const total = likes + dislikes
     const likePct = total > 0 ? Math.round((likes / total) * 100) : 0
     return { likes, dislikes, total, likePct }
-  }, [displayMode, filteredDepartments])
+  }, [filteredDepartments, stylesForDisplayMode])
 
   const galleryDepartment = useMemo(
     () =>
@@ -842,19 +859,38 @@ export function ReviewCatalogClient() {
                   </div>
 
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                    <Tabs value={displayMode} onValueChange={(value) => setDisplayMode(value as DisplayMode)} className="min-w-0">
-                      <TabsList className="h-auto w-full max-w-full flex-wrap gap-2 bg-transparent p-0 md:w-fit">
-                        <TabsTrigger value="before-after" className="rounded-xl border border-[#b8d8f2] bg-[#dff0fb] px-4 py-2 text-black data-[state=active]:border-[#1a64a6] data-[state=active]:bg-[#1a64a6] data-[state=active]:text-white">
-                          Было / стало
-                        </TabsTrigger>
-                        <TabsTrigger value="medical-only" className="rounded-xl border border-[#b8d8f2] bg-[#dff0fb] px-4 py-2 text-black data-[state=active]:border-[#1a64a6] data-[state=active]:bg-[#1a64a6] data-[state=active]:text-white">
-                          Только медицинские
-                        </TabsTrigger>
-                        <TabsTrigger value="corporate-only" className="rounded-xl border border-[#b8d8f2] bg-[#dff0fb] px-4 py-2 text-black data-[state=active]:border-[#1a64a6] data-[state=active]:bg-[#1a64a6] data-[state=active]:text-white">
-                          Только бизнес
-                        </TabsTrigger>
-                      </TabsList>
-                    </Tabs>
+                    <div className="space-y-3">
+                      <Tabs value={displayMode} onValueChange={(value) => setDisplayMode(value as DisplayMode)} className="min-w-0">
+                        <TabsList className="h-auto w-full max-w-full flex-wrap gap-2 bg-transparent p-0 md:w-fit">
+                          <TabsTrigger value="before-after" className="rounded-xl border border-[#b8d8f2] bg-[#dff0fb] px-4 py-2 text-black data-[state=active]:border-[#1a64a6] data-[state=active]:bg-[#1a64a6] data-[state=active]:text-white">
+                            Было / стало
+                          </TabsTrigger>
+                          <TabsTrigger value="medical-only" className="rounded-xl border border-[#b8d8f2] bg-[#dff0fb] px-4 py-2 text-black data-[state=active]:border-[#1a64a6] data-[state=active]:bg-[#1a64a6] data-[state=active]:text-white">
+                            Только медицинские
+                          </TabsTrigger>
+                          <TabsTrigger value="corporate-only" className="rounded-xl border border-[#b8d8f2] bg-[#dff0fb] px-4 py-2 text-black data-[state=active]:border-[#1a64a6] data-[state=active]:bg-[#1a64a6] data-[state=active]:text-white">
+                            Только бизнес
+                          </TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+
+                      <Tabs value={voteFilter} onValueChange={(value) => setVoteFilter(value as VoteFilter)} className="min-w-0">
+                        <TabsList className="h-auto w-full max-w-full flex-wrap gap-2 bg-transparent p-0 md:w-fit">
+                          <TabsTrigger value="all" className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-slate-700 data-[state=active]:border-[#1a64a6] data-[state=active]:bg-[#1a64a6] data-[state=active]:text-white">
+                            Все
+                          </TabsTrigger>
+                          <TabsTrigger value="like" className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-slate-700 data-[state=active]:border-emerald-600 data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
+                            Нравится
+                          </TabsTrigger>
+                          <TabsTrigger value="unrated" className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-slate-700 data-[state=active]:border-amber-500 data-[state=active]:bg-amber-500 data-[state=active]:text-white">
+                            Без оценки
+                          </TabsTrigger>
+                          <TabsTrigger value="dislike" className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-slate-700 data-[state=active]:border-rose-600 data-[state=active]:bg-rose-600 data-[state=active]:text-white">
+                            Не нравится
+                          </TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+                    </div>
 
                     <div className="relative w-full min-w-0 xl:max-w-sm">
                       <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -878,6 +914,15 @@ export function ReviewCatalogClient() {
                         Исходники тоже участвуют в оценке
                       </span>
                     ) : null}
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1">
+                      {voteFilter === "all"
+                        ? "Показаны все оценки"
+                        : voteFilter === "like"
+                          ? "Фильтр: нравится"
+                          : voteFilter === "dislike"
+                            ? "Фильтр: не нравится"
+                            : "Фильтр: без оценки"}
+                    </span>
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1">
                       <MessageSquareText className="size-4" />
                       Один общий миниотзыв на изображение
