@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   ArrowUpRight,
   Building2,
@@ -17,7 +17,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { GalleryFeedbackBadges } from "@/components/gallery-feedback-badges"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
@@ -128,7 +127,6 @@ function ReviewPanel({
   style,
   imageUrl,
   currentVote,
-  feedback,
   comment,
   commentDraft,
   voting,
@@ -143,7 +141,6 @@ function ReviewPanel({
   style: ReviewImageStyle
   imageUrl: string | null
   currentVote: FeedbackVoteValue | null
-  feedback?: { likes: number; dislikes: number }
   comment: GalleryImageComment | null
   commentDraft: string
   voting: boolean
@@ -158,14 +155,13 @@ function ReviewPanel({
 
   return (
     <div className="overflow-hidden rounded-[1.25rem] border border-slate-200/90 bg-white/95 shadow-sm">
-      <div className="flex items-start justify-between gap-3 border-b border-slate-200/80 px-4 py-3">
+      <div className="border-b border-slate-200/80 px-4 py-3">
         <div>
           <p className="text-sm font-semibold text-foreground">{title}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {helperText}
           </p>
         </div>
-        <GalleryFeedbackBadges summary={feedback} className="shrink-0" />
       </div>
 
       <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted/20">
@@ -272,31 +268,54 @@ export function ReviewCatalogClient() {
   const [savingCommentTarget, setSavingCommentTarget] = useState<string | null>(null)
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({})
 
-  useEffect(() => {
-    let cancelled = false
-
-    async function loadCatalog() {
+  const loadCatalog = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false
+    if (!silent) {
       setLoading(true)
-      try {
-        const payload = await fetchPublicReviewCatalog()
-        if (cancelled) return
-        setDepartments(payload.departments)
-      } catch (error) {
-        if (cancelled) return
+    }
+
+    try {
+      const payload = await fetchPublicReviewCatalog()
+      setDepartments(payload.departments)
+    } catch (error) {
+      if (!silent) {
         toast.error(error instanceof Error ? error.message : "Не удалось загрузить каталог")
         setDepartments([])
-      } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
+      }
+    } finally {
+      if (!silent) {
+        setLoading(false)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadCatalog()
+  }, [loadCatalog])
+
+  useEffect(() => {
+    if (viewMode !== "review") return
+
+    function refreshIfVisible() {
+      if (document.visibilityState === "visible") {
+        void loadCatalog({ silent: true })
       }
     }
 
-    loadCatalog()
+    window.addEventListener("focus", refreshIfVisible)
+    document.addEventListener("visibilitychange", refreshIfVisible)
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadCatalog({ silent: true })
+      }
+    }, 30000)
+
     return () => {
-      cancelled = true
+      window.removeEventListener("focus", refreshIfVisible)
+      document.removeEventListener("visibilitychange", refreshIfVisible)
+      window.clearInterval(intervalId)
     }
-  }, [])
+  }, [loadCatalog, viewMode])
 
   const normalizedQuery = query.trim().toLocaleLowerCase("ru")
   const stylesForDisplayMode = useMemo<ReviewImageStyle[]>(
@@ -313,7 +332,7 @@ export function ReviewCatalogClient() {
     function matchesVoteFilter(employee: PublicReviewCatalogEmployee) {
       if (voteFilter === "all") return true
 
-      const votes = stylesForDisplayMode.map((style) => employee.viewerVotes[style])
+      const votes = stylesForDisplayMode.map((style) => employee.sharedVotes[style])
       if (voteFilter === "unrated") {
         return votes.some((vote) => vote === null)
       }
@@ -346,8 +365,12 @@ export function ReviewCatalogClient() {
     for (const department of filteredDepartments) {
       for (const employee of department.employees) {
         for (const style of stylesForDisplayMode) {
-          likes += employee.feedback[style].likes
-          dislikes += employee.feedback[style].dislikes
+          const vote = employee.sharedVotes[style]
+          if (vote === "like") {
+            likes += 1
+          } else if (vote === "dislike") {
+            dislikes += 1
+          }
         }
       }
     }
@@ -393,8 +416,7 @@ export function ReviewCatalogClient() {
       setDepartments((prev) =>
         updateEmployeeInDepartments(prev, employee.employeeId, (item) => ({
           ...item,
-          feedback: payload.feedback,
-          viewerVotes: payload.viewerVotes,
+          sharedVotes: payload.sharedVotes,
         }))
       )
       toast.success("Оценка сохранена")
@@ -474,8 +496,7 @@ export function ReviewCatalogClient() {
                 title="Исходное фото"
                 style="original"
                 imageUrl={employee.originalUrl}
-                currentVote={employee.viewerVotes.original}
-                feedback={employee.feedback.original}
+                currentVote={employee.sharedVotes.original}
                 comment={employee.comments.original}
                 commentDraft={getCommentDraft(employee, "original")}
                 voting={votingTarget === `${employee.employeeId}:original`}
@@ -498,8 +519,7 @@ export function ReviewCatalogClient() {
                 title="Медицинский портрет"
                 style="medical"
                 imageUrl={employee.medicalUrl}
-                currentVote={employee.viewerVotes.medical}
-                feedback={employee.feedback.medical}
+                currentVote={employee.sharedVotes.medical}
                 comment={employee.comments.medical}
                 commentDraft={getCommentDraft(employee, "medical")}
                 voting={votingTarget === `${employee.employeeId}:medical`}
@@ -522,8 +542,7 @@ export function ReviewCatalogClient() {
                 title="Корпоративный портрет"
                 style="corporate"
                 imageUrl={employee.corporateUrl}
-                currentVote={employee.viewerVotes.corporate}
-                feedback={employee.feedback.corporate}
+                currentVote={employee.sharedVotes.corporate}
                 comment={employee.comments.corporate}
                 commentDraft={getCommentDraft(employee, "corporate")}
                 voting={votingTarget === `${employee.employeeId}:corporate`}

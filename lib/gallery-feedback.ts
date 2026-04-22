@@ -5,7 +5,7 @@ import type {
   FeedbackVoteValue,
   GalleryFeedbackSummary,
   GalleryImageComments,
-  GalleryViewerVotes,
+  GallerySharedVotes,
   PortraitStyle,
   ReviewImageStyle,
 } from "@/lib/types"
@@ -16,7 +16,7 @@ function emptyStyleSummary() {
   return { likes: 0, dislikes: 0 }
 }
 
-export function emptyViewerVotes(): GalleryViewerVotes {
+export function emptySharedVotes(): GallerySharedVotes {
   return {
     original: null,
     medical: null,
@@ -76,15 +76,13 @@ export function getGalleryFeedbackMap(
 
   const placeholders = galleryItemIds.map(() => "?").join(", ")
   const rows = database.prepare(
-    `SELECT gallery_item_id, style, vote, COUNT(*) AS total
+    `SELECT gallery_item_id, style, vote
      FROM gallery_feedback_votes
-     WHERE gallery_item_id IN (${placeholders})
-     GROUP BY gallery_item_id, style, vote`
+     WHERE gallery_item_id IN (${placeholders})`
   ).all(...galleryItemIds) as Array<{
     gallery_item_id: string
     style: ReviewImageStyle
     vote: FeedbackVoteValue
-    total: number
   }>
 
   const feedbackByItem: Record<string, GalleryFeedbackSummary> = {}
@@ -96,9 +94,11 @@ export function getGalleryFeedbackMap(
     const target = feedbackByItem[row.gallery_item_id] ?? emptyGalleryFeedbackSummary()
     const styleSummary = target[row.style]
     if (row.vote === "like") {
-      styleSummary.likes = row.total
+      styleSummary.likes = 1
+      styleSummary.dislikes = 0
     } else {
-      styleSummary.dislikes = row.total
+      styleSummary.likes = 0
+      styleSummary.dislikes = 1
     }
     feedbackByItem[row.gallery_item_id] = target
   }
@@ -106,53 +106,51 @@ export function getGalleryFeedbackMap(
   return feedbackByItem
 }
 
-export function getViewerVotesForGalleryItem(
+export function getGallerySharedVotesForGalleryItem(
   database: Database.Database,
-  galleryItemId: string,
-  fingerprintHash: string
-): GalleryViewerVotes {
+  galleryItemId: string
+): GallerySharedVotes {
   const rows = database.prepare(
     `SELECT style, vote
      FROM gallery_feedback_votes
-     WHERE gallery_item_id = ? AND fingerprint_hash = ?`
-  ).all(galleryItemId, fingerprintHash) as Array<{
+     WHERE gallery_item_id = ?`
+  ).all(galleryItemId) as Array<{
     style: ReviewImageStyle
     vote: FeedbackVoteValue
   }>
 
-  const viewerVotes = emptyViewerVotes()
+  const sharedVotes = emptySharedVotes()
   for (const row of rows) {
-    viewerVotes[row.style] = row.vote
+    sharedVotes[row.style] = row.vote
   }
 
-  return viewerVotes
+  return sharedVotes
 }
 
-export function getViewerVotesMapForGalleryItems(
+export function getGallerySharedVotesMap(
   database: Database.Database,
-  galleryItemIds: string[],
-  fingerprintHash: string
-): Record<string, GalleryViewerVotes> {
+  galleryItemIds: string[]
+): Record<string, GallerySharedVotes> {
   if (galleryItemIds.length === 0) return {}
 
   const placeholders = galleryItemIds.map(() => "?").join(", ")
   const rows = database.prepare(
     `SELECT gallery_item_id, style, vote
      FROM gallery_feedback_votes
-     WHERE fingerprint_hash = ? AND gallery_item_id IN (${placeholders})`
-  ).all(fingerprintHash, ...galleryItemIds) as Array<{
+     WHERE gallery_item_id IN (${placeholders})`
+  ).all(...galleryItemIds) as Array<{
     gallery_item_id: string
     style: ReviewImageStyle
     vote: FeedbackVoteValue
   }>
 
-  const votesByItem: Record<string, GalleryViewerVotes> = {}
+  const votesByItem: Record<string, GallerySharedVotes> = {}
   for (const itemId of galleryItemIds) {
-    votesByItem[itemId] = emptyViewerVotes()
+    votesByItem[itemId] = emptySharedVotes()
   }
 
   for (const row of rows) {
-    const target = votesByItem[row.gallery_item_id] ?? emptyViewerVotes()
+    const target = votesByItem[row.gallery_item_id] ?? emptySharedVotes()
     target[row.style] = row.vote
     votesByItem[row.gallery_item_id] = target
   }

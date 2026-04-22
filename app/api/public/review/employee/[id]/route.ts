@@ -2,28 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { getDb } from "@/lib/db"
 import {
-  emptyViewerVotes,
-  emptyGalleryFeedbackSummary,
-  getGalleryFeedbackMap,
-  getOrCreateReviewViewerId,
-  getViewerVotesForGalleryItem,
-  hashFeedbackValue,
-  REVIEW_VIEWER_COOKIE,
+  emptySharedVotes,
+  getGallerySharedVotesForGalleryItem,
 } from "@/lib/gallery-feedback"
 import { logger } from "@/lib/logger"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { getClientIp, withNoStore } from "@/lib/request-security"
 import { type PublicReviewEmployee } from "@/lib/types"
-
-function applyViewerCookie(response: NextResponse, viewerId: string) {
-  response.cookies.set(REVIEW_VIEWER_COOKIE, viewerId, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.EAM_HTTPS === "true",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-  })
-}
 
 export async function GET(
   request: NextRequest,
@@ -76,14 +61,11 @@ export async function GET(
       corporate_path: string | null
     } | undefined
 
-    const { viewerId, isNew } = getOrCreateReviewViewerId(request.cookies.get(REVIEW_VIEWER_COOKIE)?.value)
-    const viewerFingerprint = hashFeedbackValue(viewerId)
-    const feedback = latestGalleryItem ? getGalleryFeedbackMap(database, [latestGalleryItem.id])[latestGalleryItem.id] : emptyGalleryFeedbackSummary()
-    const viewerVotes = latestGalleryItem
-      ? getViewerVotesForGalleryItem(database, latestGalleryItem.id, viewerFingerprint)
-      : emptyViewerVotes()
+    const sharedVotes = latestGalleryItem
+      ? getGallerySharedVotesForGalleryItem(database, latestGalleryItem.id)
+      : emptySharedVotes()
 
-    const payload: PublicReviewEmployee & { feedback: typeof feedback } = {
+    const payload: PublicReviewEmployee = {
       employeeId: employee.id,
       name: employee.name,
       departmentName: employee.department_name ?? undefined,
@@ -92,15 +74,10 @@ export async function GET(
       medicalUrl: latestGalleryItem?.medical_path ? `/api/public/review/image/gallery/${latestGalleryItem.id}?style=medical` : null,
       corporateUrl: latestGalleryItem?.corporate_path ? `/api/public/review/image/gallery/${latestGalleryItem.id}?style=corporate` : null,
       hasGeneratedSet: Boolean(latestGalleryItem?.medical_path || latestGalleryItem?.corporate_path),
-      viewerVotes,
-      feedback,
+      sharedVotes,
     }
 
-    const response = withNoStore(NextResponse.json(payload))
-    if (isNew) {
-      applyViewerCookie(response, viewerId)
-    }
-    return response
+    return withNoStore(NextResponse.json(payload))
   } catch (error) {
     logger.error("PUBLIC_REVIEW", "Employee error", { error: error instanceof Error ? error.message : String(error) })
     return withNoStore(

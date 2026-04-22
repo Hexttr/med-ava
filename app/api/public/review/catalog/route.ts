@@ -3,27 +3,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/lib/db"
 import {
   emptyGalleryImageComments,
-  getGalleryFeedbackMap,
+  getGallerySharedVotesMap,
   getGalleryImageCommentsMap,
-  getOrCreateReviewViewerId,
-  getViewerVotesMapForGalleryItems,
-  hashFeedbackValue,
-  REVIEW_VIEWER_COOKIE,
 } from "@/lib/gallery-feedback"
 import { logger } from "@/lib/logger"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { getClientIp, withNoStore } from "@/lib/request-security"
 import type { PublicReviewCatalogDepartment, PublicReviewCatalogEmployee, PublicReviewCatalogResponse } from "@/lib/types"
-
-function applyViewerCookie(response: NextResponse, viewerId: string) {
-  response.cookies.set(REVIEW_VIEWER_COOKIE, viewerId, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.EAM_HTTPS === "true",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-  })
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -78,11 +64,8 @@ export async function GET(request: NextRequest) {
     }>
 
     const galleryItemIds = rows.map((row) => row.gallery_item_id)
-    const { viewerId, isNew } = getOrCreateReviewViewerId(request.cookies.get(REVIEW_VIEWER_COOKIE)?.value)
-    const viewerFingerprint = hashFeedbackValue(viewerId)
-    const feedbackByItem = getGalleryFeedbackMap(database, galleryItemIds)
     const commentsByItem = getGalleryImageCommentsMap(database, galleryItemIds)
-    const viewerVotesByItem = getViewerVotesMapForGalleryItems(database, galleryItemIds, viewerFingerprint)
+    const sharedVotesByItem = getGallerySharedVotesMap(database, galleryItemIds)
 
     const departments = new Map<string, PublicReviewCatalogDepartment>()
 
@@ -99,8 +82,7 @@ export async function GET(request: NextRequest) {
         medicalUrl: row.medical_path ? `/api/public/review/image/gallery/${row.gallery_item_id}?style=medical` : null,
         corporateUrl: row.corporate_path ? `/api/public/review/image/gallery/${row.gallery_item_id}?style=corporate` : null,
         hasGeneratedSet: Boolean(row.medical_path || row.corporate_path),
-        feedback: feedbackByItem[row.gallery_item_id],
-        viewerVotes: viewerVotesByItem[row.gallery_item_id],
+        sharedVotes: sharedVotesByItem[row.gallery_item_id],
         comments: commentsByItem[row.gallery_item_id] ?? emptyGalleryImageComments(),
       }
 
@@ -120,12 +102,7 @@ export async function GET(request: NextRequest) {
       totalEmployees: rows.length,
     }
 
-    const response = withNoStore(NextResponse.json(payload))
-    if (isNew) {
-      applyViewerCookie(response, viewerId)
-    }
-
-    return response
+    return withNoStore(NextResponse.json(payload))
   } catch (error) {
     logger.error("PUBLIC_REVIEW", "Catalog error", { error: error instanceof Error ? error.message : String(error) })
     return withNoStore(

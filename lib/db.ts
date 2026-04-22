@@ -233,6 +233,125 @@ function runMigrations(database: Database.Database) {
     `)
     database.prepare("UPDATE _schema_version SET version = 6").run()
   }
+
+  if (version < 7) {
+    database.exec(`
+      CREATE TABLE gallery_feedback_votes_v7 (
+        id TEXT PRIMARY KEY,
+        gallery_item_id TEXT NOT NULL,
+        employee_id TEXT NOT NULL,
+        style TEXT NOT NULL,
+        vote TEXT NOT NULL,
+        fingerprint_hash TEXT,
+        ip_hash TEXT NOT NULL,
+        user_agent_hash TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+    `)
+
+    const groupedVotes = database.prepare(
+      `SELECT
+         gallery_item_id,
+         employee_id,
+         style,
+         SUM(CASE WHEN vote = 'like' THEN 1 ELSE 0 END) AS likes,
+         SUM(CASE WHEN vote = 'dislike' THEN 1 ELSE 0 END) AS dislikes
+       FROM gallery_feedback_votes
+       GROUP BY gallery_item_id, employee_id, style`
+    ).all() as Array<{
+      gallery_item_id: string
+      employee_id: string
+      style: string
+      likes: number
+      dislikes: number
+    }>
+
+    const selectLatestVoteRow = database.prepare(
+      `SELECT
+         id,
+         gallery_item_id,
+         employee_id,
+         style,
+         vote,
+         fingerprint_hash,
+         ip_hash,
+         user_agent_hash,
+         created_at,
+         updated_at
+       FROM gallery_feedback_votes
+       WHERE gallery_item_id = ? AND style = ? AND vote = ?
+       ORDER BY updated_at DESC, created_at DESC
+       LIMIT 1`
+    )
+    const insertSharedVote = database.prepare(
+      `INSERT INTO gallery_feedback_votes_v7 (
+         id,
+         gallery_item_id,
+         employee_id,
+         style,
+         vote,
+         fingerprint_hash,
+         ip_hash,
+         user_agent_hash,
+         created_at,
+         updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+
+    for (const row of groupedVotes) {
+      const hasLikes = row.likes > 0
+      const hasDislikes = row.dislikes > 0
+      if (hasLikes === hasDislikes) {
+        continue
+      }
+
+      const finalVote = hasLikes ? "like" : "dislike"
+      const latestVoteRow = selectLatestVoteRow.get(row.gallery_item_id, row.style, finalVote) as {
+        id: string
+        gallery_item_id: string
+        employee_id: string
+        style: string
+        vote: string
+        fingerprint_hash: string | null
+        ip_hash: string
+        user_agent_hash: string
+        created_at: number
+        updated_at: number
+      } | undefined
+
+      if (!latestVoteRow) {
+        continue
+      }
+
+      insertSharedVote.run(
+        latestVoteRow.id,
+        latestVoteRow.gallery_item_id,
+        latestVoteRow.employee_id,
+        latestVoteRow.style,
+        latestVoteRow.vote,
+        latestVoteRow.fingerprint_hash,
+        latestVoteRow.ip_hash,
+        latestVoteRow.user_agent_hash,
+        latestVoteRow.created_at,
+        latestVoteRow.updated_at
+      )
+    }
+
+    database.exec(`
+      DROP TABLE gallery_feedback_votes;
+      ALTER TABLE gallery_feedback_votes_v7 RENAME TO gallery_feedback_votes;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_feedback_unique_style
+        ON gallery_feedback_votes(gallery_item_id, style);
+      CREATE INDEX IF NOT EXISTS idx_feedback_gallery_item_id
+        ON gallery_feedback_votes(gallery_item_id);
+      CREATE INDEX IF NOT EXISTS idx_feedback_employee_id
+        ON gallery_feedback_votes(employee_id);
+      CREATE INDEX IF NOT EXISTS idx_feedback_updated_at
+        ON gallery_feedback_votes(updated_at);
+    `)
+    database.prepare("UPDATE _schema_version SET version = 7").run()
+  }
 }
 
 export function getUploadsDir(): string {

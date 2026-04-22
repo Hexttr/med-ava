@@ -82,7 +82,7 @@ export interface GalleryImageComments {
   corporate: GalleryImageComment | null
 }
 
-export interface GalleryViewerVotes {
+export interface GallerySharedVotes {
   original: FeedbackVoteValue | null
   medical: FeedbackVoteValue | null
   corporate: FeedbackVoteValue | null
@@ -92,7 +92,6 @@ export interface GalleryFeedbackSummary {
   original: GalleryStyleFeedbackSummary
   medical: GalleryStyleFeedbackSummary
   corporate: GalleryStyleFeedbackSummary
-  viewerVotes?: GalleryViewerVotes
 }
 
 export interface GalleryItem {
@@ -125,18 +124,15 @@ export interface PublicReviewEmployee {
   medicalUrl: string | null
   corporateUrl: string | null
   hasGeneratedSet: boolean
-  viewerVotes: GalleryViewerVotes
+  sharedVotes: GallerySharedVotes
 }
 
-export interface PublicReviewEmployeeResponse extends PublicReviewEmployee {
-  feedback: GalleryFeedbackSummary
-}
+export type PublicReviewEmployeeResponse = PublicReviewEmployee
 
 export interface PublicReviewVoteResponse {
   galleryItemId: string
   employeeId: string
-  feedback: GalleryFeedbackSummary
-  viewerVotes: GalleryViewerVotes
+  sharedVotes: GallerySharedVotes
 }
 
 export interface PublicReviewCommentResponse {
@@ -156,8 +152,7 @@ export interface PublicReviewCatalogEmployee {
   medicalUrl: string | null
   corporateUrl: string | null
   hasGeneratedSet: boolean
-  feedback: GalleryFeedbackSummary
-  viewerVotes: GalleryViewerVotes
+  sharedVotes: GallerySharedVotes
   comments: GalleryImageComments
 }
 

@@ -218,8 +218,7 @@ export function ReviewClient() {
         prev
           ? {
               ...prev,
-              feedback: payload.feedback,
-              viewerVotes: payload.viewerVotes,
+              sharedVotes: payload.sharedVotes,
             }
           : prev
       )
@@ -410,7 +409,7 @@ export function ReviewClient() {
                         <PhotoPanel
                           title="Медицинский портрет"
                           imageUrl={selectedEmployee.medicalUrl}
-                          currentVote={selectedEmployee.viewerVotes.medical}
+                          currentVote={selectedEmployee.sharedVotes.medical}
                           voting={votingStyle === "medical"}
                           onVote={(vote) => handleVote("medical", vote)}
                           onOpen={setLightboxUrl}
@@ -419,7 +418,7 @@ export function ReviewClient() {
                         <PhotoPanel
                           title="Корпоративный портрет"
                           imageUrl={selectedEmployee.corporateUrl}
-                          currentVote={selectedEmployee.viewerVotes.corporate}
+                          currentVote={selectedEmployee.sharedVotes.corporate}
                           voting={votingStyle === "corporate"}
                           onVote={(vote) => handleVote("corporate", vote)}
                           onOpen={setLightboxUrl}

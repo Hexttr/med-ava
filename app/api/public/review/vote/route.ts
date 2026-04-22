@@ -3,28 +3,14 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { getDb } from "@/lib/db"
 import {
-  getGalleryFeedbackMap,
-  getOrCreateReviewViewerId,
-  getViewerVotesForGalleryItem,
-  hashFeedbackValue,
+  getGallerySharedVotesForGalleryItem,
   isReviewImageStyle,
   isFeedbackVote,
-  REVIEW_VIEWER_COOKIE,
 } from "@/lib/gallery-feedback"
 import { logger } from "@/lib/logger"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { enforceTrustedOrigin, getClientIp, withNoStore } from "@/lib/request-security"
 import type { FeedbackVoteValue } from "@/lib/types"
-
-function applyViewerCookie(response: NextResponse, viewerId: string) {
-  response.cookies.set(REVIEW_VIEWER_COOKIE, viewerId, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.EAM_HTTPS === "true",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-  })
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -82,23 +68,24 @@ export async function POST(request: NextRequest) {
       return withNoStore(NextResponse.json({ error: "Корпоративный портрет недоступен" }, { status: 400 }))
     }
 
-    const { viewerId, isNew } = getOrCreateReviewViewerId(request.cookies.get(REVIEW_VIEWER_COOKIE)?.value)
-    const fingerprintHash = hashFeedbackValue(viewerId)
-    const ipHash = hashFeedbackValue(ip)
-    const userAgentHash = hashFeedbackValue(request.headers.get("user-agent") || "unknown")
+    const ipHash = crypto.createHash("sha256").update(ip).digest("hex")
+    const userAgentHash = crypto
+      .createHash("sha256")
+      .update(request.headers.get("user-agent") || "unknown")
+      .digest("hex")
     const now = Date.now()
 
     const existingVote = database.prepare(
       `SELECT vote
        FROM gallery_feedback_votes
-       WHERE gallery_item_id = ? AND style = ? AND fingerprint_hash = ?`
-    ).get(galleryItemId, style, fingerprintHash) as { vote: FeedbackVoteValue } | undefined
+       WHERE gallery_item_id = ? AND style = ?`
+    ).get(galleryItemId, style) as { vote: FeedbackVoteValue } | undefined
 
     if (existingVote?.vote === vote) {
       database.prepare(
         `DELETE FROM gallery_feedback_votes
-         WHERE gallery_item_id = ? AND style = ? AND fingerprint_hash = ?`
-      ).run(galleryItemId, style, fingerprintHash)
+         WHERE gallery_item_id = ? AND style = ?`
+      ).run(galleryItemId, style)
     } else {
       database.prepare(
         `INSERT INTO gallery_feedback_votes (
@@ -113,9 +100,11 @@ export async function POST(request: NextRequest) {
            created_at,
            updated_at
          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(gallery_item_id, style, fingerprint_hash)
+         ON CONFLICT(gallery_item_id, style)
          DO UPDATE SET
+           employee_id = excluded.employee_id,
            vote = excluded.vote,
+           fingerprint_hash = excluded.fingerprint_hash,
            ip_hash = excluded.ip_hash,
            user_agent_hash = excluded.user_agent_hash,
            updated_at = excluded.updated_at`
@@ -125,7 +114,7 @@ export async function POST(request: NextRequest) {
         employeeId,
         style,
         vote,
-        fingerprintHash,
+        null,
         ipHash,
         userAgentHash,
         now,
@@ -133,22 +122,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const feedback = getGalleryFeedbackMap(database, [galleryItemId])[galleryItemId]
-    const viewerVotes = getViewerVotesForGalleryItem(database, galleryItemId, fingerprintHash)
-    const response = withNoStore(
+    return withNoStore(
       NextResponse.json({
         galleryItemId,
         employeeId,
-        feedback,
-        viewerVotes,
+        sharedVotes: getGallerySharedVotesForGalleryItem(database, galleryItemId),
       })
     )
-
-    if (isNew) {
-      applyViewerCookie(response, viewerId)
-    }
-
-    return response
   } catch (error) {
     logger.error("PUBLIC_REVIEW", "Vote error", { error: error instanceof Error ? error.message : String(error) })
     return withNoStore(
