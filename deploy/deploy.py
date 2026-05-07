@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shlex
 import sys
 import tarfile
 import tempfile
@@ -25,14 +26,16 @@ except ImportError:
     sys.exit(1)
 
 
-DEFAULT_HOST = "81.31.245.65"
-DEFAULT_USER = "medava"
+DEFAULT_HOST = "178.170.165.78"
+DEFAULT_USER = "user_adm"
+DEFAULT_RUNTIME_USER = "medava"
 REPO_URL = "https://github.com/Hexttr/med-ava.git"
 BRANCH = "ubuntu"
 APP_DIR = "/opt/med-ava"
 PORT = 3000
 KNOWN_HOSTS = Path(__file__).with_name("known_hosts")
 WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
+BIND_HOST = "0.0.0.0"
 
 
 def safe_print(text: str) -> None:
@@ -75,8 +78,24 @@ def upload_file(ssh: paramiko.SSHClient, local_path: Path, remote_path: str) -> 
     sftp.close()
 
 
-def sudo(command: str) -> str:
-    return f"sudo -n bash -lc {command!r}"
+def privileged_shell(command: str, remote_user: str, sudo_password: str | None) -> str:
+    quoted = shlex.quote(command)
+    if remote_user == "root":
+        return f"bash -lc {quoted}"
+    if not sudo_password:
+        raise RuntimeError("sudo_password required when SSH user is not root (set DEPLOY_SUDO_PASSWORD)")
+    return f"echo {shlex.quote(sudo_password)} | sudo -S bash -lc {quoted}"
+
+
+def shell_as_user(command: str, target_user: str, remote_user: str, sudo_password: str | None) -> str:
+    quoted = shlex.quote(command)
+    if target_user == remote_user:
+        return f"bash -lc {quoted}"
+    if remote_user == "root":
+        return f"sudo -u {shlex.quote(target_user)} bash -lc {quoted}"
+    if not sudo_password:
+        raise RuntimeError("sudo_password required when SSH user is not root (set DEPLOY_SUDO_PASSWORD)")
+    return f"echo {shlex.quote(sudo_password)} | sudo -S -u {shlex.quote(target_user)} bash -lc {quoted}"
 
 
 def describe_auth_method(args: argparse.Namespace) -> str:
@@ -115,7 +134,7 @@ WorkingDirectory={app_dir}
 Environment=NODE_ENV=production
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
 EnvironmentFile={app_dir}/.env
-ExecStart=/usr/local/bin/node {app_dir}/node_modules/.bin/next start -H 127.0.0.1 -p {PORT}
+ExecStart=/usr/bin/env node {app_dir}/node_modules/.bin/next start -H {BIND_HOST} -p {PORT}
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
@@ -158,7 +177,15 @@ def main() -> None:
     parser.add_argument("--branch", default=os.environ.get("DEPLOY_BRANCH", BRANCH))
     parser.add_argument("--public-url", default=os.environ.get("DEPLOY_PUBLIC_URL", ""))
     parser.add_argument("--app-dir", default=os.environ.get("DEPLOY_APP_DIR", APP_DIR))
-    parser.add_argument("--runtime-user", default=os.environ.get("DEPLOY_RUNTIME_USER", DEFAULT_USER))
+    parser.add_argument(
+        "--runtime-user",
+        default=os.environ.get("DEPLOY_RUNTIME_USER", DEFAULT_RUNTIME_USER),
+    )
+    parser.add_argument(
+        "--sudo-password",
+        default=os.environ.get("DEPLOY_SUDO_PASSWORD", ""),
+        help="Sudo password on the server when SSH user is not root (or set DEPLOY_SUDO_PASSWORD)",
+    )
     parser.add_argument("--upload-local", action="store_true", help="Upload the current local workspace instead of pulling from Git")
     parser.add_argument("--local-source", default=os.environ.get("DEPLOY_LOCAL_SOURCE", str(WORKSPACE_ROOT)))
     parser.add_argument("--skip-build", action="store_true", help="Skip npm run build")
@@ -198,78 +225,112 @@ def main() -> None:
             "or ensure ssh-agent/default ~/.ssh keys are available."
         ) from error
 
+    sudo_pw = args.sudo_password.strip() if args.sudo_password else None
+    if args.user != "root" and not sudo_pw:
+        raise SystemExit(
+            "When SSH user is not root, provide sudo password via --sudo-password or DEPLOY_SUDO_PASSWORD."
+        )
+
     try:
         safe_print("--- 1. Подготовка репозитория ---")
         if args.upload_local:
             archive_path = create_release_archive(Path(args.local_source))
             remote_archive = "/tmp/med-ava-release.tar.gz"
             upload_file(ssh, archive_path, remote_archive)
-            run_ssh(ssh, f"mkdir -p {args.app_dir}")
+            run_ssh(ssh, privileged_shell(f"mkdir -p {args.app_dir}", args.user, sudo_pw))
             run_ssh(
                 ssh,
-                f"find {args.app_dir} -mindepth 1 -maxdepth 1 ! -name data ! -name .env -exec rm -rf {{}} +"
+                privileged_shell(
+                    f"find {args.app_dir} -mindepth 1 -maxdepth 1 ! -name data ! -name .env -exec rm -rf {{}} +",
+                    args.user,
+                    sudo_pw,
+                ),
             )
-            run_ssh(ssh, f"tar -xzf {remote_archive} -C {args.app_dir}")
+            run_ssh(ssh, privileged_shell(f"tar -xzf {remote_archive} -C {args.app_dir}", args.user, sudo_pw))
+            run_ssh(
+                ssh,
+                privileged_shell(
+                    f"chown -R {args.runtime_user}:{args.runtime_user} {args.app_dir}",
+                    args.user,
+                    sudo_pw,
+                ),
+            )
         else:
+            pull_cmd = (
+                f"cd {args.app_dir} && git fetch origin && git checkout {args.branch} "
+                f"&& git pull --ff-only origin {args.branch}"
+            )
             prepare_repo_command = (
                 f"mkdir -p {args.app_dir} && "
                 f"if test -d {args.app_dir}/.git; then "
-                f"cd {args.app_dir} && git fetch origin && git checkout {args.branch} && git pull --ff-only origin {args.branch}; "
+                f"sudo -u {shlex.quote(args.runtime_user)} bash -lc {shlex.quote(pull_cmd)}; "
                 f"else "
                 "tmp_dir=$(mktemp -d /tmp/med-ava-clone-XXXXXX) && "
                 f"git clone -b {args.branch} {REPO_URL} \"$tmp_dir\" && "
                 f"find {args.app_dir} -mindepth 1 -maxdepth 1 ! -name data ! -name .env -exec rm -rf {{}} + && "
-                f"cp -a \"$tmp_dir\"/. {args.app_dir}/ && "
+                f"cp -a \"$tmp_dir\"/. {args.app_dir}/ && chown -R {args.runtime_user}:{args.runtime_user} {args.app_dir} && "
                 "rm -rf \"$tmp_dir\"; "
                 "fi"
             )
             run_ssh(
                 ssh,
-                prepare_repo_command
+                privileged_shell(prepare_repo_command, args.user, sudo_pw),
             )
 
         safe_print("\n--- 2. Настройка окружения и прав ---")
-        run_ssh(ssh, f"cd {args.app_dir} && test -f .env || cp .env.example .env")
+        run_ssh(ssh, privileged_shell(f"cd {args.app_dir} && test -f .env || cp .env.example .env", args.user, sudo_pw))
         if args.public_url:
             run_ssh(
                 ssh,
-                f"cd {args.app_dir} && "
-                f"grep -q '^EAM_PUBLIC_URL=' .env && sed -i 's|^EAM_PUBLIC_URL=.*|EAM_PUBLIC_URL={args.public_url}|' .env || echo 'EAM_PUBLIC_URL={args.public_url}' >> .env"
+                privileged_shell(
+                    f"cd {args.app_dir} && "
+                    f"grep -q '^EAM_PUBLIC_URL=' .env && sed -i 's|^EAM_PUBLIC_URL=.*|EAM_PUBLIC_URL={args.public_url}|' .env || echo 'EAM_PUBLIC_URL={args.public_url}' >> .env",
+                    args.user,
+                    sudo_pw,
+                ),
             )
         run_ssh(
             ssh,
-            f"cd {args.app_dir} && "
-            f"grep -q '^EAM_HTTPS=' .env && sed -i 's|^EAM_HTTPS=.*|EAM_HTTPS=true|' .env || echo 'EAM_HTTPS=true' >> .env"
+            privileged_shell(
+                f"cd {args.app_dir} && "
+                f"grep -q '^EAM_HTTPS=' .env && sed -i 's|^EAM_HTTPS=.*|EAM_HTTPS=true|' .env || echo 'EAM_HTTPS=true' >> .env",
+                args.user,
+                sudo_pw,
+            ),
         )
         run_ssh(
             ssh,
-            f"cd {args.app_dir} && "
-            "grep -q '^EAM_SESSION_SECRET=' .env || echo \"EAM_SESSION_SECRET=$(openssl rand -hex 32)\" >> .env"
+            privileged_shell(
+                f"cd {args.app_dir} && "
+                "grep -q '^EAM_SESSION_SECRET=' .env || echo \"EAM_SESSION_SECRET=$(openssl rand -hex 32)\" >> .env",
+                args.user,
+                sudo_pw,
+            ),
         )
-        run_ssh(ssh, sudo(f"mkdir -p {args.app_dir}/data/uploads/employees {args.app_dir}/data/uploads/gallery {args.app_dir}/data/uploads/backgrounds"))
-        run_ssh(ssh, sudo(f"chown -R {args.runtime_user}:{args.runtime_user} {args.app_dir}"))
-        run_ssh(ssh, sudo(f"chmod 750 {args.app_dir} {args.app_dir}/data {args.app_dir}/data/uploads {args.app_dir}/data/uploads/employees {args.app_dir}/data/uploads/gallery {args.app_dir}/data/uploads/backgrounds"))
-        run_ssh(ssh, sudo(f"chmod 600 {args.app_dir}/.env"))
-        run_ssh(ssh, sudo(f"test -f {args.app_dir}/data/gemini-key && chmod 600 {args.app_dir}/data/gemini-key || true"))
-        run_ssh(ssh, sudo(f"test -f {args.app_dir}/data/eam.db && chmod 640 {args.app_dir}/data/eam.db || true"))
-        run_ssh(ssh, sudo(f"test -f {args.app_dir}/data/eam-logs.jsonl && chmod 640 {args.app_dir}/data/eam-logs.jsonl || true"))
+        run_ssh(ssh, privileged_shell(f"mkdir -p {args.app_dir}/data/uploads/employees {args.app_dir}/data/uploads/gallery {args.app_dir}/data/uploads/backgrounds", args.user, sudo_pw))
+        run_ssh(ssh, privileged_shell(f"chown -R {args.runtime_user}:{args.runtime_user} {args.app_dir}", args.user, sudo_pw))
+        run_ssh(ssh, privileged_shell(f"chmod 750 {args.app_dir} {args.app_dir}/data {args.app_dir}/data/uploads {args.app_dir}/data/uploads/employees {args.app_dir}/data/uploads/gallery {args.app_dir}/data/uploads/backgrounds", args.user, sudo_pw))
+        run_ssh(ssh, privileged_shell(f"chmod 600 {args.app_dir}/.env", args.user, sudo_pw))
+        run_ssh(ssh, privileged_shell(f"test -f {args.app_dir}/data/gemini-key && chmod 600 {args.app_dir}/data/gemini-key || true", args.user, sudo_pw))
+        run_ssh(ssh, privileged_shell(f"test -f {args.app_dir}/data/eam.db && chmod 640 {args.app_dir}/data/eam.db || true", args.user, sudo_pw))
+        run_ssh(ssh, privileged_shell(f"test -f {args.app_dir}/data/eam-logs.jsonl && chmod 640 {args.app_dir}/data/eam-logs.jsonl || true", args.user, sudo_pw))
 
         safe_print("\n--- 3. Установка зависимостей и smoke checks ---")
-        run_ssh(ssh, dependency_install_command(args.app_dir))
-        run_ssh(ssh, f"cd {args.app_dir} && npm run typecheck")
-        run_ssh(ssh, f"cd {args.app_dir} && npm run lint")
+        run_ssh(ssh, shell_as_user(dependency_install_command(args.app_dir), args.runtime_user, args.user, sudo_pw))
+        run_ssh(ssh, shell_as_user(f"cd {args.app_dir} && npm run typecheck", args.runtime_user, args.user, sudo_pw))
+        run_ssh(ssh, shell_as_user(f"cd {args.app_dir} && npm run lint", args.runtime_user, args.user, sudo_pw))
         if not args.skip_build:
-            run_ssh(ssh, clean_build_command(args.app_dir))
+            run_ssh(ssh, shell_as_user(clean_build_command(args.app_dir), args.runtime_user, args.user, sudo_pw))
 
         safe_print("\n--- 4. Обновление systemd ---")
         service_content = systemd_service(args.app_dir, args.runtime_user)
         write_remote_file(ssh, "/tmp/med-ava.service", service_content)
-        run_ssh(ssh, sudo("install -m 644 /tmp/med-ava.service /etc/systemd/system/med-ava.service"))
-        run_ssh(ssh, sudo("systemctl daemon-reload && systemctl enable med-ava && systemctl restart med-ava"))
+        run_ssh(ssh, privileged_shell("install -m 644 /tmp/med-ava.service /etc/systemd/system/med-ava.service", args.user, sudo_pw))
+        run_ssh(ssh, privileged_shell("systemctl daemon-reload && systemctl enable med-ava && systemctl restart med-ava", args.user, sudo_pw))
 
         safe_print("\n--- 5. Проверка readiness ---")
         time.sleep(3)
-        run_ssh(ssh, sudo("systemctl status med-ava --no-pager -l"))
+        run_ssh(ssh, privileged_shell("systemctl status med-ava --no-pager -l", args.user, sudo_pw))
         _, out, _ = run_ssh(ssh, "curl -fsS http://127.0.0.1:3000/api/ready", check=False)
         safe_print(out.strip() or "Readiness endpoint returned no body")
 

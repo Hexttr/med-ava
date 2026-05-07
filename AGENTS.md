@@ -102,19 +102,25 @@ med-ava/
 ## Развёртывание
 
 - **Ветка**: `ubuntu`
-- **Сервер**: 81.31.245.65, root
-- **Скрипт**: `deploy/deploy.py` (paramiko)
-- **Порядок**: `git push` → `python deploy/deploy.py`
-- **Пароль**: `DEPLOY_PASSWORD` env или `--password`
+- **Текущий production**: `178.170.165.78`, пользователь SSH `user_adm`, приложение от имени `medava`, каталог `/opt/med-ava`
+- **Публичный URL**: `https://ava.nmiczd.ru` (nginx + Let’s Encrypt)
+- **Скрипты** (`deploy/`, paramiko, файл `deploy/known_hosts` обязателен):
+  1. Один раз на чистом Ubuntu: `python deploy/bootstrap_server.py` (ставит Node 24, git, nginx, certbot, пользователя `medava`).
+  2. Релиз кода: `python deploy/deploy.py` — по умолчанию целевой хост задан в скрипте; переопределение: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PASSWORD`, **`DEPLOY_SUDO_PASSWORD`** (обязательно, если SSH не root).
+  3. TLS и домен (после того как DNS A указывает на сервер): `python deploy/switch_domain.py --domain ava.nmiczd.ru`
+  4. Перенос данных с другого сервера: `python deploy/migrate_data.py` (архивирует `/opt/med-ava/data` и `.env` на источнике и распаковывает на целевом).
 
-```bash
-$env:DEPLOY_PASSWORD = 'ваш_пароль'
-python deploy/deploy.py
+```powershell
+$env:DEPLOY_PASSWORD = '***'
+$env:DEPLOY_SUDO_PASSWORD = '***'
+python deploy/deploy.py --public-url https://ava.nmiczd.ru
 ```
 
 - **Путь на сервере**: `/opt/med-ava`
-- **Node**: `/usr/local/bin/node` (v24), не /usr/bin/node (v22) — из-за better-sqlite3
-- **systemd**: `med-ava.service`, EAM_PUBLIC_URL и EnvironmentFile в unit
+- **Node**: из NodeSource 24.x (`/usr/bin/node`), systemd слушает `0.0.0.0:3000`
+- **systemd**: `med-ava.service`, переменные из `{app_dir}/.env`
+
+Старый сервер при необходимости: `DEPLOY_HOST=72.56.91.213` `DEPLOY_USER=root` (sudo-пароль не нужен).
 
 ---
 

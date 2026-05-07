@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
 """
-Переключает med-ava на домен и выпускает Let's Encrypt сертификат.
+Настраивает nginx + Let's Encrypt для med-ava и обновляет EAM_PUBLIC_URL в .env.
+
+Ожидается HTTP-блок на :80 (certbot добавит HTTPS).
+
+Использование:
+  python deploy/switch_domain.py --domain ava.nmiczd.ru --password ... --sudo-password ...
 """
 
 from __future__ import annotations
 
 import argparse
 import os
+import shlex
 import sys
+import time
+from pathlib import Path
 from textwrap import dedent
 
 try:
@@ -16,11 +24,11 @@ except ImportError:
     print("Установите paramiko: pip install paramiko")
     sys.exit(1)
 
-
-DEFAULT_HOST = "81.31.245.65"
-DEFAULT_USER = "root"
+DEFAULT_HOST = "178.170.165.78"
+DEFAULT_USER = "user_adm"
 APP_DIR = "/opt/med-ava"
 NGINX_SITE = "/etc/nginx/sites-available/med-ava"
+KNOWN_HOSTS = Path(__file__).with_name("known_hosts")
 
 
 def safe_print(text: str) -> None:
@@ -48,31 +56,34 @@ def write_remote_file(ssh: paramiko.SSHClient, remote_path: str, content: str) -
     sftp.close()
 
 
-def nginx_config(domain: str) -> str:
+def load_client(known_hosts_path: Path) -> paramiko.SSHClient:
+    client = paramiko.SSHClient()
+    client.load_host_keys(str(known_hosts_path))
+    client.set_missing_host_key_policy(paramiko.RejectPolicy())
+    return client
+
+
+def privileged(command: str, remote_user: str, sudo_password: str | None) -> str:
+    qc = shlex.quote(command)
+    if remote_user == "root":
+        return f"bash -lc {qc}"
+    if not sudo_password:
+        raise RuntimeError("sudo_password required for non-root")
+    return f"echo {shlex.quote(sudo_password)} | sudo -S bash -lc {qc}"
+
+
+def nginx_http_only(domain: str) -> str:
+    """HTTP proxy до выпуска сертификата (certbot добавит ssl server)."""
     return dedent(f"""\
     server {{
         listen 80;
         server_name {domain};
-        return 301 https://$host$request_uri;
-    }}
 
-    server {{
-        listen 443 ssl http2;
-        server_name {domain};
-
-        ssl_certificate /etc/ssl/med-ava/med-ava.crt;
-        ssl_certificate_key /etc/ssl/med-ava/med-ava.key;
-        ssl_session_timeout 1d;
-        ssl_session_cache shared:medava_ssl:10m;
-        ssl_session_tickets off;
-        ssl_protocols TLSv1.2 TLSv1.3;
+        client_max_body_size 100m;
 
         add_header X-Frame-Options DENY always;
         add_header X-Content-Type-Options nosniff always;
         add_header Referrer-Policy strict-origin-when-cross-origin always;
-        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
-
-        client_max_body_size 50m;
 
         location / {{
             proxy_pass http://127.0.0.1:3000;
@@ -80,7 +91,7 @@ def nginx_config(domain: str) -> str:
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection "upgrade";
             proxy_read_timeout 300;
@@ -90,8 +101,8 @@ def nginx_config(domain: str) -> str:
     """)
 
 
-def update_public_url(ssh: paramiko.SSHClient, public_url: str) -> None:
-    command = (
+def update_public_url(ssh: paramiko.SSHClient, public_url: str, remote_user: str, sudo_password: str | None) -> None:
+    py = (
         "python3 - <<'PY'\n"
         "from pathlib import Path\n"
         f"p = Path('{APP_DIR}/.env')\n"
@@ -110,25 +121,16 @@ def update_public_url(ssh: paramiko.SSHClient, public_url: str) -> None:
         "p.write_text('\\n'.join(out) + '\\n', encoding='utf-8')\n"
         "PY"
     )
-    run_ssh(ssh, command)
+    run_ssh(ssh, privileged(py, remote_user, sudo_password))
 
 
-def remove_systemd_env_override(ssh: paramiko.SSHClient, env_name: str) -> None:
-    command = (
-        "python3 - <<'PY'\n"
-        "from pathlib import Path\n"
-        "service = Path('/etc/systemd/system/med-ava.service')\n"
-        "if not service.exists():\n"
-        "    raise SystemExit(0)\n"
-        f"prefix = 'Environment={env_name}='\n"
-        "lines = [line for line in service.read_text(encoding='utf-8').splitlines() if not line.startswith(prefix)]\n"
-        "service.write_text('\\n'.join(lines) + '\\n', encoding='utf-8')\n"
-        "PY"
-    )
-    run_ssh(ssh, command)
-
-
-def issue_certificate(ssh: paramiko.SSHClient, domain: str, email: str | None) -> None:
+def issue_certificate(
+    ssh: paramiko.SSHClient,
+    domain: str,
+    email: str | None,
+    remote_user: str,
+    sudo_password: str | None,
+) -> None:
     if email:
         certbot_command = (
             f"certbot --nginx -d {domain} --non-interactive "
@@ -139,44 +141,89 @@ def issue_certificate(ssh: paramiko.SSHClient, domain: str, email: str | None) -
             f"certbot --nginx -d {domain} --non-interactive "
             "--agree-tos --register-unsafely-without-email --redirect"
         )
-    run_ssh(ssh, certbot_command)
+    run_ssh(ssh, privileged(certbot_command, remote_user, sudo_password))
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Switch med-ava to domain and issue TLS")
+    parser = argparse.ArgumentParser(description="Configure nginx + TLS for med-ava")
     parser.add_argument("--host", default=os.environ.get("DEPLOY_HOST", DEFAULT_HOST))
     parser.add_argument("--user", default=os.environ.get("DEPLOY_USER", DEFAULT_USER))
     parser.add_argument("--password", default=os.environ.get("DEPLOY_PASSWORD", ""))
+    parser.add_argument(
+        "--sudo-password",
+        default=os.environ.get("DEPLOY_SUDO_PASSWORD", os.environ.get("DEPLOY_PASSWORD", "")),
+    )
     parser.add_argument("--domain", required=True)
     parser.add_argument("--email", default=os.environ.get("LETSENCRYPT_EMAIL", ""))
     args = parser.parse_args()
 
     if not args.password:
         raise SystemExit("Specify --password or DEPLOY_PASSWORD")
+    sudo_pw = args.sudo_password.strip() if args.sudo_password else None
+    if args.user != "root" and not sudo_pw:
+        raise SystemExit("Non-root requires --sudo-password or DEPLOY_SUDO_PASSWORD")
+
+    if not KNOWN_HOSTS.exists():
+        raise SystemExit(f"known_hosts file not found: {KNOWN_HOSTS}")
 
     public_url = f"https://{args.domain}"
 
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(args.host, username=args.user, password=args.password, timeout=30)
+    ssh = load_client(KNOWN_HOSTS)
+    ssh.connect(
+        args.host,
+        username=args.user,
+        password=args.password,
+        timeout=30,
+        look_for_keys=False,
+        allow_agent=False,
+    )
 
     try:
-        safe_print("--- Install certbot ---")
-        run_ssh(ssh, "apt-get update && apt-get install -y certbot python3-certbot-nginx")
+        safe_print("--- Запись nginx (HTTP, certbot добавит TLS) ---")
+        write_remote_file(ssh, "/tmp/med-ava.nginx", nginx_http_only(args.domain))
+        run_ssh(
+            ssh,
+            privileged(
+                f"install -m 644 /tmp/med-ava.nginx {NGINX_SITE} && "
+                f"ln -sf {NGINX_SITE} /etc/nginx/sites-enabled/med-ava && "
+                "rm -f /etc/nginx/sites-enabled/default",
+                args.user,
+                sudo_pw,
+            ),
+        )
 
-        safe_print("--- Update nginx and app URL ---")
-        write_remote_file(ssh, NGINX_SITE, nginx_config(args.domain))
-        update_public_url(ssh, public_url)
-        remove_systemd_env_override(ssh, "EAM_PUBLIC_URL")
-        run_ssh(ssh, "nginx -t && systemctl reload nginx")
+        safe_print("--- .env: EAM_PUBLIC_URL + HTTPS ---")
+        update_public_url(ssh, public_url, args.user, sudo_pw)
+        run_ssh(
+            ssh,
+            privileged(
+                f"cd {APP_DIR} && grep -q '^EAM_HTTPS=' .env && sed -i 's|^EAM_HTTPS=.*|EAM_HTTPS=true|' .env || echo 'EAM_HTTPS=true' >> .env",
+                args.user,
+                sudo_pw,
+            ),
+        )
 
-        safe_print("--- Issue certificate ---")
-        issue_certificate(ssh, args.domain, args.email or None)
+        safe_print("--- nginx -t && reload ---")
+        run_ssh(ssh, privileged("nginx -t && systemctl reload nginx", args.user, sudo_pw))
 
-        safe_print("--- Restart app and verify ---")
-        run_ssh(ssh, "systemctl daemon-reload && systemctl restart med-ava && systemctl reload nginx")
-        _, out, _ = run_ssh(ssh, f"curl -fsS {public_url}/api/ready")
-        safe_print(out)
+        safe_print("--- certbot ---")
+        issue_certificate(ssh, args.domain, args.email or None, args.user, sudo_pw)
+
+        safe_print("--- Перезапуск приложения ---")
+        run_ssh(ssh, privileged("systemctl restart med-ava && systemctl reload nginx", args.user, sudo_pw))
+
+        safe_print("--- Проверка ---")
+        last_err = ""
+        for attempt in range(1, 6):
+            time.sleep(3)
+            code, out, err = run_ssh(ssh, f"curl -fsS {public_url}/api/ready", check=False)
+            if code == 0:
+                safe_print(out)
+                safe_print("\n=== Готово ===")
+                return
+            last_err = out + err
+            safe_print(f"Попытка {attempt}/5: сервис ещё поднимается…")
+        raise RuntimeError(f"Readiness по HTTPS не прошёл после нескольких попыток:\n{last_err}")
     finally:
         ssh.close()
 
